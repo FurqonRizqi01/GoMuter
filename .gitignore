@@ -1,0 +1,49 @@
+# Global OS / tooling
+.DS_Store
+Thumbs.db
+*.log
+*.tmp
+*.swp
+.idea/
+.vscode/
+
+# Python backend
+venv/
+**/__pycache__/
+**/*.py[cod]
+*.sqlite3
+.env
+*.env
+
+# Django secrets (fallbacks)
+secret.key
+*.pem
+*.crt
+
+# Flutter / Dart tool output
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+**/build/
+
+# Android sensitive config
+**/local.properties
+**/key.properties
+**/*.keystore
+**/*.jks
+**/google-services.json
+
+# iOS / macOS generated files
+**/Pods/
+**/.symlinks/
+**/GeneratedPluginRegistrant.*
+
+# Web artifacts
+**/node_modules/
+
+# Misc archives
+*.tgz
+*.tar.gz
+*.zip
