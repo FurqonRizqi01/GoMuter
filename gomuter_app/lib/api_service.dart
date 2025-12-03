@@ -189,6 +189,62 @@ class ApiService {
     throw Exception('Gagal mengambil detail PKL: ${response.body}');
   }
 
+  static Future<Map<String, dynamic>> getPKLRatingSummary({
+    required int pklId,
+    String? accessToken,
+  }) async {
+    final url = Uri.parse('$baseUrl/api/pkl/$pklId/rating/');
+    final response = await http.get(
+      url,
+      headers: _jsonHeaders(token: accessToken),
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    }
+    throw Exception('Gagal mengambil rating PKL: ${response.body}');
+  }
+
+  static Future<Map<String, dynamic>> submitPKLRating({
+    required String token,
+    required int pklId,
+    required double score,
+    String? comment,
+  }) async {
+    final url = Uri.parse('$baseUrl/api/pkl/$pklId/rating/');
+    final payload = {
+      'score': double.parse(score.toStringAsFixed(1)),
+      if (comment != null && comment.trim().isNotEmpty) 'comment': comment.trim(),
+    };
+
+    final response = await http.post(
+      url,
+      headers: _jsonHeaders(token: token),
+      body: jsonEncode(payload),
+    );
+
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    }
+    throw Exception('Gagal menyimpan rating: ${response.body}');
+  }
+
+  static Future<void> deletePKLRating({
+    required String token,
+    required int pklId,
+  }) async {
+    final url = Uri.parse('$baseUrl/api/pkl/$pklId/rating/');
+    final response = await http.delete(
+      url,
+      headers: _jsonHeaders(token: token),
+    );
+
+    if (response.statusCode == 204) {
+      return;
+    }
+    throw Exception('Gagal menghapus rating: ${response.body}');
+  }
+
   // === Endpoint admin ===
 
   static Future<List<dynamic>> getPendingPKL({required String token}) async {

@@ -1,12 +1,11 @@
-import 'dart:typed_data';
-
 import 'package:cross_file/cross_file.dart';
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:gomuter_app/api_service.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:gomuter_app/utils/token_manager.dart';
+import 'package:gomuter_app/widgets/pkl_bottom_nav.dart';
 
 class PklPaymentSettingsPage extends StatefulWidget {
   const PklPaymentSettingsPage({super.key});
@@ -48,8 +47,7 @@ class _PklPaymentSettingsPageState extends State<PklPaymentSettingsPage> {
   }
 
   Future<String?> _getToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('access_token');
+    return TokenManager.getValidAccessToken();
   }
 
   Future<void> _loadProfile() async {
@@ -344,10 +342,410 @@ class _PklPaymentSettingsPageState extends State<PklPaymentSettingsPage> {
     return '$cleaned${_allowedExtensions.first}';
   }
 
+  Widget _buildHeroBanner() {
+    final subtitle = _isNewProfile
+        ? 'Ajukan profil usaha agar pembayaran bisa digunakan.'
+        : 'Simpan link dan QRIS untuk mempermudah transaksi.';
+    return Container(
+      padding: const EdgeInsets.all(28),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF0B7332), Color(0xFF10A14D), Color(0xFF25D366)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(32),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0D8A3A).withValues(alpha: 0.3),
+            blurRadius: 28,
+            offset: const Offset(0, 14),
+            spreadRadius: 0,
+          ),
+          BoxShadow(
+            color: const Color(0xFF0D8A3A).withValues(alpha: 0.1),
+            blurRadius: 48,
+            offset: const Offset(0, 24),
+            spreadRadius: 0,
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.3),
+                    width: 1.5,
+                  ),
+                ),
+                child: const Icon(
+                  Icons.qr_code_2_rounded,
+                  color: Colors.white,
+                  size: 28,
+                ),
+              ),
+              const SizedBox(width: 16),
+              const Expanded(
+                child: Text(
+                  'Pembayaran PKL',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 24,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.5,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Text(
+            subtitle,
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.85),
+              fontSize: 15,
+              fontWeight: FontWeight.w500,
+              height: 1.4,
+            ),
+          ),
+          const SizedBox(height: 20),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.2),
+                width: 1,
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.verified_rounded,
+                  color: Colors.white.withValues(alpha: 0.9),
+                  size: 22,
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Text(
+                    'Pastikan QRIS terbaru agar pembeli bisa langsung bayar.',
+                    style: TextStyle(
+                      color: Colors.white,
+                      height: 1.4,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildErrorBanner() {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 18),
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFEBEE),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: const Color(0xFFFFCDD2), width: 1),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFCDD2),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(
+              Icons.error_outline_rounded,
+              color: Color(0xFFD32F2F),
+              size: 22,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Terjadi Kesalahan',
+                  style: TextStyle(
+                    color: Color(0xFFD32F2F),
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  _error ?? 'Terjadi kesalahan.',
+                  style: TextStyle(
+                    color: const Color(0xFFD32F2F).withValues(alpha: 0.8),
+                    fontSize: 13,
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCardShell({required Widget child}) {
+    return Container(
+      padding: const EdgeInsets.all(26),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(32),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.06),
+            blurRadius: 24,
+            offset: const Offset(0, 12),
+            spreadRadius: 0,
+          ),
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 48,
+            offset: const Offset(0, 20),
+          ),
+        ],
+      ),
+      child: child,
+    );
+  }
+
+  Widget _buildSectionHeading(String title, String subtitle) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: const Color(0xFFE8F5E9),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Icon(
+            title.contains('Link') ? Icons.link_rounded : Icons.image_rounded,
+            color: const Color(0xFF0D8A3A),
+            size: 22,
+          ),
+        ),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.3,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                subtitle,
+                style: TextStyle(
+                  color: Colors.black.withValues(alpha: 0.6),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  height: 1.3,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLinkCard() {
+    return _buildCardShell(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildSectionHeading(
+            'Link Pembayaran',
+            'Simpan tautan pembayaran QRIS atau dompet digital kamu.',
+          ),
+          const SizedBox(height: 20),
+          TextField(
+            controller: _qrisLinkController,
+            decoration: InputDecoration(
+              prefixIcon: Container(
+                margin: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE8F5E9),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.link_rounded,
+                  color: Color(0xFF0D8A3A),
+                  size: 20,
+                ),
+              ),
+              filled: true,
+              fillColor: const Color(0xFFF8F9FA),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(20),
+                borderSide: BorderSide(
+                  color: Colors.black.withValues(alpha: 0.08),
+                  width: 1.5,
+                ),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(20),
+                borderSide: BorderSide(
+                  color: Colors.black.withValues(alpha: 0.08),
+                  width: 1.5,
+                ),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(20),
+                borderSide: const BorderSide(
+                  color: Color(0xFF0D8A3A),
+                  width: 2,
+                ),
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 20,
+                vertical: 18,
+              ),
+              hintText: 'https://contoh.qris.id/pay',
+              hintStyle: TextStyle(
+                color: Colors.black.withValues(alpha: 0.4),
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          const SizedBox(height: 18),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: _isSavingLink ? null : _saveQrisLink,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF0D8A3A),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                elevation: 0,
+                shadowColor: Colors.transparent,
+              ),
+              icon: _isSavingLink
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.5,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Icon(Icons.save_rounded, size: 20),
+              label: Text(
+                _isSavingLink ? 'Menyimpan...' : 'Simpan Link',
+                style: const TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 15,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQrisCard() {
+    return _buildCardShell(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildSectionHeading(
+            'Gambar QRIS',
+            'Unggah atau tempel URL QRIS terbaru untuk pembeli.',
+          ),
+          const SizedBox(height: 16),
+          _buildDropArea(),
+          const SizedBox(height: 12),
+          Wrap(
+            alignment: WrapAlignment.center,
+            runAlignment: WrapAlignment.center,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 12,
+            runSpacing: 8,
+            children: [
+              TextButton.icon(
+                onPressed: _isUploading ? null : _promptManualUrl,
+                icon: const Icon(Icons.link),
+                label: const Text('Masukkan URL manual'),
+              ),
+              if (_qrisImageController.text.isNotEmpty)
+                TextButton.icon(
+                  onPressed: _isUploading ? null : _clearImage,
+                  style: TextButton.styleFrom(foregroundColor: Colors.red),
+                  icon: const Icon(Icons.delete_outline),
+                  label: const Text('Hapus gambar'),
+                ),
+            ],
+          ),
+          if (_previewBytes != null)
+            _buildPreview(Image.memory(_previewBytes!, fit: BoxFit.cover))
+          else if (_qrisImageController.text.isNotEmpty)
+            _buildPreview(
+              Image.network(
+                _qrisImageController.text,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Container(
+                  color: const Color(0xFFF5F7FB),
+                  alignment: Alignment.center,
+                  child: const Text('QRIS tidak dapat dimuat'),
+                ),
+              ),
+            ),
+          if (_qrisImageController.text.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              _qrisImageController.text,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              style: const TextStyle(fontSize: 12, color: Colors.black54),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFF4F6FB),
       appBar: AppBar(
+        automaticallyImplyLeading: false,
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        surfaceTintColor: Colors.transparent,
+        foregroundColor: Colors.black87,
         title: const Text('Pembayaran & QRIS'),
         actions: [
           IconButton(
@@ -358,117 +756,26 @@ class _PklPaymentSettingsPageState extends State<PklPaymentSettingsPage> {
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (_error != null)
-                    Container(
-                      margin: const EdgeInsets.only(bottom: 16),
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFFEBEE),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        _error!,
-                        style: const TextStyle(color: Colors.red),
-                      ),
-                    ),
-                  const Text(
-                    'Link Pembayaran',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
-                  ),
-                  const SizedBox(height: 6),
-                  TextField(
-                    controller: _qrisLinkController,
-                    decoration: InputDecoration(
-                      filled: true,
-                      fillColor: const Color(0xFFF5F7FB),
-                      prefixIcon: const Icon(Icons.link),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(18),
-                        borderSide: BorderSide.none,
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 14,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: _isSavingLink ? null : _saveQrisLink,
-                      icon: _isSavingLink
-                          ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.save_outlined),
-                      label: Text(
-                        _isSavingLink ? 'Menyimpan...' : 'Simpan Link',
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  const Text(
-                    'Gambar QRIS',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
-                  ),
-                  const SizedBox(height: 8),
-                  _buildDropArea(),
-                  const SizedBox(height: 10),
-                  Wrap(
-                    spacing: 12,
-                    runSpacing: 8,
-                    children: [
-                      TextButton.icon(
-                        onPressed: _isUploading ? null : _promptManualUrl,
-                        icon: const Icon(Icons.link),
-                        label: const Text('Masukkan URL manual'),
-                      ),
-                      if (_qrisImageController.text.isNotEmpty)
-                        TextButton.icon(
-                          onPressed: _isUploading ? null : _clearImage,
-                          icon: const Icon(Icons.delete_outline),
-                          label: const Text('Hapus gambar'),
-                        ),
-                    ],
-                  ),
-                  if (_previewBytes != null)
-                    _buildPreview(
-                      Image.memory(_previewBytes!, fit: BoxFit.cover),
-                    )
-                  else if (_qrisImageController.text.isNotEmpty)
-                    _buildPreview(
-                      Image.network(
-                        _qrisImageController.text,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Container(
-                          color: const Color(0xFFF5F7FB),
-                          alignment: Alignment.center,
-                          child: const Text('QRIS tidak dapat dimuat'),
-                        ),
-                      ),
-                    ),
-                  if (_qrisImageController.text.isNotEmpty) ...[
-                    const SizedBox(height: 6),
-                    SelectableText(
-                      _qrisImageController.text,
-                      maxLines: 2,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Colors.black54,
-                      ),
-                    ),
+          : SafeArea(
+              bottom: false,
+              child: RefreshIndicator(
+                onRefresh: _loadProfile,
+                child: ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 72),
+                  children: [
+                    const SizedBox(height: 12),
+                    _buildHeroBanner(),
+                    const SizedBox(height: 18),
+                    if (_error != null) _buildErrorBanner(),
+                    _buildLinkCard(),
+                    const SizedBox(height: 18),
+                    _buildQrisCard(),
                   ],
-                ],
+                ),
               ),
             ),
+      bottomNavigationBar: const PklBottomNavBar(current: PklNavItem.payment),
     );
   }
 
@@ -537,7 +844,12 @@ class _PklPaymentSettingsPageState extends State<PklPaymentSettingsPage> {
       );
     }
 
-    return content;
+    return Align(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 360),
+        child: content,
+      ),
+    );
   }
 
   Widget _buildPreview(Widget child) {

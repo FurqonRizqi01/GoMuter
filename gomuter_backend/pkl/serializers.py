@@ -1,3 +1,4 @@
+from django.db import models
 from rest_framework import serializers
 from .models import (
     PKL,
@@ -9,6 +10,7 @@ from .models import (
     FavoritePKL,
     Notification,
     PKLDailyStats,
+    PKLRating,
     ALLOWED_RADIUS_METERS,
 )
 
@@ -43,6 +45,8 @@ class PKLListSerializer(serializers.ModelSerializer):
     latest_latitude = serializers.SerializerMethodField()
     latest_longitude = serializers.SerializerMethodField()
     latest_timestamp = serializers.SerializerMethodField()
+    average_rating = serializers.SerializerMethodField()
+    rating_count = serializers.SerializerMethodField()
 
     class Meta:
         model = PKL
@@ -61,6 +65,8 @@ class PKLListSerializer(serializers.ModelSerializer):
             'latest_latitude',
             'latest_longitude',
             'latest_timestamp',
+            'average_rating',
+            'rating_count',
         ]
 
     def get_latest_latitude(self, obj):
@@ -74,6 +80,26 @@ class PKLListSerializer(serializers.ModelSerializer):
     def get_latest_timestamp(self, obj):
         lokasi = obj.lokasi.order_by('-timestamp').first()
         return lokasi.timestamp if lokasi else None
+
+    def _resolve_annotation(self, obj, attr):
+        if hasattr(obj, attr):
+            return getattr(obj, attr)
+        return None
+
+    def get_average_rating(self, obj):
+        value = self._resolve_annotation(obj, 'average_rating')
+        if value is not None:
+            return round(float(value), 1)
+        agg = obj.ratings.aggregate(avg=models.Avg('score'))
+        if agg['avg'] is None:
+            return None
+        return round(float(agg['avg']), 1)
+
+    def get_rating_count(self, obj):
+        value = self._resolve_annotation(obj, 'rating_count')
+        if value is not None:
+            return int(value)
+        return obj.ratings.count()
 
 
 class PKLVerifySerializer(serializers.ModelSerializer):
@@ -202,3 +228,27 @@ class PKLDailyStatsSerializer(serializers.ModelSerializer):
         model = PKLDailyStats
         fields = ['date', 'live_views', 'search_hits', 'auto_updates']
         read_only_fields = fields
+
+
+class PKLRatingSerializer(serializers.ModelSerializer):
+    buyer_username = serializers.CharField(source='buyer.username', read_only=True)
+
+    class Meta:
+        model = PKLRating
+        fields = [
+            'id',
+            'pkl',
+            'buyer',
+            'buyer_username',
+            'score',
+            'comment',
+            'created_at',
+            'updated_at',
+        ]
+        read_only_fields = ['id', 'buyer', 'pkl', 'buyer_username', 'created_at', 'updated_at']
+
+
+class PKLRatingSummarySerializer(serializers.Serializer):
+    average_rating = serializers.FloatField(allow_null=True)
+    rating_count = serializers.IntegerField()
+    user_rating = PKLRatingSerializer(allow_null=True)

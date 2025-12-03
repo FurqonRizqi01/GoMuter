@@ -1,9 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'api_service.dart';
+import 'navigation/pkl_routes.dart';
 import 'pages/admin/admin_home_page.dart';
 import 'pages/pembeli/pembeli_home_page.dart';
+import 'pages/pkl/pkl_chat_list_page.dart';
+import 'pages/pkl/pkl_edit_info_page.dart';
 import 'pages/pkl/pkl_home_page.dart';
+import 'pages/pkl/pkl_payment_settings_page.dart';
+import 'pages/pkl/pkl_preorder_page.dart';
+import 'utils/token_manager.dart';
 import 'web/file_picker_web_registrar.dart';
 
 void main() {
@@ -20,10 +26,116 @@ class GoMuterApp extends StatelessWidget {
     return MaterialApp(
       title: 'GoMuter',
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.teal),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF0D8A3A),
+          primary: const Color(0xFF0D8A3A),
+          secondary: const Color(0xFF25D366),
+        ),
         useMaterial3: true,
+        fontFamily: 'Roboto',
+        textTheme: const TextTheme(
+          displayLarge: TextStyle(fontWeight: FontWeight.w800),
+          displayMedium: TextStyle(fontWeight: FontWeight.w800),
+          displaySmall: TextStyle(fontWeight: FontWeight.w700),
+          headlineLarge: TextStyle(fontWeight: FontWeight.w700),
+          headlineMedium: TextStyle(fontWeight: FontWeight.w700),
+          headlineSmall: TextStyle(fontWeight: FontWeight.w700),
+          titleLarge: TextStyle(fontWeight: FontWeight.w700),
+          titleMedium: TextStyle(fontWeight: FontWeight.w600),
+          titleSmall: TextStyle(fontWeight: FontWeight.w600),
+          bodyLarge: TextStyle(fontWeight: FontWeight.w500),
+          bodyMedium: TextStyle(fontWeight: FontWeight.w500),
+          bodySmall: TextStyle(fontWeight: FontWeight.w500),
+        ),
+        elevatedButtonTheme: ElevatedButtonThemeData(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF0D8A3A),
+            foregroundColor: Colors.white,
+            elevation: 0,
+            shadowColor: Colors.transparent,
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(18),
+            ),
+            textStyle: const TextStyle(
+              fontWeight: FontWeight.w700,
+              fontSize: 15,
+            ),
+          ),
+        ),
+        outlinedButtonTheme: OutlinedButtonThemeData(
+          style: OutlinedButton.styleFrom(
+            foregroundColor: const Color(0xFF0D8A3A),
+            side: const BorderSide(color: Color(0xFF0D8A3A), width: 1.8),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(18),
+            ),
+            textStyle: const TextStyle(
+              fontWeight: FontWeight.w700,
+              fontSize: 15,
+            ),
+          ),
+        ),
+        textButtonTheme: TextButtonThemeData(
+          style: TextButton.styleFrom(
+            foregroundColor: const Color(0xFF0D8A3A),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
+            textStyle: const TextStyle(
+              fontWeight: FontWeight.w700,
+              fontSize: 14,
+            ),
+          ),
+        ),
+        inputDecorationTheme: InputDecorationTheme(
+          filled: true,
+          fillColor: const Color(0xFFF8F9FA),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(20),
+            borderSide: const BorderSide(color: Color(0xFFE0E0E0), width: 1.5),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(20),
+            borderSide: const BorderSide(color: Color(0xFFE0E0E0), width: 1.5),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(20),
+            borderSide: const BorderSide(color: Color(0xFF0D8A3A), width: 2),
+          ),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 20,
+            vertical: 16,
+          ),
+        ),
+        cardTheme: const CardThemeData(
+          elevation: 0,
+          clipBehavior: Clip.antiAlias,
+        ),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          scrolledUnderElevation: 0,
+          surfaceTintColor: Colors.transparent,
+          foregroundColor: Colors.black87,
+          centerTitle: false,
+          titleTextStyle: TextStyle(
+            color: Colors.black87,
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
       ),
       home: const LoginPage(),
+      routes: {
+        PklRoutes.home: (_) => const PklHomePage(),
+        PklRoutes.profile: (_) => const PklEditInfoPage(),
+        PklRoutes.payment: (_) => const PklPaymentSettingsPage(),
+        PklRoutes.preorder: (_) => const PklPreOrderPage(),
+        PklRoutes.chat: (_) => const PklChatListPage(),
+      },
     );
   }
 }
@@ -68,10 +180,9 @@ class _LoginPageState extends State<LoginPage> {
           (currentUser['username'] as String?)?.trim() ??
           _usernameController.text.trim();
 
-      // Simpan token & role ke SharedPreferences
+      await TokenManager.saveTokens(access: accessToken, refresh: refreshToken);
+
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('access_token', accessToken);
-      await prefs.setString('refresh_token', refreshToken);
       await prefs.setString('user_role', role);
       await prefs.setString('username', username);
 
@@ -146,13 +257,15 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   void _navigateToRoleHome(String role, String accessToken) {
+    if (role == 'PKL') {
+      Navigator.pushReplacementNamed(context, PklRoutes.home);
+      return;
+    }
+
     Widget destination;
     switch (role) {
       case 'ADMIN':
         destination = AdminHomePage(accessToken: accessToken);
-        break;
-      case 'PKL':
-        destination = const PklHomePage();
         break;
       default:
         destination = const PembeliHomePage();

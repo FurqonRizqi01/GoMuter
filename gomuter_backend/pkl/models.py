@@ -1,5 +1,6 @@
 from django.db import models
 from django.conf import settings
+from django.core.validators import MinValueValidator, MaxValueValidator
 
 from django.utils import timezone
 
@@ -234,3 +235,31 @@ class PKLDailyStats(models.Model):
         today = timezone.localdate()
         stats, _ = cls.objects.get_or_create(pkl=pkl, date=today)
         return stats
+
+
+class PKLRating(models.Model):
+    buyer = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='pkl_ratings',
+    )
+    pkl = models.ForeignKey(
+        PKL,
+        on_delete=models.CASCADE,
+        related_name='ratings',
+    )
+    score = models.DecimalField(
+        max_digits=2,
+        decimal_places=1,
+        validators=[MinValueValidator(0), MaxValueValidator(5)],
+    )
+    comment = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ('buyer', 'pkl')
+        ordering = ['-updated_at']
+
+    def __str__(self):
+        return f'{self.buyer.username} rated {self.pkl.nama_usaha}: {self.score}'

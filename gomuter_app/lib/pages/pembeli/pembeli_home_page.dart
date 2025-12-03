@@ -4,9 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:gomuter_app/api_service.dart';
 import 'package:gomuter_app/pages/pembeli/chat_page.dart';
+import 'package:gomuter_app/pages/pembeli/pkl_detail_page.dart';
+// ignore: unused_import
 import 'package:gomuter_app/pages/pembeli/preorder_page.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:gomuter_app/utils/token_manager.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class PembeliHomePage extends StatefulWidget {
@@ -17,6 +20,13 @@ class PembeliHomePage extends StatefulWidget {
 }
 
 class _PembeliHomePageState extends State<PembeliHomePage> {
+  // Theme Colors
+  static const Color _primaryGreen = Color(0xFF1B7B5A);
+  static const Color _secondaryGreen = Color(0xFF2D9D78);
+  static const Color _lightGreen = Color(0xFFE8F5F0);
+  // ignore: unused_field
+  static const Color _accentPeach = Color(0xFFFAD4C0);
+
   bool _isLoading = true;
   bool _isSyncingLocation = false;
   bool _isLoadingNotifications = false;
@@ -26,13 +36,19 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
   Set<int> _favoriteIds = {};
   List<dynamic> _notifications = [];
   final TextEditingController _searchController = TextEditingController();
+  // ignore: unused_field
   LatLng _initialCenter = const LatLng(-6.2, 106.8);
+  // ignore: unused_field
   List<Marker> _markers = [];
   final List<int> _radiusOptions = [300, 500, 1000, 1500];
   int _selectedRadius = 300;
   Timer? _locationTimer;
   static const Duration _locationInterval = Duration(minutes: 5);
   SharedPreferences? _prefs;
+  Position? _buyerPosition;
+  String _selectedCategory = 'Semua';
+  final List<String> _categories = ['Semua', 'Makanan', 'Minuman', 'Snack'];
+  String? _currentLocation;
 
   int get _unreadNotificationsCount {
     var count = 0;
@@ -63,6 +79,10 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
   }
 
   Future<String?> _getAccessToken() async {
+    final token = await TokenManager.getValidAccessToken();
+    if (token != null && token.isNotEmpty) {
+      return token;
+    }
     final prefs = await _getPrefs();
     return prefs.getString('access_token');
   }
@@ -73,6 +93,25 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
     await Future.wait([_loadFavorites(), _loadNotifications(silent: true)]);
     await _syncLocation();
     _startLocationTimer();
+    _updateCurrentLocation();
+  }
+
+  Future<void> _updateCurrentLocation() async {
+    try {
+      // ignore: unused_local_variable
+      final position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.medium,
+      );
+      // For demo, we'll just show coordinates
+      // In production, you'd use a geocoding service
+      setState(() {
+        _currentLocation = 'Jakarta Selatan';
+      });
+    } catch (_) {
+      setState(() {
+        _currentLocation = 'Lokasi tidak tersedia';
+      });
+    }
   }
 
   Future<void> _loadSavedRadius() async {
@@ -208,6 +247,12 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
       final token = await _getAccessToken();
       if (token == null) return;
 
+      if (mounted) {
+        setState(() {
+          _buyerPosition = position;
+        });
+      }
+
       await ApiService.updateBuyerLocation(
         token: token,
         latitude: position.latitude,
@@ -289,6 +334,7 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
     }
   }
 
+  // ignore: unused_element
   Future<void> _onRadiusChanged(int radius) async {
     if (_selectedRadius == radius) return;
     setState(() {
@@ -387,6 +433,7 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
     }
   }
 
+  // ignore: unused_element
   Widget _buildBadgeIcon({
     required IconData icon,
     required int count,
@@ -422,78 +469,169 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      backgroundColor: Colors.transparent,
       builder: (ctx) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'PKL Favorit (${_favorites.length})',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
+        return Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[300],
+                        borderRadius: BorderRadius.circular(2),
                       ),
                     ),
-                    IconButton(
-                      onPressed: () {
-                        Navigator.of(ctx).pop();
-                        _loadFavorites();
-                      },
-                      icon: const Icon(Icons.refresh),
-                      tooltip: 'Muat ulang',
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                if (_favorites.isEmpty)
-                  const Text(
-                    'Belum ada PKL favorit. Gunakan ikon hati pada daftar untuk menambahkannya.',
-                  )
-                else
-                  SizedBox(
-                    height: MediaQuery.of(ctx).size.height * 0.5,
-                    child: ListView.separated(
-                      itemCount: _favorites.length,
-                      separatorBuilder: (_, __) => const Divider(height: 1),
-                      itemBuilder: (_, index) {
-                        final fav = _favorites[index] as Map<String, dynamic>;
-                        final pklId = (fav['pkl'] as num?)?.toInt();
-                        final nama = (fav['pkl_nama_usaha'] ?? '-') as String;
-                        final jenis = (fav['jenis_dagangan'] ?? '-') as String;
-
-                        return ListTile(
-                          dense: true,
-                          title: Text(nama),
-                          subtitle: Text(jenis),
-                          onTap: () {
-                            final jenisText = fav['jenis_dagangan'];
-                            if (jenisText is String) {
-                              Navigator.of(ctx).pop();
-                              _searchController.text = jenisText;
-                              _loadPkls(jenis: jenisText);
-                            }
-                          },
-                          trailing: IconButton(
-                            icon: const Icon(Icons.delete_outline),
-                            tooltip: 'Hapus favorit',
-                            onPressed: pklId == null
-                                ? null
-                                : () {
-                                    Navigator.of(ctx).pop();
-                                    _toggleFavorite(pklId);
-                                  },
-                          ),
-                        );
-                      },
-                    ),
                   ),
-              ],
+                  const SizedBox(height: 20),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: Colors.pink[50],
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Icon(
+                              Icons.favorite_rounded,
+                              color: Colors.pinkAccent,
+                              size: 20,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Text(
+                            'PKL Favorit (${_favorites.length})',
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                      IconButton(
+                        onPressed: () {
+                          Navigator.of(ctx).pop();
+                          _loadFavorites();
+                        },
+                        icon: Icon(Icons.refresh_rounded, color: _primaryGreen),
+                        tooltip: 'Muat ulang',
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  if (_favorites.isEmpty)
+                    Container(
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[50],
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Column(
+                        children: [
+                          Icon(
+                            Icons.favorite_border_rounded,
+                            size: 48,
+                            color: Colors.grey[400],
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            'Belum ada PKL favorit',
+                            style: TextStyle(
+                              color: Colors.grey[600],
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  else
+                    SizedBox(
+                      height: MediaQuery.of(ctx).size.height * 0.4,
+                      child: ListView.separated(
+                        itemCount: _favorites.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 12),
+                        itemBuilder: (_, index) {
+                          final fav = _favorites[index] as Map<String, dynamic>;
+                          final pklId = (fav['pkl'] as num?)?.toInt();
+                          final nama = (fav['pkl_nama_usaha'] ?? '-') as String;
+                          final jenis =
+                              (fav['jenis_dagangan'] ?? '-') as String;
+
+                          return Container(
+                            decoration: BoxDecoration(
+                              color: Colors.grey[50],
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: ListTile(
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 8,
+                              ),
+                              leading: Container(
+                                width: 48,
+                                height: 48,
+                                decoration: BoxDecoration(
+                                  color: _lightGreen,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Icon(
+                                  _getCategoryIcon(jenis),
+                                  color: _primaryGreen,
+                                ),
+                              ),
+                              title: Text(
+                                nama,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              subtitle: Text(
+                                jenis,
+                                style: TextStyle(
+                                  color: Colors.grey[600],
+                                  fontSize: 12,
+                                ),
+                              ),
+                              trailing: IconButton(
+                                icon: const Icon(
+                                  Icons.delete_outline_rounded,
+                                  color: Colors.redAccent,
+                                ),
+                                onPressed: pklId == null
+                                    ? null
+                                    : () {
+                                        Navigator.of(ctx).pop();
+                                        _toggleFavorite(pklId);
+                                      },
+                              ),
+                              onTap: () {
+                                final jenisText = fav['jenis_dagangan'];
+                                if (jenisText is String) {
+                                  Navigator.of(ctx).pop();
+                                  _searchController.text = jenisText;
+                                  _loadPkls(jenis: jenisText);
+                                }
+                              },
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                ],
+              ),
             ),
           ),
         );
@@ -505,6 +643,7 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      backgroundColor: Colors.transparent,
       builder: (ctx) {
         var hasRequestedInitial = false;
         return StatefulBuilder(
@@ -526,113 +665,220 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
               sheetSetState(() {});
             }
 
-            final sheetHeight = MediaQuery.of(ctx).size.height * 0.65;
-
             if (!hasRequestedInitial) {
               hasRequestedInitial = true;
               Future.microtask(refresh);
             }
 
-            return SafeArea(
-              child: SizedBox(
-                height: sheetHeight,
-                child: Column(
-                  children: [
-                    ListTile(
-                      title: Text('Notifikasi (${_notifications.length})'),
-                      trailing: IconButton(
-                        icon: const Icon(Icons.refresh),
-                        tooltip: 'Muat ulang',
-                        onPressed: _isLoadingNotifications ? null : refresh,
-                      ),
+            return Container(
+              height: MediaQuery.of(ctx).size.height * 0.7,
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      children: [
+                        Container(
+                          width: 40,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: Colors.grey[300],
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: BoxDecoration(
+                                    color: Colors.orange[50],
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Icon(
+                                    Icons.notifications_rounded,
+                                    color: Colors.orange[700],
+                                    size: 20,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Text(
+                                  'Notifikasi (${_notifications.length})',
+                                  style: const TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            IconButton(
+                              icon: Icon(
+                                Icons.refresh_rounded,
+                                color: _primaryGreen,
+                              ),
+                              onPressed: _isLoadingNotifications
+                                  ? null
+                                  : refresh,
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
-                    if (_isLoadingNotifications)
-                      const LinearProgressIndicator(minHeight: 2),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 8,
-                      ),
-                      child: Align(
-                        alignment: Alignment.centerRight,
-                        child: TextButton(
-                          onPressed: _unreadNotificationsCount == 0
-                              ? null
-                              : markAll,
-                          child: const Text('Tandai semua dibaca'),
+                  ),
+                  if (_isLoadingNotifications)
+                    LinearProgressIndicator(
+                      backgroundColor: Colors.grey[200],
+                      valueColor: AlwaysStoppedAnimation<Color>(_primaryGreen),
+                    ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton(
+                        onPressed: _unreadNotificationsCount == 0
+                            ? null
+                            : markAll,
+                        child: Text(
+                          'Tandai semua dibaca',
+                          style: TextStyle(color: _primaryGreen),
                         ),
                       ),
                     ),
-                    Expanded(
-                      child: _notifications.isEmpty
-                          ? const Center(
-                              child: Text('Belum ada notifikasi radius.'),
-                            )
-                          : ListView.separated(
-                              itemCount: _notifications.length,
-                              separatorBuilder: (_, __) =>
-                                  const Divider(height: 1),
-                              itemBuilder: (_, index) {
-                                final notif =
-                                    _notifications[index]
-                                        as Map<String, dynamic>;
-                                final notifId = (notif['id'] as num?)?.toInt();
-                                final message =
-                                    (notif['message'] ?? '-') as String;
-                                final pklName =
-                                    (notif['pkl_nama_usaha'] ?? '') as String;
-                                final radius = notif['radius_m'];
-                                final distance = notif['distance_m'];
-                                final timeLabel = _formatTimestamp(
-                                  notif['created_at'],
-                                );
-                                final details = <String>[];
-                                if (pklName.isNotEmpty) details.add(pklName);
-                                if (radius is num) {
-                                  details.add('Radius ${radius.toInt()} m');
-                                }
-                                if (distance is num) {
-                                  final dist = distance.toDouble();
-                                  details.add(
-                                    'Jarak ${dist.toStringAsFixed(0)} m',
-                                  );
-                                }
-                                if (timeLabel.isNotEmpty)
-                                  details.add(timeLabel);
-                                final detailText = details.join(' • ');
-                                final isRead = notif['is_read'] == true;
-
-                                return ListTile(
-                                  leading: Icon(
-                                    isRead
-                                        ? Icons.notifications_none
-                                        : Icons.notifications_active,
-                                    color: isRead
-                                        ? Colors.grey
-                                        : Colors.orangeAccent,
+                  ),
+                  Expanded(
+                    child: _notifications.isEmpty
+                        ? Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.notifications_off_outlined,
+                                  size: 56,
+                                  color: Colors.grey[400],
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  'Belum ada notifikasi',
+                                  style: TextStyle(
+                                    color: Colors.grey[600],
+                                    fontSize: 14,
                                   ),
-                                  tileColor: isRead
+                                ),
+                              ],
+                            ),
+                          )
+                        : ListView.separated(
+                            padding: const EdgeInsets.all(20),
+                            itemCount: _notifications.length,
+                            separatorBuilder: (_, __) =>
+                                const SizedBox(height: 12),
+                            itemBuilder: (_, index) {
+                              final notif =
+                                  _notifications[index] as Map<String, dynamic>;
+                              final notifId = (notif['id'] as num?)?.toInt();
+                              final message =
+                                  (notif['message'] ?? '-') as String;
+                              final pklName =
+                                  (notif['pkl_nama_usaha'] ?? '') as String;
+                              final timeLabel = _formatTimestamp(
+                                notif['created_at'],
+                              );
+                              final isRead = notif['is_read'] == true;
+
+                              return Container(
+                                decoration: BoxDecoration(
+                                  color: isRead ? Colors.grey[50] : _lightGreen,
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: isRead
                                       ? null
-                                      : Colors.orange.withOpacity(0.08),
-                                  title: Text(message),
-                                  subtitle: detailText.isEmpty
-                                      ? null
-                                      : Text(detailText),
+                                      : Border.all(
+                                          color: _primaryGreen.withValues(
+                                            alpha: 0.3,
+                                          ),
+                                        ),
+                                ),
+                                child: ListTile(
+                                  contentPadding: const EdgeInsets.all(16),
+                                  leading: Container(
+                                    padding: const EdgeInsets.all(10),
+                                    decoration: BoxDecoration(
+                                      color: isRead
+                                          ? Colors.grey[200]
+                                          : _primaryGreen.withValues(
+                                              alpha: 0.1,
+                                            ),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Icon(
+                                      isRead
+                                          ? Icons.notifications_none_rounded
+                                          : Icons.notifications_active_rounded,
+                                      color: isRead
+                                          ? Colors.grey
+                                          : _primaryGreen,
+                                    ),
+                                  ),
+                                  title: Text(
+                                    message,
+                                    style: TextStyle(
+                                      fontWeight: isRead
+                                          ? FontWeight.normal
+                                          : FontWeight.w600,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                  subtitle: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      if (pklName.isNotEmpty) ...[
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          pklName,
+                                          style: TextStyle(
+                                            color: _primaryGreen,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ],
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        timeLabel,
+                                        style: TextStyle(
+                                          color: Colors.grey[500],
+                                          fontSize: 11,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                   trailing: isRead
                                       ? null
                                       : TextButton(
                                           onPressed: () => markRead(notifId),
-                                          child: const Text('Sudah dibaca'),
+                                          child: Text(
+                                            'Baca',
+                                            style: TextStyle(
+                                              color: _primaryGreen,
+                                              fontSize: 12,
+                                            ),
+                                          ),
                                         ),
                                   onTap: isRead
                                       ? null
                                       : () => markRead(notifId),
-                                );
-                              },
-                            ),
-                    ),
-                  ],
-                ),
+                                ),
+                              );
+                            },
+                          ),
+                  ),
+                ],
               ),
             );
           },
@@ -656,248 +902,490 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
     return '';
   }
 
+  String _distanceLabelForPKL(Map<String, dynamic> pkl) {
+    final buyer = _buyerPosition;
+    if (buyer == null) return '-';
+    final latRaw = pkl['latest_latitude'];
+    final lngRaw = pkl['latest_longitude'];
+    if (latRaw == null || lngRaw == null) return '-';
+    final lat = (latRaw as num).toDouble();
+    final lng = (lngRaw as num).toDouble();
+    final meters = Geolocator.distanceBetween(
+      buyer.latitude,
+      buyer.longitude,
+      lat,
+      lng,
+    );
+    if (meters >= 1000) {
+      return '${(meters / 1000).toStringAsFixed(1)} km';
+    }
+    return '${meters.toStringAsFixed(0)} m';
+  }
+
+  IconData _getCategoryIcon(String jenis) {
+    final lowerJenis = jenis.toLowerCase();
+    if (lowerJenis.contains('makan') ||
+        lowerJenis.contains('nasi') ||
+        lowerJenis.contains('mie')) {
+      return Icons.restaurant;
+    } else if (lowerJenis.contains('minum') ||
+        lowerJenis.contains('es') ||
+        lowerJenis.contains('jus')) {
+      return Icons.local_drink;
+    } else if (lowerJenis.contains('snack') ||
+        lowerJenis.contains('gorengan')) {
+      return Icons.bakery_dining;
+    } else if (lowerJenis.contains('buah')) {
+      return Icons.apple;
+    } else if (lowerJenis.contains('sayur')) {
+      return Icons.eco;
+    }
+    return Icons.storefront;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('GoMuter - Pembeli'),
-        actions: [
-          IconButton(
-            tooltip: 'Notifikasi',
-            icon: _buildBadgeIcon(
-              icon: Icons.notifications,
-              count: _unreadNotificationsCount,
-            ),
-            onPressed: () {
-              _showNotificationsSheet();
-            },
-          ),
-          IconButton(
-            tooltip: 'Favorit',
-            icon: _buildBadgeIcon(
-              icon: Icons.favorite,
-              count: _favoriteIds.length,
-              color: Colors.pinkAccent,
-            ),
-            onPressed: _showFavoritesSheet,
-          ),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _isLoading
-                ? null
-                : () {
-                    final jenis = _searchController.text.trim();
-                    _loadPkls(jenis: jenis.isEmpty ? null : jenis);
-                  },
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(12.0),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _searchController,
-                    decoration: const InputDecoration(
-                      labelText: 'Cari berdasarkan jenis dagangan',
-                      border: OutlineInputBorder(),
-                    ),
-                    onSubmitted: (value) {
-                      final jenis = value.trim();
-                      _loadPkls(jenis: jenis.isEmpty ? null : jenis);
-                    },
-                  ),
-                ),
-                const SizedBox(width: 8),
-                ElevatedButton(
-                  onPressed: _isLoading
-                      ? null
-                      : () {
-                          final jenis = _searchController.text.trim();
-                          _loadPkls(jenis: jenis.isEmpty ? null : jenis);
-                        },
-                  child: const Text('Cari'),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 4),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12.0),
-            child: Row(
-              children: [
-                Expanded(
-                  child: DropdownButtonFormField<int>(
-                    value: _selectedRadius,
-                    decoration: const InputDecoration(
-                      labelText: 'Radius notifikasi (meter)',
-                      border: OutlineInputBorder(),
-                      contentPadding: EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 10,
-                      ),
-                    ),
-                    items: _radiusOptions
-                        .map(
-                          (radius) => DropdownMenuItem<int>(
-                            value: radius,
-                            child: Text('$radius m'),
+      backgroundColor: const Color(0xFFF5F7FA),
+      body: SafeArea(
+        child: Column(
+          children: [
+            _buildHeader(),
+            _buildSearchBar(),
+            _buildCategoryChips(),
+            Expanded(
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _error != null
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.error_outline,
+                            size: 48,
+                            color: Colors.red[300],
                           ),
-                        )
-                        .toList(),
-                    onChanged: (value) {
-                      if (value != null) {
-                        _onRadiusChanged(value);
-                      }
-                    },
-                  ),
-                ),
-                const SizedBox(width: 12),
-                ElevatedButton.icon(
-                  onPressed: _isSyncingLocation ? null : _syncLocation,
-                  icon: _isSyncingLocation
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.my_location),
-                  label: const Text('Sinkron lokasi'),
-                ),
-              ],
-            ),
-          ),
-          Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _error != null
-                ? Center(
-                    child: Text(
-                      _error!,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(color: Colors.red),
-                    ),
-                  )
-                : _pkls.isEmpty
-                ? const Center(
-                    child: Text('Tidak ada PKL dengan kriteria tersebut.'),
-                  )
-                : Column(
-                    children: [
-                      SizedBox(
-                        height: 250,
-                        child: FlutterMap(
-                          options: MapOptions(
-                            initialCenter: _initialCenter,
-                            initialZoom: 14,
-                          ),
-                          children: [
-                            TileLayer(
-                              urlTemplate:
-                                  'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-                              subdomains: const ['a', 'b', 'c'],
-                              userAgentPackageName: 'com.example.gomuter_app',
+                          const SizedBox(height: 16),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 32),
+                            child: Text(
+                              _error!,
+                              textAlign: TextAlign.center,
+                              style: TextStyle(color: Colors.grey[600]),
                             ),
-                            MarkerLayer(markers: _markers),
-                          ],
-                        ),
+                          ),
+                          const SizedBox(height: 16),
+                          ElevatedButton(
+                            onPressed: () => _loadPkls(),
+                            child: const Text('Coba Lagi'),
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 8),
-                      Expanded(
-                        child: ListView.builder(
-                          itemCount: _pkls.length,
-                          itemBuilder: (context, index) {
-                            final pkl = _pkls[index] as Map<String, dynamic>;
-                            final namaUsaha =
-                                (pkl['nama_usaha'] ?? '-') as String;
-                            final jenisDagangan =
-                                (pkl['jenis_dagangan'] ?? '-') as String;
-                            final jam =
-                                (pkl['jam_operasional'] ?? '-') as String;
-                            final alamat =
-                                (pkl['alamat_domisili'] ?? '-') as String;
-                            final pklId = (pkl['id'] as num?)?.toInt();
-                            final isFavorite =
-                                pklId != null && _favoriteIds.contains(pklId);
+                    )
+                  : RefreshIndicator(
+                      onRefresh: () async {
+                        await _loadPkls();
+                        await _loadFavorites();
+                      },
+                      child: _buildPKLList(),
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
-                            return Card(
-                              margin: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 4,
-                              ),
-                              child: ListTile(
-                                title: Text(namaUsaha),
-                                subtitle: Text(
-                                  '$jenisDagangan\nJam: $jam\nAlamat: $alamat',
-                                ),
-                                isThreeLine: true,
-                                trailing: Wrap(
-                                  spacing: 4,
-                                  children: [
-                                    IconButton(
-                                      icon: Icon(
-                                        isFavorite
-                                            ? Icons.favorite
-                                            : Icons.favorite_border,
-                                        color: Colors.pinkAccent,
-                                      ),
-                                      tooltip: isFavorite
-                                          ? 'Hapus favorit'
-                                          : 'Jadikan favorit',
-                                      onPressed: pklId == null
-                                          ? null
-                                          : () => _toggleFavorite(pklId),
-                                    ),
-                                    IconButton(
-                                      icon: const Icon(Icons.receipt_long),
-                                      tooltip: 'Pre-order',
-                                      onPressed: () {
-                                        final pklIdentifier = pkl['id'];
-                                        if (pklIdentifier == null) return;
-                                        Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (_) => PreOrderPage(
-                                              pklId: (pklIdentifier as num)
-                                                  .toInt(),
-                                              pklName: namaUsaha,
-                                            ),
-                                          ),
-                                        );
-                                      },
-                                    ),
-                                    IconButton(
-                                      icon: const Icon(Icons.chat),
-                                      tooltip: 'Chat',
-                                      onPressed: () {
-                                        final pklIdentifier = pkl['id'];
-                                        if (pklIdentifier == null) return;
-                                        Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (_) => ChatPage(
-                                              pklId: (pklIdentifier as num)
-                                                  .toInt(),
-                                              pklNama: namaUsaha,
-                                            ),
-                                          ),
-                                        );
-                                      },
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            );
-                          },
+  Widget _buildHeader() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [_primaryGreen, _secondaryGreen],
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Selamat Datang!',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.location_on,
+                        color: Colors.white.withValues(alpha: 0.9),
+                        size: 16,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        _currentLocation ?? 'Memuat lokasi...',
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.9),
+                          fontSize: 14,
                         ),
                       ),
                     ],
                   ),
+                ],
+              ),
+              Row(
+                children: [
+                  _buildHeaderIconButton(
+                    icon: Icons.favorite_rounded,
+                    badgeCount: _favorites.length,
+                    onTap: _showFavoritesSheet,
+                  ),
+                  const SizedBox(width: 8),
+                  _buildHeaderIconButton(
+                    icon: Icons.notifications_rounded,
+                    badgeCount: _unreadNotificationsCount,
+                    onTap: _showNotificationsSheet,
+                  ),
+                ],
+              ),
+            ],
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildHeaderIconButton({
+    required IconData icon,
+    required int badgeCount,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.2),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Icon(icon, color: Colors.white, size: 22),
+            if (badgeCount > 0)
+              Positioned(
+                right: -6,
+                top: -6,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 4,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.red,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  constraints: const BoxConstraints(
+                    minWidth: 16,
+                    minHeight: 16,
+                  ),
+                  child: Text(
+                    badgeCount > 9 ? '9+' : '$badgeCount',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSearchBar() {
+    return Container(
+      margin: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 15,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: TextField(
+        controller: _searchController,
+        onSubmitted: (value) => _loadPkls(jenis: value.isEmpty ? null : value),
+        decoration: InputDecoration(
+          hintText: 'Cari PKL atau jenis dagangan...',
+          hintStyle: TextStyle(color: Colors.grey[400]),
+          prefixIcon: Icon(Icons.search, color: _primaryGreen),
+          suffixIcon: _searchController.text.isNotEmpty
+              ? IconButton(
+                  icon: const Icon(Icons.clear),
+                  onPressed: () {
+                    _searchController.clear();
+                    _loadPkls();
+                  },
+                )
+              : null,
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 20,
+            vertical: 16,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCategoryChips() {
+    return SizedBox(
+      height: 50,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        itemCount: _categories.length,
+        itemBuilder: (context, index) {
+          final category = _categories[index];
+          final isSelected = _selectedCategory == category;
+          return Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: ChoiceChip(
+              label: Text(category),
+              selected: isSelected,
+              onSelected: (selected) {
+                setState(() {
+                  _selectedCategory = category;
+                });
+                if (category == 'Semua') {
+                  _loadPkls();
+                } else {
+                  _loadPkls(jenis: category);
+                }
+              },
+              selectedColor: _primaryGreen,
+              backgroundColor: Colors.white,
+              labelStyle: TextStyle(
+                color: isSelected ? Colors.white : Colors.grey[700],
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildPKLList() {
+    if (_pkls.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.store_mall_directory_outlined,
+              size: 64,
+              color: Colors.grey[400],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Tidak ada PKL aktif',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey[600],
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Coba ubah radius pencarian atau lokasi Anda',
+              style: TextStyle(color: Colors.grey[500], fontSize: 14),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: _pkls.length,
+      itemBuilder: (context, index) {
+        final pkl = _pkls[index] as Map<String, dynamic>;
+        return _buildPKLCard(pkl);
+      },
+    );
+  }
+
+  Widget _buildPKLCard(Map<String, dynamic> pkl) {
+    final pklId = (pkl['id'] as num?)?.toInt();
+    final nama = (pkl['nama_usaha'] ?? '-') as String;
+    final jenis = (pkl['jenis_dagangan'] ?? '-') as String;
+    final deskripsi = (pkl['deskripsi'] ?? '') as String;
+    final isFavorite = pklId != null && _favoriteIds.contains(pklId);
+    final distance = _distanceLabelForPKL(pkl);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 15,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(20),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(20),
+          onTap: pklId == null
+              ? null
+              : () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => PklDetailPage(pklId: pklId),
+                    ),
+                  );
+                },
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Container(
+                  width: 70,
+                  height: 70,
+                  decoration: BoxDecoration(
+                    color: _lightGreen,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Icon(
+                    _getCategoryIcon(jenis),
+                    size: 32,
+                    color: _primaryGreen,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        nama,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: _primaryGreen.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          jenis,
+                          style: TextStyle(
+                            color: _primaryGreen,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                      if (deskripsi.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          deskripsi,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: Colors.grey[600],
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.location_on,
+                            size: 14,
+                            color: Colors.grey[500],
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            distance,
+                            style: TextStyle(
+                              color: Colors.grey[600],
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                Column(
+                  children: [
+                    IconButton(
+                      icon: Icon(
+                        isFavorite ? Icons.favorite : Icons.favorite_border,
+                        color: isFavorite ? Colors.pink : Colors.grey[400],
+                      ),
+                      onPressed: pklId == null
+                          ? null
+                          : () => _toggleFavorite(pklId),
+                    ),
+                    IconButton(
+                      icon: Icon(
+                        Icons.chat_bubble_outline,
+                        color: _primaryGreen,
+                      ),
+                      onPressed: pklId == null
+                          ? null
+                          : () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      ChatPage(pklId: pklId, pklNama: nama),
+                                ),
+                              );
+                            },
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

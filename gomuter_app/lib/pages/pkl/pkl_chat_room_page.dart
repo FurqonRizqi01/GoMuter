@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:gomuter_app/api_service.dart';
+import 'package:gomuter_app/utils/token_manager.dart';
+import 'package:gomuter_app/widgets/pkl_bottom_nav.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class PklChatRoomPage extends StatefulWidget {
@@ -22,7 +24,6 @@ class _PklChatRoomPageState extends State<PklChatRoomPage> {
   bool _isLoading = true;
   bool _isSending = false;
   String? _error;
-  String? _token;
   String? _currentUsername;
   List<dynamic> _messages = [];
   final TextEditingController _msgController = TextEditingController();
@@ -44,7 +45,7 @@ class _PklChatRoomPageState extends State<PklChatRoomPage> {
   Future<void> _setupChat() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('access_token');
+      final token = await TokenManager.getValidAccessToken();
       final username = prefs.getString('username');
 
       if (token == null) {
@@ -56,7 +57,6 @@ class _PklChatRoomPageState extends State<PklChatRoomPage> {
       }
 
       setState(() {
-        _token = token;
         _currentUsername = username;
       });
 
@@ -82,11 +82,12 @@ class _PklChatRoomPageState extends State<PklChatRoomPage> {
   }
 
   Future<void> _loadMessages({bool silent = false}) async {
-    if (_token == null) return;
+    final token = await TokenManager.getValidAccessToken();
+    if (token == null) return;
 
     try {
       final msgs = await ApiService.getChatMessages(
-        token: _token!,
+        token: token,
         chatId: widget.chatId,
       );
       if (mounted) {
@@ -105,7 +106,10 @@ class _PklChatRoomPageState extends State<PklChatRoomPage> {
 
   Future<void> _sendMessage() async {
     final content = _msgController.text.trim();
-    if (_token == null || content.isEmpty) return;
+    if (content.isEmpty) return;
+
+    final token = await TokenManager.getValidAccessToken();
+    if (token == null) return;
 
     setState(() {
       _isSending = true;
@@ -113,7 +117,7 @@ class _PklChatRoomPageState extends State<PklChatRoomPage> {
 
     try {
       await ApiService.sendChatMessage(
-        token: _token!,
+        token: token,
         chatId: widget.chatId,
         content: content,
       );
@@ -137,7 +141,68 @@ class _PklChatRoomPageState extends State<PklChatRoomPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Chat dengan ${widget.pembeliName}')),
+      backgroundColor: const Color(0xFFF4F6FB),
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        surfaceTintColor: Colors.transparent,
+        foregroundColor: Colors.black87,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_rounded),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF25D366), Color(0xFF0D8A3A)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF0D8A3A).withValues(alpha: 0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: const Icon(
+                Icons.person_rounded,
+                color: Colors.white,
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    widget.pembeliName,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 16,
+                      letterSpacing: -0.3,
+                    ),
+                  ),
+                  Text(
+                    'Pembeli',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.black.withValues(alpha: 0.5),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
@@ -148,55 +213,82 @@ class _PklChatRoomPageState extends State<PklChatRoomPage> {
                 style: const TextStyle(color: Colors.red),
               ),
             )
-          : Column(
-              children: [
-                Expanded(child: _buildMessages()),
-                const Divider(height: 1),
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 6,
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _msgController,
-                          decoration: const InputDecoration(
-                            hintText: 'Tulis pesan...',
-                            border: OutlineInputBorder(),
+          : SafeArea(
+              bottom: false,
+              child: Column(
+                children: [
+                  Expanded(
+                    child: Container(
+                      margin: const EdgeInsets.all(16),
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(32),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.06),
+                            blurRadius: 24,
+                            offset: const Offset(0, 12),
                           ),
-                          onSubmitted: (_) => _sendMessage(),
-                        ),
+                        ],
                       ),
-                      const SizedBox(width: 8),
-                      IconButton(
-                        icon: _isSending
-                            ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : const Icon(Icons.send),
-                        onPressed: _isSending ? null : _sendMessage,
-                      ),
-                    ],
+                      child: _buildMessages(),
+                    ),
                   ),
-                ),
-              ],
+                  _buildComposer(),
+                ],
+              ),
             ),
+      bottomNavigationBar: PklBottomNavBar(
+        current: PklNavItem.chat,
+        onCurrentTap: (_) {
+          if (Navigator.of(context).canPop()) {
+            Navigator.of(context).pop();
+          }
+        },
+      ),
     );
   }
 
   Widget _buildMessages() {
     if (_messages.isEmpty) {
-      return const Center(child: Text('Belum ada pesan di chat ini.'));
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: const Color(0xFFE8F5E9),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.chat_bubble_outline_rounded,
+                size: 48,
+                color: Color(0xFF0D8A3A),
+              ),
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'Belum ada pesan',
+              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Mulai percakapan dengan ${widget.pembeliName}',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.black.withValues(alpha: 0.6),
+                fontSize: 14,
+              ),
+            ),
+          ],
+        ),
+      );
     }
 
     return ListView.builder(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(16),
       itemCount: _messages.length,
       itemBuilder: (context, index) {
         final msg = _messages[index] as Map<String, dynamic>;
@@ -207,17 +299,33 @@ class _PklChatRoomPageState extends State<PklChatRoomPage> {
         return Align(
           alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
           child: Container(
-            margin: const EdgeInsets.symmetric(vertical: 4),
-            padding: const EdgeInsets.all(10),
-            constraints: const BoxConstraints(maxWidth: 260),
+            margin: const EdgeInsets.symmetric(vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            constraints: const BoxConstraints(maxWidth: 280),
             decoration: BoxDecoration(
-              color: isMe ? Colors.teal[300] : Colors.grey[200],
+              gradient: isMe
+                  ? const LinearGradient(
+                      colors: [Color(0xFF25D366), Color(0xFF0D8A3A)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    )
+                  : null,
+              color: isMe ? null : Colors.white,
               borderRadius: BorderRadius.only(
-                topLeft: const Radius.circular(12),
-                topRight: const Radius.circular(12),
-                bottomLeft: Radius.circular(isMe ? 12 : 4),
-                bottomRight: Radius.circular(isMe ? 4 : 12),
+                topLeft: const Radius.circular(20),
+                topRight: const Radius.circular(20),
+                bottomLeft: Radius.circular(isMe ? 20 : 6),
+                bottomRight: Radius.circular(isMe ? 6 : 20),
               ),
+              boxShadow: [
+                BoxShadow(
+                  color: isMe
+                      ? const Color(0xFF0D8A3A).withValues(alpha: 0.3)
+                      : Colors.black.withValues(alpha: 0.06),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
             ),
             child: Column(
               crossAxisAlignment: isMe
@@ -228,20 +336,117 @@ class _PklChatRoomPageState extends State<PklChatRoomPage> {
                   senderName,
                   style: TextStyle(
                     fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                    color: isMe ? Colors.white70 : Colors.black54,
+                    fontWeight: FontWeight.w700,
+                    color: isMe
+                        ? Colors.white.withValues(alpha: 0.8)
+                        : const Color(0xFF0D8A3A),
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 6),
                 Text(
                   content,
-                  style: TextStyle(color: isMe ? Colors.white : Colors.black87),
+                  style: TextStyle(
+                    color: isMe ? Colors.white : Colors.black87,
+                    height: 1.4,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ],
             ),
           ),
         );
       },
+    );
+  }
+
+  Widget _buildComposer() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 20,
+            offset: const Offset(0, -8),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        child: Row(
+          children: [
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 18),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8F9FA),
+                  borderRadius: BorderRadius.circular(28),
+                  border: Border.all(
+                    color: Colors.black.withValues(alpha: 0.08),
+                    width: 1.5,
+                  ),
+                ),
+                child: TextField(
+                  controller: _msgController,
+                  decoration: InputDecoration(
+                    hintText: 'Tulis pesan...',
+                    hintStyle: TextStyle(
+                      color: Colors.black.withValues(alpha: 0.4),
+                      fontWeight: FontWeight.w500,
+                    ),
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                  onSubmitted: (_) => _sendMessage(),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Container(
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF25D366), Color(0xFF0D8A3A)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF0D8A3A).withValues(alpha: 0.4),
+                    blurRadius: 12,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+              ),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: _isSending ? null : _sendMessage,
+                  borderRadius: BorderRadius.circular(50),
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    child: _isSending
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.5,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Icon(
+                            Icons.send_rounded,
+                            color: Colors.white,
+                            size: 22,
+                          ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

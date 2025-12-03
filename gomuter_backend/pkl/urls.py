@@ -9,6 +9,7 @@ from .views import (
     FavoritePKLListCreateView,
     FavoritePKLDeleteView,
     PKLDetailView,
+    PKLRatingView,
     AdminPKLPendingListView,
     AdminPKLVerifyView,
     AdminMonitoringPKLView,
@@ -38,6 +39,7 @@ urlpatterns = [
     # public/pembeli endpoints
     path('active/', ActivePKLListView.as_view(), name='pkl-active-list'),
     path('<int:pk>/', PKLDetailView.as_view(), name='pkl-detail'),
+    path('<int:pkl_id>/rating/', PKLRatingView.as_view(), name='pkl-rating'),
 
     # admin endpoints
     path('admin/pending/', AdminPKLPendingListView.as_view(), name='admin-pkl-pending'),

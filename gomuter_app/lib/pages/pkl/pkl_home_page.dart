@@ -3,11 +3,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:gomuter_app/api_service.dart';
-import 'package:gomuter_app/pages/pkl/pkl_chat_list_page.dart';
-import 'package:gomuter_app/pages/pkl/pkl_edit_info_page.dart';
-import 'package:gomuter_app/pages/pkl/pkl_payment_settings_page.dart';
-import 'package:gomuter_app/pages/pkl/pkl_preorder_page.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:gomuter_app/navigation/pkl_routes.dart';
+import 'package:gomuter_app/utils/token_manager.dart';
+import 'package:gomuter_app/widgets/pkl_bottom_nav.dart';
 
 class PklHomePage extends StatefulWidget {
   const PklHomePage({super.key});
@@ -25,6 +23,7 @@ class _PklHomePageState extends State<PklHomePage> {
   bool _isUpdatingLocation = false;
   String? _error;
   String? _hoveredActionCard;
+  String? _pressedActionCard;
 
   String _namaUsaha = '';
   String _jenisDagangan = '';
@@ -35,7 +34,6 @@ class _PklHomePageState extends State<PklHomePage> {
   String? _locationMessage;
   Timer? _locationTimer;
   DateTime? _lastAutoUpdate;
-  int _selectedNavIndex = 0;
   int _liveViewsToday = 0;
   int _searchHitsToday = 0;
   int _autoUpdatesToday = 0;
@@ -54,8 +52,7 @@ class _PklHomePageState extends State<PklHomePage> {
   }
 
   Future<String?> _getToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('access_token');
+    return TokenManager.getValidAccessToken();
   }
 
   Future<void> _loadProfile() async {
@@ -230,31 +227,38 @@ class _PklHomePageState extends State<PklHomePage> {
     _showSnack('Auto-update lokasi dimatikan.');
   }
 
-  void _openEditInfoPage() async {
-    final updated = await Navigator.of(
-      context,
-    ).push<bool>(MaterialPageRoute(builder: (_) => const PklEditInfoPage()));
-    if (updated == true) {
-      _loadProfile();
+  Future<void> _logout() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Konfirmasi Keluar'),
+        content: const Text('Apakah Anda yakin ingin keluar dari aplikasi?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Batal'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Keluar'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      await TokenManager.clearTokens();
+      if (!mounted) return;
+      Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
     }
   }
 
-  void _openPaymentSettingsPage() {
-    Navigator.of(
-      context,
-    ).push(MaterialPageRoute(builder: (_) => const PklPaymentSettingsPage()));
-  }
-
-  void _openChatList() {
-    Navigator.of(
-      context,
-    ).push(MaterialPageRoute(builder: (_) => const PklChatListPage()));
-  }
-
-  void _openPreOrderPage() {
-    Navigator.of(
-      context,
-    ).push(MaterialPageRoute(builder: (_) => const PklPreOrderPage()));
+  Future<void> _openEditInfoPage() async {
+    final updated = await Navigator.of(context).pushNamed(PklRoutes.profile);
+    if (updated == true) {
+      _loadProfile();
+    }
   }
 
   void _showProfileRequired() {
@@ -298,7 +302,7 @@ class _PklHomePageState extends State<PklHomePage> {
   }
 
   Widget _buildHeroSection() {
-    const overlap = 42.0;
+    const overlap = 12.0;
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
       child: Column(
@@ -321,89 +325,190 @@ class _PklHomePageState extends State<PklHomePage> {
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(22),
+      padding: const EdgeInsets.all(28),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFF0D8A3A), Color(0xFF35C481)],
+          colors: [Color(0xFF0B7332), Color(0xFF10A14D), Color(0xFF25D366)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(30),
+        borderRadius: BorderRadius.circular(32),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF0D8A3A).withOpacity(0.25),
-            blurRadius: 18,
-            offset: const Offset(0, 10),
+            color: const Color(0xFF0D8A3A).withValues(alpha: 0.3),
+            blurRadius: 24,
+            offset: const Offset(0, 12),
+            spreadRadius: 0,
+          ),
+          BoxShadow(
+            color: const Color(0xFF0D8A3A).withValues(alpha: 0.1),
+            blurRadius: 48,
+            offset: const Offset(0, 20),
+            spreadRadius: 0,
           ),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            _namaUsaha.isEmpty ? 'Selamat datang, Mitra PKL!' : _namaUsaha,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 22,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            _jenisDagangan.isEmpty
-                ? 'Lengkapi kategori daganganmu.'
-                : _jenisDagangan,
-            style: const TextStyle(color: Colors.white70),
-          ),
-          const SizedBox(height: 18),
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
+          Row(
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 6,
-                ),
+                padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: colors.background,
-                  borderRadius: BorderRadius.circular(40),
+                  color: Colors.white.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.3),
+                    width: 1.5,
+                  ),
                 ),
-                child: Text(
-                  'Status Verifikasi: $status',
-                  style: TextStyle(
-                    color: colors.text,
-                    fontWeight: FontWeight.w600,
+                child: const Icon(
+                  Icons.store_rounded,
+                  color: Colors.white,
+                  size: 28,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _namaUsaha.isEmpty
+                          ? 'Selamat datang, Mitra PKL!'
+                          : _namaUsaha,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 24,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.5,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      _jenisDagangan.isEmpty
+                          ? 'Lengkapi kategori daganganmu.'
+                          : _jenisDagangan,
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.85),
+                        fontSize: 15,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    color: colors.background.withValues(alpha: 0.95),
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.1),
+                        blurRadius: 8,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        status == 'DITERIMA'
+                            ? Icons.verified_rounded
+                            : status == 'DITOLAK'
+                            ? Icons.cancel_rounded
+                            : Icons.schedule_rounded,
+                        color: colors.text,
+                        size: 18,
+                      ),
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: Text(
+                          status,
+                          style: TextStyle(
+                            color: colors.text,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
+              const SizedBox(width: 12),
               _buildLiveStatusChip(),
             ],
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 20),
           Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(18),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.15),
-              borderRadius: BorderRadius.circular(20),
+              color: Colors.white.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.2),
+                width: 1,
+              ),
             ),
             child: Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.25),
-                    borderRadius: BorderRadius.circular(16),
+                    color: Colors.white.withValues(alpha: 0.25),
+                    borderRadius: BorderRadius.circular(18),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.1),
+                        blurRadius: 8,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
                   ),
-                  child: const Icon(Icons.location_pin, color: Colors.white),
+                  child: const Icon(
+                    Icons.location_on_rounded,
+                    color: Colors.white,
+                    size: 24,
+                  ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 14),
                 Expanded(
-                  child: Text(
-                    _alamatDomisili.isEmpty
-                        ? 'Tambahkan alamat domisili agar pembeli tahu basecamp kamu.'
-                        : _alamatDomisili,
-                    style: const TextStyle(color: Colors.white, height: 1.3),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Alamat Basecamp',
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.8),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        _alamatDomisili.isEmpty
+                            ? 'Tambahkan alamat domisili agar pembeli tahu basecamp kamu.'
+                            : _alamatDomisili,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          height: 1.4,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -436,28 +541,49 @@ class _PklHomePageState extends State<PklHomePage> {
 
   Widget _buildLiveStatusChip() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(40),
-        border: Border.all(color: Colors.white.withOpacity(0.4)),
-        color: Colors.white.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.5),
+          width: 1.5,
+        ),
+        color: Colors.white.withValues(alpha: 0.12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            _statusAktif
-                ? Icons.radio_button_checked
-                : Icons.radio_button_unchecked,
-            size: 16,
-            color: Colors.white,
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(
+              color: _statusAktif ? Colors.greenAccent : Colors.white70,
+              shape: BoxShape.circle,
+              boxShadow: _statusAktif
+                  ? [
+                      BoxShadow(
+                        color: Colors.greenAccent.withValues(alpha: 0.6),
+                        blurRadius: 8,
+                        spreadRadius: 2,
+                      ),
+                    ]
+                  : null,
+            ),
           ),
-          const SizedBox(width: 6),
+          const SizedBox(width: 8),
           Text(
-            _statusAktif ? 'Live di GoMuter' : 'Belum Live',
+            _statusAktif ? 'Live' : 'Offline',
             style: const TextStyle(
               color: Colors.white,
-              fontWeight: FontWeight.w600,
+              fontWeight: FontWeight.w700,
+              fontSize: 13,
             ),
           ),
         ],
@@ -507,58 +633,109 @@ class _PklHomePageState extends State<PklHomePage> {
     required VoidCallback onTap,
   }) {
     final isHovered = _hoveredActionCard == title;
-    final cardColor = isHovered ? _darkenColor(color, 0.08) : color;
+    final isPressed = _pressedActionCard == title;
+    final cardColor = isHovered ? _darkenColor(color, 0.05) : color;
 
-    return InkWell(
-      borderRadius: BorderRadius.circular(20),
-      onTap: onTap,
-      mouseCursor: SystemMouseCursors.click,
-      onHover: (hovering) {
-        if (!mounted) return;
-        setState(() {
-          _hoveredActionCard = hovering ? title : null;
-        });
-      },
-      splashColor: Colors.black.withOpacity(0.08),
-      highlightColor: Colors.transparent,
-      hoverColor: Colors.transparent,
+    return AnimatedScale(
+      duration: const Duration(milliseconds: 150),
+      curve: Curves.easeOutCubic,
+      scale: isPressed ? 0.96 : (isHovered ? 1.02 : 1),
       child: Container(
-        constraints: const BoxConstraints(minHeight: 150),
-        padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
-          color: cardColor,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(24),
           boxShadow: isHovered
               ? [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
-                    blurRadius: 20,
+                    color: iconColor.withValues(alpha: 0.2),
+                    blurRadius: 24,
                     offset: const Offset(0, 12),
+                    spreadRadius: 0,
+                  ),
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.08),
+                    blurRadius: 32,
+                    offset: const Offset(0, 16),
                   ),
                 ]
-              : null,
+              : [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.06),
+                    blurRadius: 16,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(14),
+        child: Material(
+          color: cardColor,
+          borderRadius: BorderRadius.circular(24),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: onTap,
+            mouseCursor: SystemMouseCursors.click,
+            onTapDown: (_) {
+              setState(() => _pressedActionCard = title);
+            },
+            onTapUp: (_) {
+              setState(() => _pressedActionCard = null);
+            },
+            onTapCancel: () {
+              setState(() => _pressedActionCard = null);
+            },
+            onHover: (hovering) {
+              if (!mounted) return;
+              setState(() {
+                _hoveredActionCard = hovering ? title : null;
+              });
+            },
+            splashColor: Colors.black.withValues(alpha: 0.05),
+            highlightColor: Colors.transparent,
+            hoverColor: Colors.transparent,
+            child: Container(
+              constraints: const BoxConstraints(minHeight: 160),
+              padding: const EdgeInsets.all(22),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(18),
+                      boxShadow: [
+                        BoxShadow(
+                          color: iconColor.withValues(alpha: 0.2),
+                          blurRadius: 12,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
+                    ),
+                    child: Icon(icon, color: iconColor, size: 28),
+                  ),
+                  const Spacer(),
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 16,
+                      letterSpacing: -0.3,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    subtitle,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: Colors.black.withValues(alpha: 0.65),
+                      fontSize: 13,
+                      height: 1.3,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
               ),
-              child: Icon(icon, color: iconColor),
             ),
-            const Spacer(),
-            Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
-            const SizedBox(height: 4),
-            Text(
-              subtitle,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: Colors.black54, fontSize: 12),
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -572,37 +749,71 @@ class _PklHomePageState extends State<PklHomePage> {
 
   Widget _buildInfoCard() {
     return Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
       elevation: 0,
       color: Colors.white,
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Informasi Dagangan',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 16),
-            _buildInfoRow('Nama', _namaUsaha.isEmpty ? '-' : _namaUsaha),
-            _buildInfoRow(
-              'Kategori',
-              _jenisDagangan.isEmpty ? '-' : _jenisDagangan,
-            ),
-            _buildInfoRow(
-              'Jam Operasional',
-              _jamOperasional.isEmpty ? '-' : _jamOperasional,
-            ),
-            _buildInfoRow(
-              'Alamat',
-              _alamatDomisili.isEmpty ? '-' : _alamatDomisili,
-            ),
-            _buildInfoRow(
-              'Status Verifikasi',
-              _statusVerifikasi.isEmpty ? 'PENDING' : _statusVerifikasi,
+      shadowColor: Colors.black.withValues(alpha: 0.1),
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(28),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.06),
+              blurRadius: 20,
+              offset: const Offset(0, 10),
             ),
           ],
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE8F5E9),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: const Icon(
+                      Icons.info_outline_rounded,
+                      color: Color(0xFF0D8A3A),
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  const Text(
+                    'Informasi Dagangan',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.3,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              _buildInfoRow('Nama', _namaUsaha.isEmpty ? '-' : _namaUsaha),
+              _buildInfoRow(
+                'Kategori',
+                _jenisDagangan.isEmpty ? '-' : _jenisDagangan,
+              ),
+              _buildInfoRow(
+                'Jam Operasional',
+                _jamOperasional.isEmpty ? '-' : _jamOperasional,
+              ),
+              _buildInfoRow(
+                'Alamat',
+                _alamatDomisili.isEmpty ? '-' : _alamatDomisili,
+              ),
+              _buildInfoRow(
+                'Status Verifikasi',
+                _statusVerifikasi.isEmpty ? 'PENDING' : _statusVerifikasi,
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -610,25 +821,30 @@ class _PklHomePageState extends State<PklHomePage> {
 
   Widget _buildInfoRow(String label, String value) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.symmetric(vertical: 10),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
-            width: 110,
+            width: 130,
             child: Text(
               label,
-              style: const TextStyle(
-                color: Colors.black54,
-                fontSize: 12,
+              style: TextStyle(
+                color: Colors.black.withValues(alpha: 0.6),
+                fontSize: 13,
                 fontWeight: FontWeight.w600,
+                letterSpacing: 0.2,
               ),
             ),
           ),
           Expanded(
             child: Text(
               value,
-              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                height: 1.4,
+              ),
             ),
           ),
         ],
@@ -638,21 +854,54 @@ class _PklHomePageState extends State<PklHomePage> {
 
   Widget _buildStatsSection() {
     return Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
       elevation: 0,
       color: Colors.white,
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Statistik Hari Ini',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(28),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.06),
+              blurRadius: 20,
+              offset: const Offset(0, 10),
             ),
-            const SizedBox(height: 18),
-            _buildStatsRow(),
           ],
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE3F2FD),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: const Icon(
+                      Icons.analytics_outlined,
+                      color: Color(0xFF1976D2),
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  const Text(
+                    'Statistik Hari Ini',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.3,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 22),
+              _buildStatsRow(),
+            ],
+          ),
         ),
       ),
     );
@@ -664,36 +913,38 @@ class _PklHomePageState extends State<PklHomePage> {
         ? _formatTime(_lastAutoUpdate!)
         : '--:--';
 
-    return Row(
-      children: [
-        Expanded(
-          child: _buildStatBox(
-            title: 'Live',
-            subtitle: 'Tampilan',
-            value: _liveViewsToday.toString(),
-            color: const Color(0xFF5C6BC0),
+    return IntrinsicHeight(
+      child: Row(
+        children: [
+          Expanded(
+            child: _buildStatBox(
+              title: 'Live',
+              subtitle: 'Tampilan',
+              value: _liveViewsToday.toString(),
+              color: const Color(0xFF5C6BC0),
+            ),
           ),
-        ),
-        const SizedBox(width: 14),
-        Expanded(
-          child: _buildStatBox(
-            title: 'Pencarian',
-            subtitle: 'Muncul di hasil',
-            value: _searchHitsToday.toString(),
-            color: const Color(0xFF00ACC1),
+          const SizedBox(width: 14),
+          Expanded(
+            child: _buildStatBox(
+              title: 'Pencarian',
+              subtitle: 'Muncul di hasil',
+              value: _searchHitsToday.toString(),
+              color: const Color(0xFF00ACC1),
+            ),
           ),
-        ),
-        const SizedBox(width: 14),
-        Expanded(
-          child: _buildStatBox(
-            title: 'Auto-update',
-            subtitle: 'Sinkronisasi',
-            value: _autoUpdatesToday.toString(),
-            color: const Color(0xFFFF8A00),
-            footnote: '$autoStatus • Terakhir $lastUpdate',
+          const SizedBox(width: 14),
+          Expanded(
+            child: _buildStatBox(
+              title: 'Auto-update',
+              subtitle: 'Sinkronisasi',
+              value: _autoUpdatesToday.toString(),
+              color: const Color(0xFFFF8A00),
+              footnote: '$autoStatus • Terakhir $lastUpdate',
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -705,11 +956,26 @@ class _PklHomePageState extends State<PklHomePage> {
     String? footnote,
   }) {
     return Container(
-      padding: const EdgeInsets.all(18),
-      constraints: const BoxConstraints(minHeight: 150),
+      padding: const EdgeInsets.all(20),
+      constraints: const BoxConstraints(minHeight: 160),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.08),
-        borderRadius: BorderRadius.circular(18),
+        gradient: LinearGradient(
+          colors: [
+            color.withValues(alpha: 0.12),
+            color.withValues(alpha: 0.08),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: color.withValues(alpha: 0.2), width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: color.withValues(alpha: 0.15),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -718,29 +984,41 @@ class _PklHomePageState extends State<PklHomePage> {
             value,
             style: TextStyle(
               color: color,
-              fontSize: 26,
-              fontWeight: FontWeight.w700,
+              fontSize: 32,
+              fontWeight: FontWeight.w900,
+              letterSpacing: -1,
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 8),
           Text(
             title,
             style: TextStyle(
-              color: color.withOpacity(0.9),
-              fontWeight: FontWeight.w600,
+              color: color,
+              fontWeight: FontWeight.w700,
+              fontSize: 14,
             ),
           ),
+          const SizedBox(height: 2),
           Text(
             subtitle,
-            style: const TextStyle(fontSize: 12, color: Colors.black54),
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.black.withValues(alpha: 0.6),
+              fontWeight: FontWeight.w500,
+            ),
           ),
           if (footnote != null) ...[
-            const SizedBox(height: 6),
+            const Spacer(),
             Text(
               footnote,
-              style: const TextStyle(fontSize: 11, color: Colors.black54),
+              style: TextStyle(
+                fontSize: 11,
+                color: Colors.black.withValues(alpha: 0.5),
+                fontWeight: FontWeight.w500,
+              ),
             ),
-          ],
+          ] else
+            const Spacer(),
         ],
       ),
     );
@@ -757,18 +1035,24 @@ class _PklHomePageState extends State<PklHomePage> {
 
     return Material(
       color: Colors.transparent,
-      elevation: 12,
-      borderRadius: BorderRadius.circular(28),
+      elevation: 0,
+      borderRadius: BorderRadius.circular(32),
       child: Container(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(28),
+          borderRadius: BorderRadius.circular(32),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.08),
-              blurRadius: 25,
-              offset: const Offset(0, 12),
+              color: const Color(0xFF0D8A3A).withValues(alpha: 0.08),
+              blurRadius: 30,
+              offset: const Offset(0, 16),
+              spreadRadius: 0,
+            ),
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 20,
+              offset: const Offset(0, 10),
             ),
           ],
         ),
@@ -822,41 +1106,49 @@ class _PklHomePageState extends State<PklHomePage> {
             Row(
               children: [
                 Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: _isUpdatingLocation
-                        ? null
-                        : () {
-                            if (_isNewProfile) {
-                              _showProfileRequired();
-                            } else {
-                              _updateLocation();
-                            }
-                          },
-                    icon: _isUpdatingLocation
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          )
-                        : const Icon(Icons.navigation_outlined),
-                    label: Text(
-                      _isUpdatingLocation ? 'Memperbarui...' : 'Update Sekali',
+                  child: _AnimatedButton(
+                    child: ElevatedButton.icon(
+                      onPressed: _isUpdatingLocation
+                          ? null
+                          : () {
+                              if (_isNewProfile) {
+                                _showProfileRequired();
+                              } else {
+                                _updateLocation();
+                              }
+                            },
+                      icon: _isUpdatingLocation
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Icon(Icons.navigation_outlined),
+                      label: Text(
+                        _isUpdatingLocation
+                            ? 'Memperbarui...'
+                            : 'Update Sekali',
+                      ),
                     ),
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: _isNewProfile
-                        ? _showProfileRequired
-                        : _toggleAutoSync,
-                    icon: Icon(
-                      autoActive ? Icons.pause_circle_filled : Icons.autorenew,
+                  child: _AnimatedButton(
+                    child: OutlinedButton.icon(
+                      onPressed: _isNewProfile
+                          ? _showProfileRequired
+                          : _toggleAutoSync,
+                      icon: Icon(
+                        autoActive
+                            ? Icons.pause_circle_filled
+                            : Icons.autorenew,
+                      ),
+                      label: Text(autoActive ? 'Matikan Auto' : 'Auto-update'),
                     ),
-                    label: Text(autoActive ? 'Matikan Auto' : 'Auto-update'),
                   ),
                 ),
               ],
@@ -896,126 +1188,17 @@ class _PklHomePageState extends State<PklHomePage> {
     );
   }
 
-  Widget _buildBottomNavBar() {
-    final items = [
-      _BottomNavItem(
-        label: 'Informasi Dagangan',
-        icon: Icons.storefront,
-        onTap: () {
-          setState(() => _selectedNavIndex = 0);
-          _openEditInfoPage();
-        },
-      ),
-      _BottomNavItem(
-        label: 'Pembayaran QRIS',
-        icon: Icons.qr_code_2,
-        onTap: () {
-          setState(() => _selectedNavIndex = 1);
-          _openPaymentSettingsPage();
-        },
-      ),
-      _BottomNavItem(
-        label: 'Pesan Pembeli',
-        icon: Icons.chat_bubble_outline,
-        onTap: () {
-          setState(() => _selectedNavIndex = 2);
-          _openChatList();
-        },
-      ),
-      _BottomNavItem(
-        label: 'Kelola Pre-Order',
-        icon: Icons.receipt_long_outlined,
-        onTap: () {
-          setState(() => _selectedNavIndex = 3);
-          _openPreOrderPage();
-        },
-      ),
-    ];
-
-    return SafeArea(
-      top: false,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.08),
-              blurRadius: 20,
-              offset: const Offset(0, -4),
-            ),
-          ],
-          borderRadius: const BorderRadius.only(
-            topLeft: Radius.circular(24),
-            topRight: Radius.circular(24),
-          ),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: List.generate(items.length, (index) {
-            final item = items[index];
-            final isActive = _selectedNavIndex == index;
-            return Expanded(
-              child: InkWell(
-                borderRadius: BorderRadius.circular(16),
-                onTap: item.onTap,
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  padding: const EdgeInsets.symmetric(
-                    vertical: 8,
-                    horizontal: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: isActive
-                        ? const Color(0xFFE8F9EF)
-                        : Colors.transparent,
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        item.icon,
-                        color: isActive
-                            ? const Color(0xFF0D8A3A)
-                            : Colors.black54,
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        item.label,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: isActive
-                              ? FontWeight.w600
-                              : FontWeight.w500,
-                          color: isActive
-                              ? const Color(0xFF0D8A3A)
-                              : Colors.black87,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            );
-          }),
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final bodyContent = SingleChildScrollView(
       controller: _scrollController,
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.only(bottom: 120),
+      padding: const EdgeInsets.only(bottom: 36),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildHeroSection(),
-          const SizedBox(height: 32),
+          const SizedBox(height: 4),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Column(
@@ -1062,6 +1245,23 @@ class _PklHomePageState extends State<PklHomePage> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF4F6FB),
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        surfaceTintColor: Colors.transparent,
+        title: const Text(
+          'Beranda PKL',
+          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 20),
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout_rounded, color: Color(0xFFD32F2F)),
+            onPressed: _logout,
+            tooltip: 'Keluar',
+          ),
+          const SizedBox(width: 8),
+        ],
+      ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : SafeArea(
@@ -1071,21 +1271,9 @@ class _PklHomePageState extends State<PklHomePage> {
                 child: bodyContent,
               ),
             ),
-      bottomNavigationBar: _buildBottomNavBar(),
+      bottomNavigationBar: const PklBottomNavBar(current: PklNavItem.home),
     );
   }
-}
-
-class _BottomNavItem {
-  const _BottomNavItem({
-    required this.label,
-    required this.icon,
-    required this.onTap,
-  });
-
-  final String label;
-  final IconData icon;
-  final VoidCallback onTap;
 }
 
 class _StatusChipColors {
@@ -1093,4 +1281,48 @@ class _StatusChipColors {
 
   final Color background;
   final Color text;
+}
+
+class _AnimatedButton extends StatefulWidget {
+  const _AnimatedButton({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_AnimatedButton> createState() => _AnimatedButtonState();
+}
+
+class _AnimatedButtonState extends State<_AnimatedButton>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _scaleAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 100),
+    );
+    _scaleAnimation = Tween<double>(
+      begin: 1.0,
+      end: 0.95,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: (_) => _controller.forward(),
+      onTapUp: (_) => _controller.reverse(),
+      onTapCancel: () => _controller.reverse(),
+      child: ScaleTransition(scale: _scaleAnimation, child: widget.child),
+    );
+  }
 }

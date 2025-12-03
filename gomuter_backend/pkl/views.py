@@ -1,8 +1,10 @@
 import uuid
+from decimal import Decimal
 from difflib import SequenceMatcher
 
-from django.db.models import Q, F
+from django.db.models import Q, F, Avg, Count
 from django.core.files.storage import default_storage
+from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import generics, permissions
 from rest_framework.views import APIView
@@ -18,6 +20,7 @@ from .models import (
     FavoritePKL,
     Notification,
     PKLDailyStats,
+    PKLRating,
     DEFAULT_RADIUS_METERS,
 )
 from .serializers import (
@@ -31,6 +34,8 @@ from .serializers import (
     FavoritePKLSerializer,
     NotificationSerializer,
     PKLDailyStatsSerializer,
+    PKLRatingSerializer,
+    PKLRatingSummarySerializer,
 )
 from .services import notify_nearby_pkls, notify_favorite_pkl_active
 
@@ -210,6 +215,9 @@ class ActivePKLListView(generics.ListAPIView):
         return PKL.objects.filter(
             status_aktif=True,
             status_verifikasi='DITERIMA',
+        ).annotate(
+            average_rating=Avg('ratings__score'),
+            rating_count=Count('ratings', distinct=True),
         )
 
     def list(self, request, *args, **kwargs):
@@ -333,7 +341,10 @@ class PKLDetailView(generics.RetrieveAPIView):
     GET /api/pkl/<id>/
     Detail 1 PKL + lokasi terakhir.
     """
-    queryset = PKL.objects.all()
+    queryset = PKL.objects.annotate(
+        average_rating=Avg('ratings__score'),
+        rating_count=Count('ratings', distinct=True),
+    )
     serializer_class = PKLListSerializer
     permission_classes = [permissions.AllowAny]
 
@@ -342,6 +353,80 @@ class PKLDetailView(generics.RetrieveAPIView):
         _increment_daily_stat(instance, 'live_views')
         serializer = self.get_serializer(instance)
         return Response(serializer.data)
+
+
+class PKLRatingView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def get_permissions(self):
+        if self.request.method in ('POST', 'DELETE'):
+            return [permissions.IsAuthenticated(), IsPembeli()]
+        return [permission() for permission in self.permission_classes]
+
+    def _get_pkl(self, pkl_id):
+        return get_object_or_404(PKL, pk=pkl_id, status_verifikasi='DITERIMA')
+
+    def get(self, request, pkl_id):
+        pkl = self._get_pkl(pkl_id)
+        summary = pkl.ratings.aggregate(
+            avg=Avg('score'),
+            count=Count('id'),
+        )
+        user_rating = None
+        if request.user.is_authenticated:
+            user_rating = PKLRating.objects.filter(
+                pkl=pkl,
+                buyer=request.user,
+            ).first()
+
+        data = {
+            'average_rating': None if summary['avg'] is None else round(float(summary['avg']), 1),
+            'rating_count': summary['count'] or 0,
+            'user_rating': user_rating,
+        }
+        serializer = PKLRatingSummarySerializer(data)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def post(self, request, pkl_id):
+        pkl = self._get_pkl(pkl_id)
+        score = request.data.get('score')
+        comment = request.data.get('comment', '') or ''
+
+        try:
+            score_value = Decimal(str(score))
+        except Exception:
+            return Response(
+                {'detail': 'score harus berupa angka.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if score_value < 0 or score_value > 5:
+            return Response(
+                {'detail': 'score harus di antara 0 - 5.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        rating, created = PKLRating.objects.update_or_create(
+            buyer=request.user,
+            pkl=pkl,
+            defaults={'score': score_value, 'comment': comment.strip()},
+        )
+
+        serializer = PKLRatingSerializer(rating)
+        return Response(
+            serializer.data,
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+        )
+
+    def delete(self, request, pkl_id):
+        pkl = self._get_pkl(pkl_id)
+        deleted, _ = PKLRating.objects.filter(pkl=pkl, buyer=request.user).delete()
+        if not deleted:
+            return Response(
+                {'detail': 'Rating belum dibuat.'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 class IsAdmin(permissions.IsAdminUser):
     """Admin = user.is_staff == True (superuser juga is_staff)."""
@@ -354,7 +439,10 @@ class AdminPKLPendingListView(generics.ListAPIView):
     GET /api/pkl/admin/pending/
     List semua PKL dengan status_verifikasi = PENDING
     """
-    queryset = PKL.objects.filter(status_verifikasi='PENDING')
+    queryset = PKL.objects.filter(status_verifikasi='PENDING').annotate(
+        average_rating=Avg('ratings__score'),
+        rating_count=Count('ratings', distinct=True),
+    )
     serializer_class = PKLListSerializer
     permission_classes = [IsAdmin]
 
@@ -379,7 +467,13 @@ class AdminMonitoringPKLView(generics.ListAPIView):
     GET /api/pkl/admin/monitor/
     List semua PKL aktif + lokasi terakhir (buat dashboard admin)
     """
-    queryset = PKL.objects.filter(status_aktif=True, status_verifikasi='DITERIMA')
+    queryset = PKL.objects.filter(
+        status_aktif=True,
+        status_verifikasi='DITERIMA',
+    ).annotate(
+        average_rating=Avg('ratings__score'),
+        rating_count=Count('ratings', distinct=True),
+    )
     serializer_class = PKLListSerializer
     permission_classes = [IsAdmin]
 
