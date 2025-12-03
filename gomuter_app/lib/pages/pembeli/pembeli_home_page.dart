@@ -252,22 +252,23 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
     return true;
   }
 
-  Future<void> _syncLocation() async {
-    if (_isSyncingLocation) return;
+  Future<bool> _syncLocation() async {
+    if (_isSyncingLocation) return _buyerPosition != null;
+    if (!mounted) return false;
     setState(() {
       _isSyncingLocation = true;
     });
 
     try {
       final hasPermission = await _ensureLocationPermission();
-      if (!hasPermission) return;
+      if (!hasPermission) return false;
 
       final position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
       );
 
       final token = await _getAccessToken();
-      if (token == null) return;
+      if (token == null) return false;
 
       if (mounted) {
         setState(() {
@@ -281,12 +282,14 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
         longitude: position.longitude,
         radiusM: _selectedRadius,
       );
+      return true;
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Gagal menyinkronkan lokasi: $e')),
         );
       }
+      return false;
     } finally {
       if (mounted) {
         setState(() {
@@ -358,6 +361,7 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
 
   Future<void> _onRadiusChanged(int? radius) async {
     if (_selectedRadius == radius) return;
+    final previous = _selectedRadius;
     setState(() {
       _selectedRadius = radius;
     });
@@ -365,10 +369,37 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
     final prefs = await _getPrefs();
     if (radius == null) {
       await prefs.remove('buyer_radius');
-    } else {
-      await prefs.setInt('buyer_radius', radius);
+      final activeCategory = _selectedCategory;
+      await _loadPkls(jenis: activeCategory == 'Semua' ? null : activeCategory);
+      return;
     }
-    await _syncLocation();
+
+    await prefs.setInt('buyer_radius', radius);
+
+    var hasLocation = _buyerPosition != null;
+    if (!hasLocation) {
+      hasLocation = await _syncLocation();
+    }
+
+    if (!hasLocation) {
+      if (mounted) {
+        setState(() {
+          _selectedRadius = previous;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Aktifkan layanan lokasi untuk memakai filter radius.'),
+          ),
+        );
+      }
+      if (previous == null) {
+        await prefs.remove('buyer_radius');
+      } else {
+        await prefs.setInt('buyer_radius', previous);
+      }
+      return;
+    }
+
     final activeCategory = _selectedCategory;
     await _loadPkls(
       jenis: activeCategory == 'Semua' ? null : activeCategory,
@@ -1047,38 +1078,41 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Selamat Datang,',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Selamat Datang,',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    _buyerName ?? 'Pembeli',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
+                    const SizedBox(height: 4),
+                    Text(
+                      _buyerName ?? 'Pembeli',
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'Siap jelajahi kuliner favoritmu hari ini?',
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.9),
-                      fontSize: 14,
+                    const SizedBox(height: 6),
+                    Text(
+                      'Siap jelajahi kuliner favoritmu hari ini?',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.9),
+                        fontSize: 14,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
+              const SizedBox(width: 12),
               Row(
                 children: [
                   _buildHeaderIconButton(
@@ -1210,8 +1244,8 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
     }
 
     final badgeText = _selectedRadius == null
-        ? 'Semua jarak'
-        : formatRadius(_selectedRadius!);
+      ? 'Tanpa batas'
+      : formatRadius(_selectedRadius!);
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -1245,20 +1279,30 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
                   ),
                 ],
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: _lightGreen,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  badgeText,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF0F5132),
+              Row(
+                children: [
+                  if (_selectedRadius != null)
+                    TextButton(
+                      onPressed: () => _onRadiusChanged(null),
+                      child: const Text('Hapus radius'),
+                    ),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: _lightGreen,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      badgeText,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF0F5132),
+                      ),
+                    ),
                   ),
-                ),
+                ],
               ),
             ],
           ),

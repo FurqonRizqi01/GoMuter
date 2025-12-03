@@ -686,26 +686,37 @@ class _PklPaymentSettingsPageState extends State<PklPaymentSettingsPage> {
           const SizedBox(height: 16),
           _buildDropArea(),
           const SizedBox(height: 12),
-          Wrap(
-            alignment: WrapAlignment.center,
-            runAlignment: WrapAlignment.center,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            spacing: 12,
-            runSpacing: 8,
-            children: [
-              TextButton.icon(
-                onPressed: _isUploading ? null : _promptManualUrl,
-                icon: const Icon(Icons.link),
-                label: const Text('Masukkan URL manual'),
-              ),
-              if (_qrisImageController.text.isNotEmpty)
+          SizedBox(
+            width: double.infinity,
+            child: Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              runSpacing: 4,
+              children: [
                 TextButton.icon(
-                  onPressed: _isUploading ? null : _clearImage,
-                  style: TextButton.styleFrom(foregroundColor: Colors.red),
-                  icon: const Icon(Icons.delete_outline),
-                  label: const Text('Hapus gambar'),
+                  onPressed: _isUploading ? null : _promptManualUrl,
+                  icon: const Icon(Icons.link, size: 20),
+                  label: const Text('Input URL'),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    visualDensity: VisualDensity.compact,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
                 ),
-            ],
+                if (_qrisImageController.text.isNotEmpty)
+                  TextButton.icon(
+                    onPressed: _isUploading ? null : _clearImage,
+                    style: TextButton.styleFrom(
+                      foregroundColor: Colors.red,
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      visualDensity: VisualDensity.compact,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    icon: const Icon(Icons.delete_outline, size: 20),
+                    label: const Text('Hapus'),
+                  ),
+              ],
+            ),
           ),
           if (_previewBytes != null)
             _buildPreview(Image.memory(_previewBytes!, fit: BoxFit.cover))
