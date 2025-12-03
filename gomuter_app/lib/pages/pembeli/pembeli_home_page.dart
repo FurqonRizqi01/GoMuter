@@ -41,14 +41,14 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
   // ignore: unused_field
   List<Marker> _markers = [];
   final List<int> _radiusOptions = [300, 500, 1000, 1500];
-  int _selectedRadius = 300;
+  int? _selectedRadius = 300;
   Timer? _locationTimer;
   static const Duration _locationInterval = Duration(minutes: 5);
   SharedPreferences? _prefs;
   Position? _buyerPosition;
   String _selectedCategory = 'Semua';
   final List<String> _categories = ['Semua', 'Makanan', 'Minuman', 'Snack'];
-  String? _currentLocation;
+  String? _buyerName;
 
   int get _unreadNotificationsCount {
     var count = 0;
@@ -88,31 +88,53 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
   }
 
   Future<void> _initializePage() async {
+    await _loadBuyerName();
     await _loadSavedRadius();
     await _loadPkls();
-    await Future.wait([_loadFavorites(), _loadNotifications(silent: true)]);
+    await Future.wait([
+      _loadFavorites(),
+      _loadNotifications(silent: true),
+    ]);
     await _syncLocation();
     _startLocationTimer();
-    _updateCurrentLocation();
   }
 
-  Future<void> _updateCurrentLocation() async {
-    try {
-      // ignore: unused_local_variable
-      final position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.medium,
-      );
-      // For demo, we'll just show coordinates
-      // In production, you'd use a geocoding service
-      setState(() {
-        _currentLocation = 'Jakarta Selatan';
-      });
-    } catch (_) {
-      setState(() {
-        _currentLocation = 'Lokasi tidak tersedia';
-      });
+  Future<void> _loadBuyerName() async {
+    final prefs = await _getPrefs();
+    final username = prefs.getString('username');
+    if (!mounted) return;
+    setState(() {
+      _buyerName = (username == null || username.isEmpty) ? null : username;
+    });
+  }
+
+  Future<void> _logout() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Keluar dari aplikasi?'),
+        content: const Text('Anda akan kembali ke halaman login.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Batal'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Keluar'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      await TokenManager.clearTokens();
+      if (!mounted) return;
+      Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
     }
   }
+
 
   Future<void> _loadSavedRadius() async {
     final prefs = await _getPrefs();
@@ -334,16 +356,23 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
     }
   }
 
-  // ignore: unused_element
-  Future<void> _onRadiusChanged(int radius) async {
+  Future<void> _onRadiusChanged(int? radius) async {
     if (_selectedRadius == radius) return;
     setState(() {
       _selectedRadius = radius;
     });
 
     final prefs = await _getPrefs();
-    await prefs.setInt('buyer_radius', radius);
+    if (radius == null) {
+      await prefs.remove('buyer_radius');
+    } else {
+      await prefs.setInt('buyer_radius', radius);
+    }
     await _syncLocation();
+    final activeCategory = _selectedCategory;
+    await _loadPkls(
+      jenis: activeCategory == 'Semua' ? null : activeCategory,
+    );
   }
 
   Future<void> _toggleFavorite(int pklId) async {
@@ -362,18 +391,19 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
             return favId is num && favId.toInt() != pklId;
           }).toList();
         });
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Dihapus dari favorit.')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('PKL dihapus dari favorit')),
+        );
       } else {
-        final fav = await ApiService.addFavoritePKL(token: token, pklId: pklId);
+        await ApiService.addFavoritePKL(token: token, pklId: pklId);
         if (!mounted) return;
         setState(() {
           _favoriteIds.add(pklId);
-          _favorites = [..._favorites, fav];
         });
+        await _loadFavorites();
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Ditambahkan ke favorit.')),
+          const SnackBar(content: Text('PKL ditambahkan ke favorit')),
         );
       }
     } catch (e) {
@@ -902,20 +932,25 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
     return '';
   }
 
-  String _distanceLabelForPKL(Map<String, dynamic> pkl) {
+  double? _distanceMetersForPKL(Map<String, dynamic> pkl) {
     final buyer = _buyerPosition;
-    if (buyer == null) return '-';
+    if (buyer == null) return null;
     final latRaw = pkl['latest_latitude'];
     final lngRaw = pkl['latest_longitude'];
-    if (latRaw == null || lngRaw == null) return '-';
+    if (latRaw == null || lngRaw == null) return null;
     final lat = (latRaw as num).toDouble();
     final lng = (lngRaw as num).toDouble();
-    final meters = Geolocator.distanceBetween(
+    return Geolocator.distanceBetween(
       buyer.latitude,
       buyer.longitude,
       lat,
       lng,
     );
+  }
+
+  String _distanceLabelForPKL(Map<String, dynamic> pkl) {
+    final meters = _distanceMetersForPKL(pkl);
+    if (meters == null) return '-';
     if (meters >= 1000) {
       return '${(meters / 1000).toStringAsFixed(1)} km';
     }
@@ -952,6 +987,7 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
           children: [
             _buildHeader(),
             _buildSearchBar(),
+            _buildRadiusFilter(),
             _buildCategoryChips(),
             Expanded(
               child: _isLoading
@@ -1017,30 +1053,29 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'Selamat Datang!',
+                    'Selamat Datang,',
                     style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    _buyerName ?? 'Pembeli',
+                    style: const TextStyle(
                       color: Colors.white,
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.location_on,
-                        color: Colors.white.withValues(alpha: 0.9),
-                        size: 16,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        _currentLocation ?? 'Memuat lokasi...',
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.9),
-                          fontSize: 14,
-                        ),
-                      ),
-                    ],
+                  const SizedBox(height: 6),
+                  Text(
+                    'Siap jelajahi kuliner favoritmu hari ini?',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.9),
+                      fontSize: 14,
+                    ),
                   ),
                 ],
               ),
@@ -1057,6 +1092,13 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
                     badgeCount: _unreadNotificationsCount,
                     onTap: _showNotificationsSheet,
                   ),
+                  const SizedBox(width: 8),
+                  _buildHeaderIconButton(
+                    icon: Icons.logout_rounded,
+                    badgeCount: 0,
+                    onTap: _logout,
+                    highlightColor: Colors.redAccent,
+                  ),
                 ],
               ),
             ],
@@ -1070,19 +1112,20 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
     required IconData icon,
     required int badgeCount,
     required VoidCallback onTap,
+    Color? highlightColor,
   }) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.2),
+          color: (highlightColor ?? Colors.white).withValues(alpha: 0.2),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Stack(
           clipBehavior: Clip.none,
           children: [
-            Icon(icon, color: Colors.white, size: 22),
+            Icon(icon, color: highlightColor ?? Colors.white, size: 22),
             if (badgeCount > 0)
               Positioned(
                 right: -6,
@@ -1157,6 +1200,95 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
     );
   }
 
+  Widget _buildRadiusFilter() {
+    String formatRadius(int value) {
+      if (value >= 1000) {
+        final km = value / 1000;
+        return km % 1 == 0 ? '${km.toStringAsFixed(0)} km' : '${km.toStringAsFixed(1)} km';
+      }
+      return '$value m';
+    }
+
+    final badgeText = _selectedRadius == null
+        ? 'Semua jarak'
+        : formatRadius(_selectedRadius!);
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.my_location, color: _primaryGreen),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'Radius pencarian',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: _lightGreen,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  badgeText,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF0F5132),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: _radiusOptions.map((radius) {
+              final isSelected = radius == _selectedRadius;
+              return ChoiceChip(
+                label: Text(formatRadius(radius)),
+                selected: isSelected,
+                onSelected: (selected) {
+                  _onRadiusChanged(selected ? radius : null);
+                },
+                selectedColor: _primaryGreen,
+                backgroundColor: const Color(0xFFF5F7FA),
+                labelStyle: TextStyle(
+                  color: isSelected ? Colors.white : Colors.grey[700],
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              );
+            }).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildCategoryChips() {
     return SizedBox(
       height: 50,
@@ -1196,7 +1328,9 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
   }
 
   Widget _buildPKLList() {
-    if (_pkls.isEmpty) {
+    final visiblePkls = _getVisiblePkls();
+
+    if (visiblePkls.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -1227,12 +1361,26 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
 
     return ListView.builder(
       padding: const EdgeInsets.all(16),
-      itemCount: _pkls.length,
+      itemCount: visiblePkls.length,
       itemBuilder: (context, index) {
-        final pkl = _pkls[index] as Map<String, dynamic>;
+        final pkl = visiblePkls[index];
         return _buildPKLCard(pkl);
       },
     );
+  }
+
+  List<Map<String, dynamic>> _getVisiblePkls() {
+    final pkls = _pkls.whereType<Map<String, dynamic>>().toList();
+    final buyer = _buyerPosition;
+    if (buyer == null) return pkls;
+
+    final radiusMeters = _selectedRadius?.toDouble();
+    if (radiusMeters == null) return pkls;
+    return pkls.where((pkl) {
+      final distance = _distanceMetersForPKL(pkl);
+      if (distance == null) return true;
+      return distance <= radiusMeters;
+    }).toList();
   }
 
   Widget _buildPKLCard(Map<String, dynamic> pkl) {
@@ -1242,6 +1390,8 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
     final deskripsi = (pkl['deskripsi'] ?? '') as String;
     final isFavorite = pklId != null && _favoriteIds.contains(pklId);
     final distance = _distanceLabelForPKL(pkl);
+    final avgRating = (pkl['average_rating'] as num?)?.toDouble();
+    final ratingCount = (pkl['rating_count'] as num?)?.toInt() ?? 0;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -1331,6 +1481,37 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
                           ),
                         ),
                       ],
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.star_rounded,
+                            size: 16,
+                            color: Colors.amber[600] ?? Colors.amber,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            avgRating != null
+                                ? avgRating.toStringAsFixed(1)
+                                : 'Belum ada rating',
+                            style: TextStyle(
+                              color: Colors.grey[800],
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                            ),
+                          ),
+                          if (ratingCount > 0) ...[
+                            const SizedBox(width: 6),
+                            Text(
+                              '($ratingCount ulasan)',
+                              style: TextStyle(
+                                color: Colors.grey[500],
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
                       const SizedBox(height: 8),
                       Row(
                         children: [

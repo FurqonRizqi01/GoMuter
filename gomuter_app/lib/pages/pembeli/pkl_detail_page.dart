@@ -5,6 +5,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:intl/intl.dart';
 
 import 'package:gomuter_app/api_service.dart';
 import 'package:gomuter_app/pages/pembeli/chat_page.dart';
@@ -27,6 +28,11 @@ class _PklDetailPageState extends State<PklDetailPage> {
   static const Color _secondaryGreen = Color(0xFF2D9D78);
   static const Color _lightGreen = Color(0xFFE8F5F0);
   static const Color _accentPeach = Color(0xFFFAD4C0);
+  final NumberFormat _currencyFormatter = NumberFormat.currency(
+    locale: 'id_ID',
+    symbol: 'Rp',
+    decimalDigits: 0,
+  );
 
   Map<String, dynamic>? _detail;
   bool _isLoading = false;
@@ -384,6 +390,15 @@ class _PklDetailPageState extends State<PklDetailPage> {
         ? value.toStringAsFixed(0)
         : value.toStringAsFixed(1);
     return truncated;
+  }
+
+  String _formatPrice(dynamic value) {
+    if (value == null) return 'Rp -';
+    final numericValue = value is num
+        ? value.toDouble()
+        : double.tryParse(value.toString());
+    if (numericValue == null) return 'Rp -';
+    return _currencyFormatter.format(numericValue);
   }
 
   // ignore: unused_element
@@ -850,6 +865,9 @@ class _PklDetailPageState extends State<PklDetailPage> {
   Widget _buildDetailSection(Map<String, dynamic> data) {
     final alamat = (data['alamat_domisili'] ?? '-') as String;
     final jam = (data['jam_operasional'] ?? '-') as String;
+    final priceInfo = _resolvePriceInfo();
+    final priceSubtitle = priceInfo['subtitle'] ?? '-';
+    final priceDetail = priceInfo['detail'] ?? '';
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -873,12 +891,60 @@ class _PklDetailPageState extends State<PklDetailPage> {
           _buildInfoCard(
             icon: Icons.payments_rounded,
             title: 'Harga',
-            subtitle: 'Rp 15.000 - Rp 50.000',
-            detail: 'Harga bervariasi',
+            subtitle: priceSubtitle,
+            detail: priceDetail,
           ),
         ],
       ),
     );
+  }
+
+  Map<String, String> _resolvePriceInfo() {
+    final products = ((_detail?['products'] as List?) ?? [])
+        .whereType<Map<String, dynamic>>()
+        .toList();
+
+    if (products.isEmpty) {
+      return {
+        'subtitle': 'Belum ada data',
+        'detail': 'PKL belum menambahkan harga menu.',
+      };
+    }
+
+    final prices = <int>[];
+    int availableCount = 0;
+
+    for (final product in products) {
+      final priceRaw = product['price'];
+      final parsed = priceRaw is num
+          ? priceRaw.round()
+          : int.tryParse(priceRaw?.toString() ?? '');
+      if (parsed != null) {
+        prices.add(parsed);
+      }
+      if (product['is_available'] != false) {
+        availableCount += 1;
+      }
+    }
+
+    if (prices.isEmpty) {
+      return {
+        'subtitle': 'Belum ada data',
+        'detail': 'PKL belum menambahkan harga menu.',
+      };
+    }
+
+    prices.sort();
+    final minPrice = prices.first;
+    final maxPrice = prices.last;
+    final subtitle = minPrice == maxPrice
+        ? _formatPrice(minPrice)
+        : '${_formatPrice(minPrice)} - ${_formatPrice(maxPrice)}';
+    final detail = availableCount > 0
+        ? '$availableCount menu tersedia'
+        : '${prices.length} menu terdaftar';
+
+    return {'subtitle': subtitle, 'detail': detail};
   }
 
   Widget _buildInfoCard({
@@ -1150,46 +1216,162 @@ class _PklDetailPageState extends State<PklDetailPage> {
     );
   }
 
-  Widget _buildPhotoSection() {
+  Widget _buildProductSection() {
+    final products = ((_detail?['products'] as List?) ?? [])
+        .whereType<Map<String, dynamic>>()
+        .toList();
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Foto',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: Colors.grey[800],
-            ),
-          ),
-          const SizedBox(height: 12),
-          SizedBox(
-            height: 90,
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              itemCount: 3,
-              itemBuilder: (context, index) {
-                return Container(
-                  width: 90,
-                  height: 90,
-                  margin: EdgeInsets.only(right: index < 2 ? 12 : 0),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Menu Unggulan',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey[800],
+                ),
+              ),
+              if (products.isNotEmpty)
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
                     color: _lightGreen,
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Icon(
-                    _getCategoryIcon(
-                      _detail?['jenis_dagangan'] as String? ?? '',
+                  child: Text(
+                    '${products.length} item',
+                    style: TextStyle(
+                      color: _primaryGreen,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 12,
                     ),
-                    color: _primaryGreen.withValues(alpha: 0.5),
-                    size: 32,
                   ),
-                );
-              },
-            ),
+                ),
+            ],
           ),
+          const SizedBox(height: 12),
+          if (products.isEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: Colors.grey[200]!),
+              ),
+              child: Text(
+                'Belum ada foto menu. Tanyakan langsung ke PKL untuk melihat menu dan harga.',
+                style: TextStyle(color: Colors.grey[600], height: 1.4),
+              ),
+            )
+          else
+            SizedBox(
+              height: 220,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: products.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 12),
+                itemBuilder: (context, index) {
+                  final product = products[index];
+                  final imageUrl = (product['image_url'] ?? '') as String;
+                  final name = (product['name'] ?? '-') as String;
+                  final description = (product['description'] ?? '') as String;
+                  final price = product['price'];
+
+                  return Container(
+                    width: 170,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.04),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(16),
+                            child: AspectRatio(
+                              aspectRatio: 4 / 3,
+                              child: imageUrl.isEmpty
+                                  ? Container(
+                                      color: _lightGreen,
+                                      child: Icon(
+                                        _getCategoryIcon(
+                                          _detail?['jenis_dagangan']
+                                                  as String? ??
+                                              '',
+                                        ),
+                                        color: _primaryGreen
+                                            .withValues(alpha: 0.6),
+                                        size: 32,
+                                      ),
+                                    )
+                                  : Image.network(
+                                      imageUrl,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (_, __, ___) => Container(
+                                        color: _lightGreen,
+                                        child: const Center(
+                                          child: Icon(Icons.broken_image),
+                                        ),
+                                      ),
+                                    ),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          Text(
+                            name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            _formatPrice(price),
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: _primaryGreen,
+                              fontSize: 13,
+                            ),
+                          ),
+                          if (description.isNotEmpty) ...[
+                            const SizedBox(height: 6),
+                            Text(
+                              description,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[600],
+                                height: 1.3,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
         ],
       ),
     );
@@ -1415,7 +1597,7 @@ class _PklDetailPageState extends State<PklDetailPage> {
                         const SizedBox(height: 24),
                         _buildAboutSection(data),
                         const SizedBox(height: 24),
-                        _buildPhotoSection(),
+                        _buildProductSection(),
                         const SizedBox(height: 24),
                         _buildRatingSection(),
                         const SizedBox(height: 24),

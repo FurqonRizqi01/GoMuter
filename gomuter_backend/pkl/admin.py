@@ -6,6 +6,7 @@ from .models import (
     FavoritePKL,
     Notification,
     PKLDailyStats,
+    PKLProduct,
 )
 
 @admin.register(PKL)
@@ -43,3 +44,10 @@ class PKLDailyStatsAdmin(admin.ModelAdmin):
     list_display = ('pkl', 'date', 'live_views', 'search_hits', 'auto_updates')
     list_filter = ('date',)
     search_fields = ('pkl__nama_usaha',)
+
+
+@admin.register(PKLProduct)
+class PKLProductAdmin(admin.ModelAdmin):
+    list_display = ('name', 'pkl', 'price', 'is_available', 'is_featured', 'updated_at')
+    list_filter = ('is_available', 'is_featured')
+    search_fields = ('name', 'pkl__nama_usaha')

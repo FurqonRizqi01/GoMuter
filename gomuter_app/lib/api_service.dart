@@ -118,6 +118,114 @@ class ApiService {
     throw Exception('Gagal menyimpan profil PKL: ${response.body}');
   }
 
+  // === PKL products ===
+
+  static Future<List<Map<String, dynamic>>> getPKLProducts(
+    String token,
+  ) async {
+    final url = Uri.parse('$baseUrl/api/pkl/products/');
+    final response = await http.get(url, headers: _jsonHeaders(token: token));
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body) as List<dynamic>;
+      return data.map((item) => Map<String, dynamic>.from(item)).toList();
+    }
+    throw Exception('Gagal mengambil produk PKL: ${response.body}');
+  }
+
+  static Future<Map<String, dynamic>> createPKLProduct({
+    required String token,
+    required String name,
+    required int price,
+    String? description,
+    bool isFeatured = false,
+    bool isAvailable = true,
+    List<int>? imageBytes,
+    String? imageFileName,
+  }) async {
+    final url = Uri.parse('$baseUrl/api/pkl/products/');
+    final request = http.MultipartRequest('POST', url)
+      ..headers['Authorization'] = 'Bearer $token'
+      ..fields['name'] = name
+      ..fields['price'] = price.toString()
+      ..fields['is_featured'] = isFeatured.toString()
+      ..fields['is_available'] = isAvailable.toString();
+
+    if (description != null && description.isNotEmpty) {
+      request.fields['description'] = description;
+    }
+
+    if (imageBytes != null && imageFileName != null) {
+      request.files.add(
+        http.MultipartFile.fromBytes('image', imageBytes, filename: imageFileName),
+      );
+    }
+
+    final streamed = await request.send();
+    final response = await http.Response.fromStream(streamed);
+
+    if (response.statusCode == 201) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    }
+    throw Exception('Gagal membuat produk PKL: ${response.body}');
+  }
+
+  static Future<Map<String, dynamic>> updatePKLProduct({
+    required String token,
+    required int productId,
+    required String name,
+    required int price,
+    String? description,
+    required bool isFeatured,
+    required bool isAvailable,
+    List<int>? imageBytes,
+    String? imageFileName,
+    bool removeImage = false,
+  }) async {
+    final url = Uri.parse('$baseUrl/api/pkl/products/$productId/');
+    final request = http.MultipartRequest('PATCH', url)
+      ..headers['Authorization'] = 'Bearer $token'
+      ..fields['name'] = name
+      ..fields['price'] = price.toString()
+      ..fields['is_featured'] = isFeatured.toString()
+      ..fields['is_available'] = isAvailable.toString();
+
+    if (description != null) {
+      request.fields['description'] = description;
+    }
+
+    if (removeImage) {
+      request.fields['remove_image'] = 'true';
+    }
+
+    if (imageBytes != null && imageFileName != null) {
+      request.files.add(
+        http.MultipartFile.fromBytes('image', imageBytes, filename: imageFileName),
+      );
+    }
+
+    final streamed = await request.send();
+    final response = await http.Response.fromStream(streamed);
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    }
+    throw Exception('Gagal memperbarui produk PKL: ${response.body}');
+  }
+
+  static Future<void> deletePKLProduct({
+    required String token,
+    required int productId,
+  }) async {
+    final url = Uri.parse('$baseUrl/api/pkl/products/$productId/');
+    final response = await http.delete(url, headers: _jsonHeaders(token: token));
+
+    if (response.statusCode == 204) {
+      return;
+    }
+    throw Exception('Gagal menghapus produk PKL: ${response.body}');
+  }
+
   static Future<Map<String, dynamic>> updatePKLLocation({
     required String token,
     required double latitude,

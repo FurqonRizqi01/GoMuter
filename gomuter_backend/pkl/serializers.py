@@ -12,6 +12,7 @@ from .models import (
     PKLDailyStats,
     PKLRating,
     ALLOWED_RADIUS_METERS,
+    PKLProduct,
 )
 
 
@@ -232,6 +233,11 @@ class PKLDailyStatsSerializer(serializers.ModelSerializer):
 
 class PKLRatingSerializer(serializers.ModelSerializer):
     buyer_username = serializers.CharField(source='buyer.username', read_only=True)
+    score = serializers.DecimalField(
+        max_digits=2,
+        decimal_places=1,
+        coerce_to_string=False,
+    )
 
     class Meta:
         model = PKLRating
@@ -252,3 +258,76 @@ class PKLRatingSummarySerializer(serializers.Serializer):
     average_rating = serializers.FloatField(allow_null=True)
     rating_count = serializers.IntegerField()
     user_rating = PKLRatingSerializer(allow_null=True)
+
+
+class PKLProductSerializer(serializers.ModelSerializer):
+    image_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = PKLProduct
+        fields = [
+            'id',
+            'name',
+            'price',
+            'description',
+            'image_url',
+            'is_featured',
+            'is_available',
+        ]
+        read_only_fields = ['id']
+
+    def get_image_url(self, obj):
+        if not obj.image:
+            return None
+        request = self.context.get('request') if hasattr(self, 'context') else None
+        url = obj.image.url
+        if request is not None:
+            return request.build_absolute_uri(url)
+        return url
+
+
+class PKLDetailSerializer(PKLListSerializer):
+    products = PKLProductSerializer(many=True, read_only=True)
+
+    class Meta(PKLListSerializer.Meta):
+        fields = PKLListSerializer.Meta.fields + ['products']
+
+
+class PKLProductWriteSerializer(serializers.ModelSerializer):
+    remove_image = serializers.BooleanField(
+        required=False,
+        default=False,
+        write_only=True,
+    )
+
+    class Meta:
+        model = PKLProduct
+        fields = [
+            'name',
+            'price',
+            'description',
+            'image',
+            'is_featured',
+            'is_available',
+            'remove_image',
+        ]
+        extra_kwargs = {
+            'description': {'required': False, 'allow_blank': True},
+            'image': {'required': False, 'allow_null': True},
+        }
+
+    def validate_price(self, value):
+        if value <= 0:
+            raise serializers.ValidationError('Harga harus lebih dari 0.')
+        return value
+
+    def create(self, validated_data):
+        validated_data.pop('remove_image', None)
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        remove_image = validated_data.pop('remove_image', False)
+        if remove_image and instance.image:
+            instance.image.delete(save=False)
+            instance.image = None
+        return super().update(instance, validated_data)

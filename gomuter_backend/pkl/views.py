@@ -21,12 +21,14 @@ from .models import (
     Notification,
     PKLDailyStats,
     PKLRating,
+    PKLProduct,
     DEFAULT_RADIUS_METERS,
 )
 from .serializers import (
     PKLSerializer,
     LokasiPKLSerializer,
     PKLListSerializer,
+    PKLDetailSerializer,
     PKLVerifySerializer,
     PreOrderSerializer,
     BuyerLocationSerializer,
@@ -36,6 +38,8 @@ from .serializers import (
     PKLDailyStatsSerializer,
     PKLRatingSerializer,
     PKLRatingSummarySerializer,
+    PKLProductSerializer,
+    PKLProductWriteSerializer,
 )
 from .services import notify_nearby_pkls, notify_favorite_pkl_active
 
@@ -344,8 +348,8 @@ class PKLDetailView(generics.RetrieveAPIView):
     queryset = PKL.objects.annotate(
         average_rating=Avg('ratings__score'),
         rating_count=Count('ratings', distinct=True),
-    )
-    serializer_class = PKLListSerializer
+    ).prefetch_related('products')
+    serializer_class = PKLDetailSerializer
     permission_classes = [permissions.AllowAny]
 
     def retrieve(self, request, *args, **kwargs):
@@ -426,6 +430,71 @@ class PKLRatingView(APIView):
                 {'detail': 'Rating belum dibuat.'},
                 status=status.HTTP_404_NOT_FOUND,
             )
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class PKLProductListCreateView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsPKL]
+    parser_classes = [MultiPartParser, FormParser]
+
+    def _get_pkl(self, request):
+        return get_object_or_404(PKL, user=request.user)
+
+    def get(self, request):
+        pkl = self._get_pkl(request)
+        products = pkl.products.order_by('-updated_at')
+        serializer = PKLProductSerializer(
+            products,
+            many=True,
+            context={'request': request},
+        )
+        return Response(serializer.data)
+
+    def post(self, request):
+        pkl = self._get_pkl(request)
+        serializer = PKLProductWriteSerializer(data=request.data)
+        if serializer.is_valid():
+            product = serializer.save(pkl=pkl)
+            read_serializer = PKLProductSerializer(
+                product,
+                context={'request': request},
+            )
+            return Response(read_serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class PKLProductDetailView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsPKL]
+    parser_classes = [MultiPartParser, FormParser]
+
+    def _get_object(self, request, product_id):
+        return get_object_or_404(
+            PKLProduct,
+            pk=product_id,
+            pkl__user=request.user,
+        )
+
+    def patch(self, request, product_id):
+        product = self._get_object(request, product_id)
+        serializer = PKLProductWriteSerializer(
+            product,
+            data=request.data,
+            partial=True,
+        )
+        if serializer.is_valid():
+            product = serializer.save()
+            read_serializer = PKLProductSerializer(
+                product,
+                context={'request': request},
+            )
+            return Response(read_serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def delete(self, request, product_id):
+        product = self._get_object(request, product_id)
+        if product.image:
+            product.image.delete(save=False)
+        product.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 class IsAdmin(permissions.IsAdminUser):

@@ -22,6 +22,8 @@ from .views import (
     DPProofUploadView,
     NotificationListView,
     NotificationMarkReadView,
+    PKLProductListCreateView,
+    PKLProductDetailView,
 )
 from .views_chat import ChatListView, StartChatView, ChatMessagesView
 
@@ -35,6 +37,10 @@ urlpatterns = [
     path('buyer/favorites/<int:pkl_id>/', FavoritePKLDeleteView.as_view(), name='buyer-favorite-delete'),
     path('buyer/notifications/', NotificationListView.as_view(), name='buyer-notification-list'),
     path('buyer/notifications/<int:notification_id>/read/', NotificationMarkReadView.as_view(), name='buyer-notification-read'),
+
+    # PKL product management
+    path('products/', PKLProductListCreateView.as_view(), name='pkl-product-list-create'),
+    path('products/<int:product_id>/', PKLProductDetailView.as_view(), name='pkl-product-detail'),
 
     # public/pembeli endpoints
     path('active/', ActivePKLListView.as_view(), name='pkl-active-list'),

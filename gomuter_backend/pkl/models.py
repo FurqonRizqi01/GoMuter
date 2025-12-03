@@ -237,6 +237,28 @@ class PKLDailyStats(models.Model):
         return stats
 
 
+class PKLProduct(models.Model):
+    pkl = models.ForeignKey(
+        PKL,
+        on_delete=models.CASCADE,
+        related_name='products',
+    )
+    name = models.CharField(max_length=120)
+    price = models.PositiveIntegerField()
+    description = models.TextField(blank=True)
+    image = models.ImageField(upload_to='pkl_products/', blank=True, null=True)
+    is_featured = models.BooleanField(default=False)
+    is_available = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-is_featured', 'name']
+
+    def __str__(self):
+        return f'{self.name} ({self.pkl.nama_usaha})'
+
+
 class PKLRating(models.Model):
     buyer = models.ForeignKey(
         settings.AUTH_USER_MODEL,

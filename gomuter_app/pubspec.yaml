@@ -41,6 +41,8 @@ dependencies:
   cross_file: ^0.3.4
   url_launcher: ^6.3.0
   jwt_decoder: ^2.0.1
+  intl: ^0.19.0
+  geocoding: ^3.0.0
   flutter_web_plugins:
     sdk: flutter
 
