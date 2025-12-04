@@ -1,18 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:gomuter_app/api_service.dart';
-import 'package:gomuter_app/pages/pkl/pkl_chat_room_page.dart';
+import 'package:gomuter_app/pages/pembeli/chat_page.dart';
 import 'package:gomuter_app/utils/chat_badge_manager.dart';
 import 'package:gomuter_app/utils/token_manager.dart';
-import 'package:gomuter_app/widgets/pkl_bottom_nav.dart';
 
-class PklChatListPage extends StatefulWidget {
-  const PklChatListPage({super.key});
+class PembeliChatListPage extends StatefulWidget {
+  const PembeliChatListPage({super.key});
 
   @override
-  State<PklChatListPage> createState() => _PklChatListPageState();
+  State<PembeliChatListPage> createState() => _PembeliChatListPageState();
 }
 
-class _PklChatListPageState extends State<PklChatListPage> {
+class _PembeliChatListPageState extends State<PembeliChatListPage> {
   bool _isLoading = true;
   String? _error;
   List<dynamic> _chats = [];
@@ -40,12 +39,13 @@ class _PklChatListPageState extends State<PklChatListPage> {
       }
 
       final chats = await ApiService.getChats(token: token);
-      await ChatBadgeManager.markChatsSeen(ChatRole.pkl);
+      await ChatBadgeManager.markChatsSeen(ChatRole.pembeli);
       if (!mounted) return;
       setState(() {
         _chats = chats;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _error = 'Gagal memuat daftar chat.\n$e';
       });
@@ -73,13 +73,11 @@ class _PklChatListPageState extends State<PklChatListPage> {
     return Scaffold(
       backgroundColor: const Color(0xFFF4F6FB),
       appBar: AppBar(
-        automaticallyImplyLeading: false,
         backgroundColor: Colors.transparent,
         elevation: 0,
-        scrolledUnderElevation: 0,
         surfaceTintColor: Colors.transparent,
         foregroundColor: Colors.black87,
-        title: const Text('Pesan dari Pembeli'),
+        title: const Text('Pesan Saya'),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -95,7 +93,7 @@ class _PklChatListPageState extends State<PklChatListPage> {
                 onRefresh: _loadChats,
                 child: ListView(
                   physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 120),
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
                   children: [
                     const SizedBox(height: 12),
                     _buildHeroBanner(),
@@ -104,20 +102,16 @@ class _PklChatListPageState extends State<PklChatListPage> {
                     if (_chats.isEmpty)
                       _buildEmptyState()
                     else
-                      ..._chats.map<Widget>(
-                        (chat) => Padding(
+                      ..._chats.map<Widget>((chat) {
+                        return Padding(
                           padding: const EdgeInsets.only(bottom: 14),
-                          child: _buildChatTile(
-                            chat as Map<String, dynamic>,
-                          ),
-                        ),
-                      ),
+                          child: _buildChatTile(chat as Map<String, dynamic>),
+                        );
+                      }),
                   ],
                 ),
               ),
             ),
-      bottomNavigationBar:
-          const PklBottomNavBar(current: PklNavItem.chat),
     );
   }
 
@@ -126,14 +120,14 @@ class _PklChatListPageState extends State<PklChatListPage> {
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFF0D8A3A), Color(0xFF35C481)],
+          colors: [Color(0xFF25A0D7), Color(0xFF4FC3F7)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(30),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF0D8A3A).withValues(alpha: 0.25),
+            color: const Color(0xFF4FC3F7).withValues(alpha: 0.25),
             blurRadius: 24,
             offset: const Offset(0, 12),
           ),
@@ -143,7 +137,7 @@ class _PklChatListPageState extends State<PklChatListPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: const [
           Text(
-            'Chat Pembeli',
+            'Pesan dengan PKL',
             style: TextStyle(
               color: Colors.white,
               fontSize: 20,
@@ -152,7 +146,7 @@ class _PklChatListPageState extends State<PklChatListPage> {
           ),
           SizedBox(height: 6),
           Text(
-            'Balas pesan mereka agar orderan terus masuk.',
+            'Lanjutkan obrolan dengan penjual favoritmu.',
             style: TextStyle(color: Colors.white70),
           ),
         ],
@@ -200,15 +194,15 @@ class _PklChatListPageState extends State<PklChatListPage> {
       ),
       child: Column(
         children: const [
-          Icon(Icons.chat_bubble_outline, size: 44, color: Color(0xFF0D8A3A)),
+          Icon(Icons.chat_bubble_outline, size: 44, color: Color(0xFF25A0D7)),
           SizedBox(height: 10),
           Text(
-            'Belum ada chat dari pembeli.',
+            'Belum ada chat dengan PKL.',
             style: TextStyle(fontWeight: FontWeight.w600),
           ),
           SizedBox(height: 4),
           Text(
-            'Saat pembeli menghubungi kamu, daftar ini akan terisi.',
+            'Mulai obrolan dari halaman PKL favoritmu.',
             textAlign: TextAlign.center,
             style: TextStyle(color: Colors.black54),
           ),
@@ -218,8 +212,9 @@ class _PklChatListPageState extends State<PklChatListPage> {
   }
 
   Widget _buildChatTile(Map<String, dynamic> chat) {
-    final pembeli = (chat['pembeli_username'] ?? 'Pembeli') as String;
+    final pklName = (chat['pkl_nama_usaha'] ?? 'PKL') as String;
     final updatedAt = _formatTimestamp(chat['updated_at'] as String?);
+    final pklId = (chat['pkl'] as num?)?.toInt();
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
       decoration: BoxDecoration(
@@ -235,23 +230,22 @@ class _PklChatListPageState extends State<PklChatListPage> {
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(24),
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => PklChatRoomPage(
-                chatId: (chat['id'] as num).toInt(),
-                pembeliName: pembeli,
-              ),
-            ),
-          ).then((_) => _loadChats());
-        },
+        onTap: pklId == null
+            ? null
+            : () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ChatPage(pklId: pklId, pklNama: pklName),
+                  ),
+                ).then((_) => _loadChats());
+              },
         child: Row(
           children: [
             CircleAvatar(
-              backgroundColor: const Color(0xFFE8F9EF),
-              foregroundColor: const Color(0xFF0D8A3A),
-              child: Text(pembeli.isEmpty ? '?' : pembeli[0].toUpperCase()),
+              backgroundColor: const Color(0xFFE3F2FD),
+              foregroundColor: const Color(0xFF1976D2),
+              child: Text(pklName.isEmpty ? '?' : pklName[0].toUpperCase()),
             ),
             const SizedBox(width: 14),
             Expanded(
@@ -259,7 +253,7 @@ class _PklChatListPageState extends State<PklChatListPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    pembeli,
+                    pklName,
                     style: const TextStyle(
                       fontWeight: FontWeight.w700,
                       fontSize: 15,

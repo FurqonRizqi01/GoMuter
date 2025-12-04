@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:gomuter_app/api_service.dart';
+import 'package:gomuter_app/utils/chat_badge_manager.dart';
 import 'package:gomuter_app/utils/token_manager.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -105,6 +106,8 @@ class _ChatPageState extends State<ChatPage> {
         token: token,
         chatId: _chatId!,
       );
+      await ChatBadgeManager.markChatsSeen(ChatRole.pembeli);
+      if (!mounted) return;
       if (mounted) {
         setState(() {
           _messages = msgs;

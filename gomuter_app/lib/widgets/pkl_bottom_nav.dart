@@ -49,10 +49,12 @@ class PklBottomNavBar extends StatelessWidget {
     super.key,
     required this.current,
     this.onCurrentTap,
+    this.chatBadgeCount = 0,
   });
 
   final PklNavItem current;
   final ValueChanged<PklNavItem>? onCurrentTap;
+  final int chatBadgeCount;
 
   void _handleTap(BuildContext context, PklNavItem destination) {
     if (destination == current) {
@@ -102,10 +104,7 @@ class PklBottomNavBar extends StatelessWidget {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(
-                          item.icon,
-                          color: isActive ? const Color(0xFF0D8A3A) : Colors.black54,
-                        ),
+                        _buildIcon(item, isActive),
                         const SizedBox(height: 6),
                         Text(
                           item.label,
@@ -125,6 +124,43 @@ class PklBottomNavBar extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildIcon(PklNavItem item, bool isActive) {
+    final icon = Icon(
+      item.icon,
+      color: isActive ? const Color(0xFF0D8A3A) : Colors.black54,
+    );
+    if (item != PklNavItem.chat || chatBadgeCount <= 0) {
+      return icon;
+    }
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        icon,
+        Positioned(
+          right: -6,
+          top: -4,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+            decoration: BoxDecoration(
+              color: Colors.redAccent,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+            child: Text(
+              chatBadgeCount > 9 ? '9+' : '$chatBadgeCount',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

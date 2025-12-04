@@ -9,6 +9,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:gomuter_app/api_service.dart';
 import 'package:gomuter_app/pages/pembeli/chat_page.dart';
 import 'package:gomuter_app/pages/pembeli/preorder_page.dart';
+import 'package:gomuter_app/utils/chat_badge_manager.dart';
 import 'package:gomuter_app/utils/token_manager.dart';
 
 class PklDetailPage extends StatefulWidget {
@@ -418,16 +419,17 @@ class _PklDetailPageState extends State<PklDetailPage> {
     }
   }
 
-  void _openChat() {
+  Future<void> _openChat() async {
     final data = _detail;
     if (data == null) return;
     final name = (data['nama_usaha'] ?? '-') as String;
-    Navigator.push(
+    await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => ChatPage(pklId: widget.pklId, pklNama: name),
       ),
     );
+    await ChatBadgeManager.markChatsSeen(ChatRole.pembeli);
   }
 
   void _openPreorder() {

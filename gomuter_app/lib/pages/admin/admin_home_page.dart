@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:gomuter_app/api_service.dart';
+import 'package:gomuter_app/utils/token_manager.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'tabs/admin_data_pkl_tab.dart';
 import 'tabs/admin_reports_tab.dart';
@@ -40,6 +42,19 @@ class _AdminHomePageState extends State<AdminHomePage>
   int? _processingId;
   final DateFormat _detailFormatter = DateFormat('d MMM HH.mm', 'id');
 
+  Future<String?> _requireAdminToken() async {
+    final token = await TokenManager.getValidAccessToken();
+    if (token != null) {
+      return token;
+    }
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Sesi admin berakhir, silakan login ulang.')),
+      );
+    }
+    return null;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -71,7 +86,15 @@ class _AdminHomePageState extends State<AdminHomePage>
     });
 
     try {
-      final data = await ApiService.getAdminDashboard(token: widget.accessToken);
+      final token = await _requireAdminToken();
+      if (token == null) {
+        if (!mounted) return;
+        setState(() {
+          _dashboardError = 'Sesi admin berakhir, silakan login ulang.';
+        });
+        return;
+      }
+      final data = await ApiService.getAdminDashboard(token: token);
       if (!mounted) return;
       setState(() {
         _dashboard = data;
@@ -97,7 +120,15 @@ class _AdminHomePageState extends State<AdminHomePage>
     });
 
     try {
-      final data = await ApiService.getAdminPKLs(token: widget.accessToken);
+      final token = await _requireAdminToken();
+      if (token == null) {
+        if (!mounted) return;
+        setState(() {
+          _pklsError = 'Sesi admin berakhir, silakan login ulang.';
+        });
+        return;
+      }
+      final data = await ApiService.getAdminPKLs(token: token);
       if (!mounted) return;
       setState(() {
         _pkls = data;
@@ -215,9 +246,9 @@ class _AdminHomePageState extends State<AdminHomePage>
                         ],
                       ),
                       child: ElevatedButton(
-                        onPressed: () {
+                        onPressed: () async {
                           Navigator.pop(context); // Close dialog
-                          _performLogout();
+                          await _performLogout();
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.transparent,
@@ -246,9 +277,13 @@ class _AdminHomePageState extends State<AdminHomePage>
     );
   }
 
-  void _performLogout() {
-    // Navigate back to login/home and clear navigation stack
-    Navigator.of(context).popUntil((route) => route.isFirst);
+  Future<void> _performLogout() async {
+    await TokenManager.clearTokens();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('user_role');
+    await prefs.remove('username');
+    if (!mounted) return;
+    Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
   }
 
   Future<String?> _promptNote({
@@ -438,8 +473,12 @@ class _AdminHomePageState extends State<AdminHomePage>
     });
 
     try {
+      final token = await _requireAdminToken();
+      if (token == null) {
+        return;
+      }
       await ApiService.verifyPKL(
-        token: widget.accessToken,
+        token: token,
         id: id,
         data: {
           'status_verifikasi': approve ? 'DITERIMA' : 'DITOLAK',
@@ -477,8 +516,12 @@ class _AdminHomePageState extends State<AdminHomePage>
     });
 
     try {
+      final token = await _requireAdminToken();
+      if (token == null) {
+        return;
+      }
       await ApiService.verifyPKL(
-        token: widget.accessToken,
+        token: token,
         id: id,
         data: {
           'status_verifikasi': pkl['status_verifikasi'] ?? 'DITERIMA',

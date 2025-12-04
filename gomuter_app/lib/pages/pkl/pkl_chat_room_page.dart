@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:gomuter_app/api_service.dart';
+import 'package:gomuter_app/utils/chat_badge_manager.dart';
 import 'package:gomuter_app/utils/token_manager.dart';
 import 'package:gomuter_app/widgets/pkl_bottom_nav.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -90,6 +91,7 @@ class _PklChatRoomPageState extends State<PklChatRoomPage> {
         token: token,
         chatId: widget.chatId,
       );
+      await ChatBadgeManager.markChatsSeen(ChatRole.pkl);
       if (mounted) {
         setState(() {
           _messages = msgs;

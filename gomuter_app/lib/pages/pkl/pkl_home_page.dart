@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:gomuter_app/api_service.dart';
 import 'package:gomuter_app/navigation/pkl_routes.dart';
+import 'package:gomuter_app/utils/chat_badge_manager.dart';
 import 'package:gomuter_app/utils/token_manager.dart';
 import 'package:gomuter_app/widgets/pkl_bottom_nav.dart';
 
@@ -37,11 +38,13 @@ class _PklHomePageState extends State<PklHomePage> {
   int _liveViewsToday = 0;
   int _searchHitsToday = 0;
   int _autoUpdatesToday = 0;
+  int _unreadChatCount = 0;
 
   @override
   void initState() {
     super.initState();
     _loadProfile();
+    _loadChatBadge();
   }
 
   @override
@@ -53,6 +56,24 @@ class _PklHomePageState extends State<PklHomePage> {
 
   Future<String?> _getToken() async {
     return TokenManager.getValidAccessToken();
+  }
+
+  Future<void> _loadChatBadge() async {
+    try {
+      final token = await _getToken();
+      if (token == null) return;
+      final chats = await ApiService.getChats(token: token);
+      final count = await ChatBadgeManager.countUnreadChats(
+        chats,
+        ChatRole.pkl,
+      );
+      if (!mounted) return;
+      setState(() {
+        _unreadChatCount = count;
+      });
+    } catch (_) {
+      // Diamkan jika gagal, badge tidak kritikal.
+    }
   }
 
   Future<void> _loadProfile() async {
@@ -110,6 +131,8 @@ class _PklHomePageState extends State<PklHomePage> {
         });
       }
     }
+
+    await _loadChatBadge();
   }
 
   Future<void> _loadStats(String token) async {
@@ -1271,7 +1294,10 @@ class _PklHomePageState extends State<PklHomePage> {
                 child: bodyContent,
               ),
             ),
-      bottomNavigationBar: const PklBottomNavBar(current: PklNavItem.home),
+      bottomNavigationBar: PklBottomNavBar(
+        current: PklNavItem.home,
+        chatBadgeCount: _unreadChatCount,
+      ),
     );
   }
 }

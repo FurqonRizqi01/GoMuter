@@ -4,11 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:gomuter_app/api_service.dart';
 import 'package:gomuter_app/pages/pembeli/chat_page.dart';
+import 'package:gomuter_app/pages/pembeli/pembeli_chat_list_page.dart';
 import 'package:gomuter_app/pages/pembeli/pkl_detail_page.dart';
 // ignore: unused_import
 import 'package:gomuter_app/pages/pembeli/preorder_page.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:gomuter_app/utils/chat_badge_manager.dart';
 import 'package:gomuter_app/utils/token_manager.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -49,6 +51,7 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
   String _selectedCategory = 'Semua';
   final List<String> _categories = ['Semua', 'Makanan', 'Minuman', 'Snack'];
   String? _buyerName;
+  int _unreadChatCount = 0;
 
   int get _unreadNotificationsCount {
     var count = 0;
@@ -87,6 +90,24 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
     return prefs.getString('access_token');
   }
 
+  Future<void> _loadChatBadge() async {
+    try {
+      final token = await _getAccessToken();
+      if (token == null) return;
+      final chats = await ApiService.getChats(token: token);
+      final count = await ChatBadgeManager.countUnreadChats(
+        chats,
+        ChatRole.pembeli,
+      );
+      if (!mounted) return;
+      setState(() {
+        _unreadChatCount = count;
+      });
+    } catch (_) {
+      // Abaikan kesalahan badge agar tidak mengganggu UI utama.
+    }
+  }
+
   Future<void> _initializePage() async {
     await _loadBuyerName();
     await _loadSavedRadius();
@@ -94,6 +115,7 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
     await Future.wait([
       _loadFavorites(),
       _loadNotifications(silent: true),
+      _loadChatBadge(),
     ]);
     await _syncLocation();
     _startLocationTimer();
@@ -133,6 +155,15 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
       if (!mounted) return;
       Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
     }
+  }
+
+  Future<void> _openChatInbox() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const PembeliChatListPage()),
+    );
+    await ChatBadgeManager.markChatsSeen(ChatRole.pembeli);
+    await _loadChatBadge();
   }
 
 
@@ -1122,6 +1153,13 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
                   ),
                   const SizedBox(width: 8),
                   _buildHeaderIconButton(
+                    icon: Icons.chat_bubble_rounded,
+                    badgeCount: _unreadChatCount,
+                    onTap: _openChatInbox,
+                    highlightColor: Colors.blueAccent,
+                  ),
+                  const SizedBox(width: 8),
+                  _buildHeaderIconButton(
                     icon: Icons.notifications_rounded,
                     badgeCount: _unreadNotificationsCount,
                     onTap: _showNotificationsSheet,
@@ -1457,13 +1495,14 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
           borderRadius: BorderRadius.circular(20),
           onTap: pklId == null
               ? null
-              : () {
-                  Navigator.push(
+              : () async {
+                  await Navigator.push(
                     context,
                     MaterialPageRoute(
                       builder: (_) => PklDetailPage(pklId: pklId),
                     ),
                   );
+                  await _loadChatBadge();
                 },
           child: Padding(
             padding: const EdgeInsets.all(16),
@@ -1595,14 +1634,18 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
                       ),
                       onPressed: pklId == null
                           ? null
-                          : () {
-                              Navigator.push(
+                          : () async {
+                              await Navigator.push(
                                 context,
                                 MaterialPageRoute(
                                   builder: (_) =>
                                       ChatPage(pklId: pklId, pklNama: nama),
                                 ),
                               );
+                              await ChatBadgeManager.markChatsSeen(
+                                ChatRole.pembeli,
+                              );
+                              await _loadChatBadge();
                             },
                     ),
                   ],
