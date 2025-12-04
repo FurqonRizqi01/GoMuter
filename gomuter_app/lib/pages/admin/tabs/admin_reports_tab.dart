@@ -405,7 +405,7 @@ class _ReportCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Row(
-                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Icon(
                       Icons.lightbulb_outline,
@@ -413,12 +413,15 @@ class _ReportCard extends StatelessWidget {
                       color: colorSet.color,
                     ),
                     const SizedBox(width: 8),
-                    Text(
-                      report['action'],
-                      style: TextStyle(
-                        color: colorSet.color,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 13,
+                    Expanded(
+                      child: Text(
+                        report['action'],
+                        style: TextStyle(
+                          color: colorSet.color,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                        ),
+                        softWrap: true,
                       ),
                     ),
                   ],

@@ -1028,14 +1028,15 @@ class _AdminHomePageState extends State<AdminHomePage>
           fontWeight: FontWeight.w600,
           fontSize: 13,
         ),
-        padding: const EdgeInsets.all(6),
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+        labelPadding: EdgeInsets.zero,
         tabs: [
           Tab(
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: const [
                 Icon(Icons.dashboard, size: 18),
-                SizedBox(width: 6),
+                SizedBox(width: 4),
                 Text('Ringkasan'),
               ],
             ),
@@ -1045,7 +1046,7 @@ class _AdminHomePageState extends State<AdminHomePage>
               mainAxisAlignment: MainAxisAlignment.center,
               children: const [
                 Icon(Icons.store, size: 18),
-                SizedBox(width: 6),
+                SizedBox(width: 4),
                 Text('Data PKL'),
               ],
             ),
@@ -1055,7 +1056,7 @@ class _AdminHomePageState extends State<AdminHomePage>
               mainAxisAlignment: MainAxisAlignment.center,
               children: const [
                 Icon(Icons.assessment, size: 18),
-                SizedBox(width: 6),
+                SizedBox(width: 4),
                 Text('Laporan'),
               ],
             ),

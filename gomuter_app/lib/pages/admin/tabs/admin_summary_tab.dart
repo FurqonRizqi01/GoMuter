@@ -182,17 +182,35 @@ class _SummaryCardGrid extends StatelessWidget {
       ),
     ];
 
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
-        childAspectRatio: 1.4,
-      ),
-      itemCount: cards.length,
-      itemBuilder: (context, index) => cards[index],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth;
+        final isTablet = width >= 900;
+        final isLargePhone = width >= 600;
+        final crossAxisCount = isTablet
+            ? 4
+            : isLargePhone
+                ? 3
+                : 2;
+        final childAspectRatio = isTablet
+            ? 1.4
+            : isLargePhone
+                ? 1.25
+                : 1.05;
+
+        return GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: crossAxisCount,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
+            childAspectRatio: childAspectRatio,
+          ),
+          itemCount: cards.length,
+          itemBuilder: (context, index) => cards[index],
+        );
+      },
     );
   }
 
