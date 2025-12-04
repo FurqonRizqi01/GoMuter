@@ -10,9 +10,11 @@ from .views import (
     FavoritePKLDeleteView,
     PKLDetailView,
     PKLRatingView,
+    AdminPKLListView,
     AdminPKLPendingListView,
     AdminPKLVerifyView,
     AdminMonitoringPKLView,
+    AdminDashboardView,
     CreatePreOrderView,
     MyPreOrderListView,
     PKLPreOrderListView,
@@ -48,6 +50,8 @@ urlpatterns = [
     path('<int:pkl_id>/rating/', PKLRatingView.as_view(), name='pkl-rating'),
 
     # admin endpoints
+    path('admin/dashboard/', AdminDashboardView.as_view(), name='admin-dashboard'),
+    path('admin/pkls/', AdminPKLListView.as_view(), name='admin-pkl-list'),
     path('admin/pending/', AdminPKLPendingListView.as_view(), name='admin-pkl-pending'),
     path('admin/<int:pk>/verify/', AdminPKLVerifyView.as_view(), name='admin-pkl-verify'),
     path('admin/monitor/', AdminMonitoringPKLView.as_view(), name='admin-pkl-monitor'),

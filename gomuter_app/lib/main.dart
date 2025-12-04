@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'api_service.dart';
+import 'navigation/admin_routes.dart';
 import 'navigation/pkl_routes.dart';
 import 'pages/admin/admin_home_page.dart';
 import 'pages/pembeli/pembeli_home_page.dart';
@@ -12,9 +14,10 @@ import 'pages/pkl/pkl_preorder_page.dart';
 import 'utils/token_manager.dart';
 import 'web/file_picker_web_registrar.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   ensureFilePickerWebRegistered();
+  await initializeDateFormatting('id');
   runApp(const GoMuterApp());
 }
 
@@ -136,7 +139,38 @@ class GoMuterApp extends StatelessWidget {
         PklRoutes.preorder: (_) => const PklPreOrderPage(),
         PklRoutes.chat: (_) => const PklChatListPage(),
       },
+      onGenerateRoute: _onGenerateRoute,
     );
+  }
+
+  Route<dynamic>? _onGenerateRoute(RouteSettings settings) {
+    switch (settings.name) {
+      case AdminRoutes.dashboard:
+      case AdminRoutes.dataPKL:
+      case AdminRoutes.reports:
+        final token = settings.arguments as String?;
+        if (token == null) {
+          return MaterialPageRoute(
+            builder: (_) => const Scaffold(
+              body: Center(child: Text('Akses admin membutuhkan token.')),
+            ),
+            settings: settings,
+          );
+        }
+        final tabIndex = settings.name == AdminRoutes.dashboard
+            ? 0
+            : settings.name == AdminRoutes.dataPKL
+                ? 1
+                : 2;
+        return MaterialPageRoute(
+          builder: (_) => AdminHomePage(
+            accessToken: token,
+            initialTabIndex: tabIndex,
+          ),
+          settings: settings,
+        );
+    }
+    return null;
   }
 }
 
@@ -262,18 +296,18 @@ class _LoginPageState extends State<LoginPage> {
       return;
     }
 
-    Widget destination;
-    switch (role) {
-      case 'ADMIN':
-        destination = AdminHomePage(accessToken: accessToken);
-        break;
-      default:
-        destination = const PembeliHomePage();
+    if (role == 'ADMIN') {
+      Navigator.pushReplacementNamed(
+        context,
+        AdminRoutes.dashboard,
+        arguments: accessToken,
+      );
+      return;
     }
 
     Navigator.pushReplacement(
       context,
-      MaterialPageRoute(builder: (_) => destination),
+      MaterialPageRoute(builder: (_) => const PembeliHomePage()),
     );
   }
 }

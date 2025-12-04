@@ -355,6 +355,44 @@ class ApiService {
 
   // === Endpoint admin ===
 
+  static Future<Map<String, dynamic>> getAdminDashboard({required String token}) async {
+    final url = Uri.parse('$baseUrl/api/pkl/admin/dashboard/');
+    final response = await http.get(url, headers: _jsonHeaders(token: token));
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    }
+    throw Exception('Gagal mengambil ringkasan dashboard: ${response.body}');
+  }
+
+  static Future<List<dynamic>> getAdminPKLs({
+    required String token,
+    String? statusVerifikasi,
+    bool? statusAktif,
+    String? search,
+  }) async {
+    final query = <String, String>{};
+    if (statusVerifikasi != null && statusVerifikasi.isNotEmpty) {
+      query['status_verifikasi'] = statusVerifikasi;
+    }
+    if (statusAktif != null) {
+      query['status_aktif'] = statusAktif.toString();
+    }
+    if (search != null && search.trim().isNotEmpty) {
+      query['search'] = search.trim();
+    }
+
+    final uri = Uri.parse('$baseUrl/api/pkl/admin/pkls/').replace(
+      queryParameters: query.isEmpty ? null : query,
+    );
+
+    final response = await http.get(uri, headers: _jsonHeaders(token: token));
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as List<dynamic>;
+    }
+    throw Exception('Gagal mengambil data PKL: ${response.body}');
+  }
+
   static Future<List<dynamic>> getPendingPKL({required String token}) async {
     final url = Uri.parse('$baseUrl/api/pkl/admin/pending/');
     final response = await http.get(url, headers: _jsonHeaders(token: token));

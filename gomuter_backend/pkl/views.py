@@ -2,7 +2,9 @@ import uuid
 from decimal import Decimal
 from difflib import SequenceMatcher
 
-from django.db.models import Q, F, Avg, Count
+from datetime import timedelta
+
+from django.db.models import Q, F, Avg, Count, Sum, Max
 from django.core.files.storage import default_storage
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -503,6 +505,40 @@ class IsAdmin(permissions.IsAdminUser):
 
 # === VIEW ADMIN ===
 
+class AdminPKLListView(generics.ListAPIView):
+    """Daftar PKL untuk admin dengan dukungan filter status & pencarian."""
+
+    serializer_class = PKLListSerializer
+    permission_classes = [IsAdmin]
+
+    def get_queryset(self):
+        queryset = PKL.objects.all().annotate(
+            average_rating=Avg('ratings__score'),
+            rating_count=Count('ratings', distinct=True),
+        )
+
+        status_verifikasi = self.request.query_params.get('status_verifikasi')
+        if status_verifikasi:
+            queryset = queryset.filter(status_verifikasi=status_verifikasi.upper())
+
+        status_aktif = self.request.query_params.get('status_aktif')
+        if status_aktif is not None:
+            normalized = status_aktif.lower()
+            if normalized in ('true', '1'):  # pragma: no cover - defensive
+                queryset = queryset.filter(status_aktif=True)
+            elif normalized in ('false', '0'):
+                queryset = queryset.filter(status_aktif=False)
+
+        search = self.request.query_params.get('search')
+        if search:
+            queryset = queryset.filter(
+                Q(nama_usaha__icontains=search) |
+                Q(jenis_dagangan__icontains=search)
+            )
+
+        return queryset.order_by('-status_aktif', '-id')
+
+
 class AdminPKLPendingListView(generics.ListAPIView):
     """
     GET /api/pkl/admin/pending/
@@ -545,6 +581,162 @@ class AdminMonitoringPKLView(generics.ListAPIView):
     )
     serializer_class = PKLListSerializer
     permission_classes = [IsAdmin]
+
+
+class AdminDashboardView(APIView):
+    permission_classes = [IsAdmin]
+
+    def get(self, request):
+        today = timezone.localdate()
+        trend_start = today - timedelta(days=6)
+        trend_rows = (
+            PKLDailyStats.objects.filter(date__gte=trend_start)
+            .values('date')
+            .annotate(
+                live_views=Sum('live_views'),
+                search_hits=Sum('search_hits'),
+                auto_updates=Sum('auto_updates'),
+            )
+        )
+        trend_map = {row['date']: row for row in trend_rows}
+        trend_data = []
+        for offset in range(6, -1, -1):
+            current_date = today - timedelta(days=offset)
+            row = trend_map.get(current_date, {})
+            trend_data.append({
+                'date': current_date.isoformat(),
+                'live_views': row.get('live_views', 0) or 0,
+                'search_hits': row.get('search_hits', 0) or 0,
+                'auto_updates': row.get('auto_updates', 0) or 0,
+            })
+
+        prev_range_end = trend_start - timedelta(days=1)
+        prev_range_start = prev_range_end - timedelta(days=6)
+        prev_stats = (
+            PKLDailyStats.objects.filter(date__gte=prev_range_start, date__lte=prev_range_end)
+            .aggregate(
+                live_views=Sum('live_views'),
+                search_hits=Sum('search_hits'),
+                auto_updates=Sum('auto_updates'),
+            )
+        )
+
+        pkls = PKL.objects.all()
+        total_pkl = pkls.count()
+        pending_pkl = pkls.filter(status_verifikasi='PENDING').count()
+        verified_pkl = pkls.filter(status_verifikasi='DITERIMA').count()
+        rejected_pkl = pkls.filter(status_verifikasi='DITOLAK').count()
+        active_pkl = pkls.filter(status_aktif=True).count()
+        inactive_pkl = total_pkl - active_pkl
+
+        now = timezone.now()
+        current_week_cutoff = now - timedelta(days=7)
+        previous_week_cutoff = current_week_cutoff - timedelta(days=7)
+        new_pkls_week = pkls.filter(user__date_joined__gte=current_week_cutoff).count()
+        prev_new_pkls = pkls.filter(
+            user__date_joined__gte=previous_week_cutoff,
+            user__date_joined__lt=current_week_cutoff,
+        ).count()
+
+        location_updates_week = sum(item['auto_updates'] for item in trend_data)
+        prev_location_updates = prev_stats.get('auto_updates') or 0
+
+        rating_summary = PKLRating.objects.aggregate(
+            average=Avg('score'),
+            count=Count('id'),
+        )
+
+        top_pkls = (
+            PKL.objects.filter(status_verifikasi='DITERIMA')
+            .annotate(
+                average_rating=Avg('ratings__score'),
+                rating_count=Count('ratings', distinct=True),
+            )
+            .filter(average_rating__isnull=False)
+            .order_by('-average_rating', '-rating_count', 'nama_usaha')[:5]
+        )
+
+        pending_preview = pkls.filter(status_verifikasi='PENDING').order_by('-user__date_joined')[:5]
+
+        overdue_cutoff = now - timedelta(days=7)
+        overdue_pending = pkls.filter(
+            status_verifikasi='PENDING',
+            user__date_joined__lt=overdue_cutoff,
+        ).count()
+
+        stale_cutoff = now - timedelta(days=3)
+        stale_active = (
+            PKL.objects.filter(status_verifikasi='DITERIMA', status_aktif=True)
+            .annotate(latest_location=Max('lokasi__timestamp'))
+            .filter(Q(latest_location__lt=stale_cutoff) | Q(latest_location__isnull=True))
+            .count()
+        )
+
+        low_rating_count = (
+            PKL.objects.filter(status_verifikasi='DITERIMA')
+            .annotate(avg_rating=Avg('ratings__score'))
+            .filter(avg_rating__lt=3, avg_rating__isnull=False)
+            .count()
+        )
+
+        inactive_verified = pkls.filter(status_verifikasi='DITERIMA', status_aktif=False).count()
+
+        reports = []
+        if overdue_pending:
+            reports.append({
+                'id': 'pending_overdue',
+                'title': 'PKL menunggu verifikasi',
+                'description': f'{overdue_pending} PKL belum diproses lebih dari 7 hari.',
+                'severity': 'warning',
+                'action': 'Periksa tab Data PKL > Pending',
+            })
+        if stale_active:
+            reports.append({
+                'id': 'stale_locations',
+                'title': 'Lokasi PKL tidak diperbarui',
+                'description': f'{stale_active} PKL aktif belum memperbarui lokasi dalam 3 hari.',
+                'severity': 'info',
+                'action': 'Hubungi PKL terkait untuk update lokasi',
+            })
+        if low_rating_count:
+            reports.append({
+                'id': 'low_rating',
+                'title': 'Rating PKL perlu perhatian',
+                'description': f'{low_rating_count} PKL memiliki rating di bawah 3.',
+                'severity': 'danger',
+                'action': 'Tinjau ulasan pembeli untuk PKL terkait',
+            })
+        if inactive_verified:
+            reports.append({
+                'id': 'inactive_verified',
+                'title': 'PKL terverifikasi tetapi non-aktif',
+                'description': f'{inactive_verified} PKL terverifikasi sedang offline.',
+                'severity': 'info',
+                'action': 'Pertimbangkan kampanye aktivasi PKL',
+            })
+
+        response_data = {
+            'summary': {
+                'total_pkl': total_pkl,
+                'verified_pkl': verified_pkl,
+                'pending_pkl': pending_pkl,
+                'rejected_pkl': rejected_pkl,
+                'active_pkl': active_pkl,
+                'inactive_pkl': inactive_pkl,
+                'new_pkls_week': new_pkls_week,
+                'prev_new_pkls': prev_new_pkls,
+                'location_updates_week': location_updates_week,
+                'prev_location_updates': prev_location_updates,
+                'average_rating': None if rating_summary['average'] is None else round(float(rating_summary['average']), 1),
+                'rating_count': rating_summary['count'] or 0,
+            },
+            'trend': trend_data,
+            'top_pkls': PKLListSerializer(top_pkls, many=True).data,
+            'pending_preview': PKLListSerializer(pending_preview, many=True).data,
+            'reports': reports,
+        }
+
+        return Response(response_data, status=status.HTTP_200_OK)
 
 
 # === PRE-ORDER ===
