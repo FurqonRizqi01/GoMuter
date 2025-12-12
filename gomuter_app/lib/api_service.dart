@@ -120,15 +120,16 @@ class ApiService {
 
   // === PKL products ===
 
-  static Future<List<Map<String, dynamic>>> getPKLProducts(
-    String token,
-  ) async {
+  static Future<List<Map<String, dynamic>>> getPKLProducts(String token) async {
     final url = Uri.parse('$baseUrl/api/pkl/products/');
     final response = await http.get(url, headers: _jsonHeaders(token: token));
 
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body) as List<dynamic>;
       return data.map((item) => Map<String, dynamic>.from(item)).toList();
+    }
+    if (response.statusCode == 404) {
+      return <Map<String, dynamic>>[];
     }
     throw Exception('Gagal mengambil produk PKL: ${response.body}');
   }
@@ -157,7 +158,11 @@ class ApiService {
 
     if (imageBytes != null && imageFileName != null) {
       request.files.add(
-        http.MultipartFile.fromBytes('image', imageBytes, filename: imageFileName),
+        http.MultipartFile.fromBytes(
+          'image',
+          imageBytes,
+          filename: imageFileName,
+        ),
       );
     }
 
@@ -200,7 +205,11 @@ class ApiService {
 
     if (imageBytes != null && imageFileName != null) {
       request.files.add(
-        http.MultipartFile.fromBytes('image', imageBytes, filename: imageFileName),
+        http.MultipartFile.fromBytes(
+          'image',
+          imageBytes,
+          filename: imageFileName,
+        ),
       );
     }
 
@@ -218,7 +227,10 @@ class ApiService {
     required int productId,
   }) async {
     final url = Uri.parse('$baseUrl/api/pkl/products/$productId/');
-    final response = await http.delete(url, headers: _jsonHeaders(token: token));
+    final response = await http.delete(
+      url,
+      headers: _jsonHeaders(token: token),
+    );
 
     if (response.statusCode == 204) {
       return;
@@ -322,7 +334,8 @@ class ApiService {
     final url = Uri.parse('$baseUrl/api/pkl/$pklId/rating/');
     final payload = {
       'score': double.parse(score.toStringAsFixed(1)),
-      if (comment != null && comment.trim().isNotEmpty) 'comment': comment.trim(),
+      if (comment != null && comment.trim().isNotEmpty)
+        'comment': comment.trim(),
     };
 
     final response = await http.post(
@@ -355,7 +368,9 @@ class ApiService {
 
   // === Endpoint admin ===
 
-  static Future<Map<String, dynamic>> getAdminDashboard({required String token}) async {
+  static Future<Map<String, dynamic>> getAdminDashboard({
+    required String token,
+  }) async {
     final url = Uri.parse('$baseUrl/api/pkl/admin/dashboard/');
     final response = await http.get(url, headers: _jsonHeaders(token: token));
 
@@ -382,9 +397,9 @@ class ApiService {
       query['search'] = search.trim();
     }
 
-    final uri = Uri.parse('$baseUrl/api/pkl/admin/pkls/').replace(
-      queryParameters: query.isEmpty ? null : query,
-    );
+    final uri = Uri.parse(
+      '$baseUrl/api/pkl/admin/pkls/',
+    ).replace(queryParameters: query.isEmpty ? null : query);
 
     final response = await http.get(uri, headers: _jsonHeaders(token: token));
     if (response.statusCode == 200) {
@@ -707,7 +722,10 @@ class ApiService {
     required int pklId,
   }) async {
     final url = Uri.parse('$baseUrl/api/pkl/buyer/favorites/$pklId/');
-    final response = await http.delete(url, headers: _jsonHeaders(token: token));
+    final response = await http.delete(
+      url,
+      headers: _jsonHeaders(token: token),
+    );
 
     if (response.statusCode == 204) {
       return;
@@ -724,8 +742,9 @@ class ApiService {
       'limit': limit.toString(),
       if (unreadOnly) 'unread': 'true',
     };
-    final url = Uri.parse('$baseUrl/api/pkl/buyer/notifications/')
-        .replace(queryParameters: params);
+    final url = Uri.parse(
+      '$baseUrl/api/pkl/buyer/notifications/',
+    ).replace(queryParameters: params);
 
     final response = await http.get(url, headers: _jsonHeaders(token: token));
     if (response.statusCode == 200) {

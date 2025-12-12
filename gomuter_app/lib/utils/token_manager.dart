@@ -7,7 +7,10 @@ class TokenManager {
   static const _accessKey = 'access_token';
   static const _refreshKey = 'refresh_token';
 
-  static Future<void> saveTokens({required String access, required String refresh}) async {
+  static Future<void> saveTokens({
+    required String access,
+    required String refresh,
+  }) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_accessKey, access);
     await prefs.setString(_refreshKey, refresh);
@@ -44,7 +47,9 @@ class TokenManager {
     }
 
     try {
-      final response = await ApiService.refreshAccessToken(refreshToken: refresh);
+      final response = await ApiService.refreshAccessToken(
+        refreshToken: refresh,
+      );
       final newAccess = response['access'] as String?;
       final newRefresh = (response['refresh'] as String?)?.trim();
 

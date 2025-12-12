@@ -43,7 +43,7 @@ class AdminErrorState extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 24),
-            
+
             // Title
             const Text(
               'Oops! Terjadi Kesalahan',
@@ -54,7 +54,7 @@ class AdminErrorState extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 12),
-            
+
             // Message
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
@@ -74,7 +74,7 @@ class AdminErrorState extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 24),
-            
+
             // Retry Button
             Container(
               decoration: BoxDecoration(
@@ -100,11 +100,7 @@ class AdminErrorState extends StatelessWidget {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(
-                          Icons.refresh,
-                          color: Colors.white,
-                          size: 20,
-                        ),
+                        Icon(Icons.refresh, color: Colors.white, size: 20),
                         SizedBox(width: 8),
                         Text(
                           'Coba Lagi',
@@ -130,10 +126,7 @@ class AdminErrorState extends StatelessWidget {
 class AdminEmptyState extends StatelessWidget {
   final String message;
 
-  const AdminEmptyState({
-    super.key,
-    required this.message,
-  });
+  const AdminEmptyState({super.key, required this.message});
 
   @override
   Widget build(BuildContext context) {
@@ -143,9 +136,7 @@ class AdminEmptyState extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.grey.shade50,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: Colors.grey.shade200,
-        ),
+        border: Border.all(color: Colors.grey.shade200),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -171,7 +162,7 @@ class AdminEmptyState extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 20),
-          
+
           // Message
           Text(
             message,

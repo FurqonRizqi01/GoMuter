@@ -16,7 +16,8 @@ class AdminReportsTab extends StatelessWidget {
   final Future<void> Function() onRefresh;
   final Future<void> Function() onRetry;
   final void Function(Map<String, dynamic> pkl, bool approve) onVerify;
-  final void Function(Map<String, dynamic> pkl, bool shouldBeActive) onToggleActive;
+  final void Function(Map<String, dynamic> pkl, bool shouldBeActive)
+  onToggleActive;
   final void Function(Map<String, dynamic> pkl) onShowDetail;
   final int? processingId;
 
@@ -62,10 +63,7 @@ class AdminReportsTab extends StatelessWidget {
             const SizedBox(height: 20),
             Text(
               'Memuat laporan...',
-              style: TextStyle(
-                color: Colors.grey.shade600,
-                fontSize: 14,
-              ),
+              style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
             ),
           ],
         ),
@@ -133,10 +131,7 @@ class AdminReportsTab extends StatelessWidget {
                         ),
                         Text(
                           'Perhatian dan prioritas',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey,
-                          ),
+                          style: TextStyle(fontSize: 12, color: Colors.grey),
                         ),
                       ],
                     ),
@@ -192,7 +187,7 @@ class AdminReportsTab extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 24),
-          
+
           // Pending PKLs Section
           Container(
             padding: const EdgeInsets.all(20),
@@ -293,15 +288,17 @@ class AdminReportsTab extends StatelessWidget {
                     ),
                   )
                 else
-                  ...pendingPkls.take(5).map(
-                    (pkl) => AdminPKLCard(
-                      pkl: pkl,
-                      isProcessing: processingId == pkl['id'],
-                      onVerify: onVerify,
-                      onToggleActive: onToggleActive,
-                      onShowDetail: onShowDetail,
-                    ),
-                  ),
+                  ...pendingPkls
+                      .take(5)
+                      .map(
+                        (pkl) => AdminPKLCard(
+                          pkl: pkl,
+                          isProcessing: processingId == pkl['id'],
+                          onVerify: onVerify,
+                          onToggleActive: onToggleActive,
+                          onShowDetail: onShowDetail,
+                        ),
+                      ),
               ],
             ),
           ),
@@ -325,9 +322,7 @@ class _ReportCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: colorSet.bgColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: colorSet.color.withValues(alpha: 0.3),
-        ),
+        border: Border.all(color: colorSet.color.withValues(alpha: 0.3)),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -342,11 +337,7 @@ class _ReportCard extends StatelessWidget {
                     color: colorSet.color.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: Icon(
-                    colorSet.icon,
-                    size: 18,
-                    color: colorSet.color,
-                  ),
+                  child: Icon(colorSet.icon, size: 18, color: colorSet.color),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -462,7 +453,7 @@ class _SeverityColorSet {
   final Color color;
   final Color bgColor;
   final IconData icon;
-  
+
   const _SeverityColorSet({
     required this.color,
     required this.bgColor,

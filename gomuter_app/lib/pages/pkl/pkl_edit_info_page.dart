@@ -48,6 +48,7 @@ class _PklEditInfoPageState extends State<PklEditInfoPage> {
   final _jenisDaganganController = TextEditingController();
   final _jamOperasionalController = TextEditingController();
   final _alamatController = TextEditingController();
+  final _tentangController = TextEditingController();
   final _namaRekeningController = TextEditingController();
   late final NumberFormat _currencyFormatter = NumberFormat.currency(
     locale: 'id_ID',
@@ -76,6 +77,7 @@ class _PklEditInfoPageState extends State<PklEditInfoPage> {
     _jenisDaganganController.dispose();
     _jamOperasionalController.dispose();
     _alamatController.dispose();
+    _tentangController.dispose();
     _namaRekeningController.dispose();
     super.dispose();
   }
@@ -94,7 +96,9 @@ class _PklEditInfoPageState extends State<PklEditInfoPage> {
 
   void _showSnack(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _loadProfile() async {
@@ -122,6 +126,7 @@ class _PklEditInfoPageState extends State<PklEditInfoPage> {
         _jenisDaganganController.text = profile['jenis_dagangan'] ?? '';
         _jamOperasionalController.text = profile['jam_operasional'] ?? '';
         _alamatController.text = profile['alamat_domisili'] ?? '';
+        _tentangController.text = profile['tentang'] ?? '';
         _namaRekeningController.text = profile['nama_rekening'] ?? '';
         setState(() {
           _isNewProfile = false;
@@ -198,6 +203,7 @@ class _PklEditInfoPageState extends State<PklEditInfoPage> {
         'jenis_dagangan': _jenisDaganganController.text.trim(),
         'jam_operasional': _jamOperasionalController.text.trim(),
         'alamat_domisili': _alamatController.text.trim(),
+        'tentang': _tentangController.text.trim(),
         'nama_rekening': _namaRekeningController.text.trim(),
       };
 
@@ -233,7 +239,9 @@ class _PklEditInfoPageState extends State<PklEditInfoPage> {
 
   Future<void> _handleAddProduct() async {
     if (_isNewProfile) {
-      _showSnack('Ajukan profil usaha terlebih dahulu sebelum menambah produk.');
+      _showSnack(
+        'Ajukan profil usaha terlebih dahulu sebelum menambah produk.',
+      );
       return;
     }
 
@@ -277,7 +285,8 @@ class _PklEditInfoPageState extends State<PklEditInfoPage> {
   }
 
   Future<void> _handleDeleteProduct(Map<String, dynamic> product) async {
-    final confirmed = await showDialog<bool>(
+    final confirmed =
+        await showDialog<bool>(
           context: context,
           builder: (context) => AlertDialog(
             title: const Text('Hapus Produk?'),
@@ -337,13 +346,16 @@ class _PklEditInfoPageState extends State<PklEditInfoPage> {
     }
   }
 
-  Future<_ProductFormResult?> _openProductForm({Map<String, dynamic>? product}) async {
+  Future<_ProductFormResult?> _openProductForm({
+    Map<String, dynamic>? product,
+  }) async {
     final nameController = TextEditingController(text: product?['name'] ?? '');
     final priceController = TextEditingController(
       text: product?['price']?.toString() ?? '',
     );
-    final descriptionController =
-        TextEditingController(text: product?['description'] ?? '');
+    final descriptionController = TextEditingController(
+      text: product?['description'] ?? '',
+    );
 
     bool isFeatured = product?['is_featured'] == true;
     bool isAvailable = product?['is_available'] != false;
@@ -426,7 +438,10 @@ class _PklEditInfoPageState extends State<PklEditInfoPage> {
                   children: const [
                     Icon(Icons.image_outlined, size: 36, color: Colors.grey),
                     SizedBox(height: 8),
-                    Text('Belum ada gambar', style: TextStyle(color: Colors.grey)),
+                    Text(
+                      'Belum ada gambar',
+                      style: TextStyle(color: Colors.grey),
+                    ),
                   ],
                 );
               }
@@ -511,14 +526,17 @@ class _PklEditInfoPageState extends State<PklEditInfoPage> {
                         ElevatedButton.icon(
                           onPressed: pickImage,
                           icon: const Icon(Icons.image_rounded),
-                          label: Text(selectedBytes != null
-                              ? 'Ganti Gambar'
-                              : existingImageUrl != null && !removeImage
-                                  ? 'Ubah Gambar'
-                                  : 'Pilih Gambar'),
+                          label: Text(
+                            selectedBytes != null
+                                ? 'Ganti Gambar'
+                                : existingImageUrl != null && !removeImage
+                                ? 'Ubah Gambar'
+                                : 'Pilih Gambar',
+                          ),
                         ),
                         const SizedBox(width: 12),
-                        if (selectedBytes != null || (existingImageUrl != null && !removeImage))
+                        if (selectedBytes != null ||
+                            (existingImageUrl != null && !removeImage))
                           TextButton.icon(
                             onPressed: clearImage,
                             icon: const Icon(Icons.delete_outline_rounded),
@@ -704,7 +722,10 @@ class _PklEditInfoPageState extends State<PklEditInfoPage> {
                     : _handleAddProduct,
                 style: FilledButton.styleFrom(
                   backgroundColor: const Color(0xFF0D8A3A),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
                 ),
                 icon: const Icon(Icons.add_rounded),
                 label: const Text('Tambah Menu'),
@@ -767,7 +788,9 @@ class _PklEditInfoPageState extends State<PklEditInfoPage> {
                   Text(
                     'Tambahkan minimal 1 menu unggulan lengkap dengan foto dan harga.',
                     textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.black.withValues(alpha: 0.6)),
+                    style: TextStyle(
+                      color: Colors.black.withValues(alpha: 0.6),
+                    ),
                   ),
                 ],
               ),
@@ -830,7 +853,9 @@ class _PklEditInfoPageState extends State<PklEditInfoPage> {
                   const SizedBox(height: 8),
                   Text(
                     description,
-                    style: TextStyle(color: Colors.black.withValues(alpha: 0.7)),
+                    style: TextStyle(
+                      color: Colors.black.withValues(alpha: 0.7),
+                    ),
                   ),
                 ],
                 const SizedBox(height: 10),
@@ -842,7 +867,9 @@ class _PklEditInfoPageState extends State<PklEditInfoPage> {
                       _buildTag('Unggulan', const Color(0xFFFFC107)),
                     _buildTag(
                       isAvailable ? 'Tersedia' : 'Stok habis',
-                      isAvailable ? const Color(0xFF0D8A3A) : const Color(0xFFD32F2F),
+                      isAvailable
+                          ? const Color(0xFF0D8A3A)
+                          : const Color(0xFFD32F2F),
                     ),
                   ],
                 ),
@@ -854,14 +881,16 @@ class _PklEditInfoPageState extends State<PklEditInfoPage> {
               IconButton(
                 tooltip: 'Ubah',
                 icon: const Icon(Icons.edit_outlined),
-                onPressed:
-                    _isProductMutating ? null : () => _handleEditProduct(product),
+                onPressed: _isProductMutating
+                    ? null
+                    : () => _handleEditProduct(product),
               ),
               IconButton(
                 tooltip: 'Hapus',
                 icon: const Icon(Icons.delete_outline_rounded),
-                onPressed:
-                    _isProductMutating ? null : () => _handleDeleteProduct(product),
+                onPressed: _isProductMutating
+                    ? null
+                    : () => _handleDeleteProduct(product),
               ),
             ],
           ),
@@ -1006,6 +1035,13 @@ class _PklEditInfoPageState extends State<PklEditInfoPage> {
                     label: 'Nama Rekening (opsional)',
                     controller: _namaRekeningController,
                     icon: Icons.account_balance_wallet_rounded,
+                  ),
+                  const SizedBox(height: 18),
+                  _buildRoundedField(
+                    label: 'Tentang (opsional)',
+                    controller: _tentangController,
+                    icon: Icons.info_outline_rounded,
+                    maxLines: 4,
                   ),
                   const SizedBox(height: 28),
                   _buildProductSection(),

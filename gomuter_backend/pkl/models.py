@@ -19,6 +19,7 @@ class PKL(models.Model):
     jam_operasional = models.CharField(max_length=100)
     status_aktif = models.BooleanField(default=False)
     alamat_domisili = models.CharField(max_length=200, blank=True, null=True)
+    tentang = models.TextField(blank=True, null=True)
     nama_rekening = models.CharField(max_length=100, blank=True, null=True)
     qris_image_url = models.CharField(max_length=255, blank=True, null=True)
     qris_link = models.CharField(max_length=255, blank=True, null=True)

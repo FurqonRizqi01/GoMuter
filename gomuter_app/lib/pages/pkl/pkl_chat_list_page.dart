@@ -107,17 +107,14 @@ class _PklChatListPageState extends State<PklChatListPage> {
                       ..._chats.map<Widget>(
                         (chat) => Padding(
                           padding: const EdgeInsets.only(bottom: 14),
-                          child: _buildChatTile(
-                            chat as Map<String, dynamic>,
-                          ),
+                          child: _buildChatTile(chat as Map<String, dynamic>),
                         ),
                       ),
                   ],
                 ),
               ),
             ),
-      bottomNavigationBar:
-          const PklBottomNavBar(current: PklNavItem.chat),
+      bottomNavigationBar: const PklBottomNavBar(current: PklNavItem.chat),
     );
   }
 

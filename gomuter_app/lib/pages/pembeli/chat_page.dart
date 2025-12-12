@@ -208,13 +208,13 @@ class _ChatPageState extends State<ChatPage> {
       body: _isLoading
           ? _buildLoadingState()
           : _error != null
-              ? _buildErrorState()
-              : Column(
-                  children: [
-                    Expanded(child: _buildMessages()),
-                    _buildInputArea(),
-                  ],
-                ),
+          ? _buildErrorState()
+          : Column(
+              children: [
+                Expanded(child: _buildMessages()),
+                _buildInputArea(),
+              ],
+            ),
     );
   }
 
@@ -255,8 +255,11 @@ class _ChatPageState extends State<ChatPage> {
               ],
             ),
             child: const Center(
-              child: Icon(Icons.storefront_rounded,
-                  color: Colors.white, size: 24),
+              child: Icon(
+                Icons.storefront_rounded,
+                color: Colors.white,
+                size: 24,
+              ),
             ),
           ),
           const SizedBox(width: 12),
@@ -335,10 +338,7 @@ class _ChatPageState extends State<ChatPage> {
           const SizedBox(height: 20),
           Text(
             'Memuat percakapan...',
-            style: TextStyle(
-              color: Colors.grey[600],
-              fontSize: 14,
-            ),
+            style: TextStyle(color: Colors.grey[600], fontSize: 14),
           ),
         ],
       ),
@@ -382,8 +382,10 @@ class _ChatPageState extends State<ChatPage> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: _primaryGreen,
                 foregroundColor: Colors.white,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
+                ),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -427,10 +429,7 @@ class _ChatPageState extends State<ChatPage> {
               const SizedBox(height: 8),
               Text(
                 'Mulai sapa PKL sekarang!',
-                style: TextStyle(
-                  color: Colors.grey[500],
-                  fontSize: 14,
-                ),
+                style: TextStyle(color: Colors.grey[500], fontSize: 14),
               ),
             ],
           ),
@@ -499,8 +498,9 @@ class _ChatPageState extends State<ChatPage> {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
-        mainAxisAlignment:
-            isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+        mainAxisAlignment: isMe
+            ? MainAxisAlignment.end
+            : MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           if (!isMe) ...[
@@ -516,8 +516,11 @@ class _ChatPageState extends State<ChatPage> {
                 borderRadius: BorderRadius.circular(10),
               ),
               child: const Center(
-                child: Icon(Icons.storefront_rounded,
-                    color: Colors.white, size: 16),
+                child: Icon(
+                  Icons.storefront_rounded,
+                  color: Colors.white,
+                  size: 16,
+                ),
               ),
             ),
             const SizedBox(width: 8),
@@ -545,8 +548,9 @@ class _ChatPageState extends State<ChatPage> {
                 ],
               ),
               child: Column(
-                crossAxisAlignment:
-                    isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                crossAxisAlignment: isMe
+                    ? CrossAxisAlignment.end
+                    : CrossAxisAlignment.start,
                 children: [
                   if (!isMe)
                     Padding(
@@ -700,8 +704,9 @@ class _ChatPageState extends State<ChatPage> {
                             height: 20,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              valueColor:
-                                  AlwaysStoppedAnimation<Color>(Colors.white),
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                Colors.white,
+                              ),
                             ),
                           )
                         : const Icon(

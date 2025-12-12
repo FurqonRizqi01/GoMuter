@@ -115,9 +115,7 @@ class AdminSummaryTab extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [_primaryColor, _secondaryColor],
-            ),
+            gradient: LinearGradient(colors: [_primaryColor, _secondaryColor]),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Icon(icon, color: Colors.white, size: 20),
@@ -146,14 +144,16 @@ class _SummaryCardGrid extends StatelessWidget {
       _DashboardStatCard(
         title: 'Total PKL',
         value: _formatNumber(summary['total_pkl']),
-        subtitle: 'Aktif ${summary['active_pkl']} • Offline ${summary['inactive_pkl']}',
+        subtitle:
+            'Aktif ${summary['active_pkl']} • Offline ${summary['inactive_pkl']}',
         icon: Icons.store,
         gradientColors: [const Color(0xFF667eea), const Color(0xFF764ba2)],
       ),
       _DashboardStatCard(
         title: 'Verifikasi',
         value: _formatNumber(summary['verified_pkl']),
-        subtitle: 'Pending ${summary['pending_pkl']} • Ditolak ${summary['rejected_pkl']}',
+        subtitle:
+            'Pending ${summary['pending_pkl']} • Ditolak ${summary['rejected_pkl']}',
         icon: Icons.verified_user,
         gradientColors: [const Color(0xFF11998e), const Color(0xFF38ef7d)],
       ),
@@ -190,13 +190,13 @@ class _SummaryCardGrid extends StatelessWidget {
         final crossAxisCount = isTablet
             ? 4
             : isLargePhone
-                ? 3
-                : 2;
+            ? 3
+            : 2;
         final childAspectRatio = isTablet
             ? 1.4
             : isLargePhone
-                ? 1.25
-                : 1.05;
+            ? 1.25
+            : 1.05;
 
         return GridView.builder(
           shrinkWrap: true,
@@ -401,10 +401,7 @@ class _TrendCard extends StatelessWidget {
                     color: Color(0xFF11998e),
                     label: 'Dilihat Pembeli',
                   ),
-                  _TrendLegend(
-                    color: Color(0xFFf7971e),
-                    label: 'Pencarian',
-                  ),
+                  _TrendLegend(color: Color(0xFFf7971e), label: 'Pencarian'),
                 ],
               ),
             ],
@@ -476,7 +473,11 @@ class _TopPKLSection extends StatelessWidget {
                 child: Center(
                   child: Column(
                     children: [
-                      Icon(Icons.star_border, size: 40, color: Colors.grey.shade400),
+                      Icon(
+                        Icons.star_border,
+                        size: 40,
+                        color: Colors.grey.shade400,
+                      ),
                       const SizedBox(height: 8),
                       Text(
                         'Belum ada rating',
@@ -490,18 +491,23 @@ class _TopPKLSection extends StatelessWidget {
               ...pkls.asMap().entries.map((entry) {
                 final index = entry.key;
                 final pkl = entry.value;
-                final rating = _formatRating(pkl['average_rating'], pkl['rating_count']);
+                final rating = _formatRating(
+                  pkl['average_rating'],
+                  pkl['rating_count'],
+                );
                 final isActive = pkl['status_aktif'] == true;
-                
+
                 return Container(
-                  margin: EdgeInsets.only(bottom: index < pkls.length - 1 ? 12 : 0),
+                  margin: EdgeInsets.only(
+                    bottom: index < pkls.length - 1 ? 12 : 0,
+                  ),
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: index == 0 
+                    color: index == 0
                         ? _goldColor.withValues(alpha: 0.1)
                         : Colors.grey.shade50,
                     borderRadius: BorderRadius.circular(16),
-                    border: index == 0 
+                    border: index == 0
                         ? Border.all(color: _goldColor.withValues(alpha: 0.3))
                         : null,
                   ),
@@ -513,10 +519,16 @@ class _TopPKLSection extends StatelessWidget {
                         decoration: BoxDecoration(
                           gradient: index == 0
                               ? const LinearGradient(
-                                  colors: [Color(0xFFf7971e), Color(0xFFffd200)],
+                                  colors: [
+                                    Color(0xFFf7971e),
+                                    Color(0xFFffd200),
+                                  ],
                                 )
                               : LinearGradient(
-                                  colors: [Colors.grey.shade300, Colors.grey.shade400],
+                                  colors: [
+                                    Colors.grey.shade300,
+                                    Colors.grey.shade400,
+                                  ],
                                 ),
                           shape: BoxShape.circle,
                         ),
@@ -524,7 +536,9 @@ class _TopPKLSection extends StatelessWidget {
                           child: Text(
                             '${index + 1}',
                             style: TextStyle(
-                              color: index == 0 ? Colors.white : Colors.grey.shade600,
+                              color: index == 0
+                                  ? Colors.white
+                                  : Colors.grey.shade600,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -559,7 +573,7 @@ class _TopPKLSection extends StatelessWidget {
                           vertical: 4,
                         ),
                         decoration: BoxDecoration(
-                          color: isActive 
+                          color: isActive
                               ? Colors.green.withValues(alpha: 0.1)
                               : Colors.grey.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(20),
@@ -606,10 +620,7 @@ class _PendingPreview extends StatelessWidget {
   final List<Map<String, dynamic>> pending;
   final void Function(Map<String, dynamic> pkl)? onApprovePending;
 
-  const _PendingPreview({
-    required this.pending,
-    this.onApprovePending,
-  });
+  const _PendingPreview({required this.pending, this.onApprovePending});
 
   @override
   Widget build(BuildContext context) {
@@ -709,10 +720,7 @@ class _PendingPreview extends StatelessWidget {
                         color: Colors.orange.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: const Icon(
-                        Icons.store,
-                        color: Colors.orange,
-                      ),
+                      child: const Icon(Icons.store, color: Colors.orange),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
@@ -747,8 +755,8 @@ class _PendingPreview extends StatelessWidget {
                       child: Material(
                         color: Colors.transparent,
                         child: InkWell(
-                          onTap: onApprovePending == null 
-                              ? null 
+                          onTap: onApprovePending == null
+                              ? null
                               : () => onApprovePending!(pkl),
                           borderRadius: BorderRadius.circular(10),
                           child: const Padding(

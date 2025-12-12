@@ -166,7 +166,6 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
     await _loadChatBadge();
   }
 
-
   Future<void> _loadSavedRadius() async {
     final prefs = await _getPrefs();
     final saved = prefs.getInt('buyer_radius');
@@ -419,7 +418,9 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
         });
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Aktifkan layanan lokasi untuk memakai filter radius.'),
+            content: Text(
+              'Aktifkan layanan lokasi untuk memakai filter radius.',
+            ),
           ),
         );
       }
@@ -432,9 +433,7 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
     }
 
     final activeCategory = _selectedCategory;
-    await _loadPkls(
-      jenis: activeCategory == 'Semua' ? null : activeCategory,
-    );
+    await _loadPkls(jenis: activeCategory == 'Semua' ? null : activeCategory);
   }
 
   Future<void> _toggleFavorite(int pklId) async {
@@ -1276,14 +1275,16 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
     String formatRadius(int value) {
       if (value >= 1000) {
         final km = value / 1000;
-        return km % 1 == 0 ? '${km.toStringAsFixed(0)} km' : '${km.toStringAsFixed(1)} km';
+        return km % 1 == 0
+            ? '${km.toStringAsFixed(0)} km'
+            : '${km.toStringAsFixed(1)} km';
       }
       return '$value m';
     }
 
     final badgeText = _selectedRadius == null
-      ? 'Tanpa batas'
-      : formatRadius(_selectedRadius!);
+        ? 'Tanpa batas'
+        : formatRadius(_selectedRadius!);
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -1311,9 +1312,7 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
                   const SizedBox(width: 8),
                   const Text(
                     'Radius pencarian',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                    ),
+                    style: TextStyle(fontWeight: FontWeight.w700),
                   ),
                 ],
               ),
@@ -1325,8 +1324,10 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
                       child: const Text('Hapus radius'),
                     ),
                   Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: _lightGreen,
                       borderRadius: BorderRadius.circular(20),

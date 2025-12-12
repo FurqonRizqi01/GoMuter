@@ -49,7 +49,9 @@ class _AdminHomePageState extends State<AdminHomePage>
     }
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Sesi admin berakhir, silakan login ulang.')),
+        const SnackBar(
+          content: Text('Sesi admin berakhir, silakan login ulang.'),
+        ),
       );
     }
     return null;
@@ -74,8 +76,11 @@ class _AdminHomePageState extends State<AdminHomePage>
   }
 
   List<Map<String, dynamic>> get _pendingPkls => _pkls
-      .where((item) =>
-          (item['status_verifikasi'] ?? '').toString().toUpperCase() == 'PENDING')
+      .where(
+        (item) =>
+            (item['status_verifikasi'] ?? '').toString().toUpperCase() ==
+            'PENDING',
+      )
       .map((item) => Map<String, dynamic>.from(item as Map))
       .toList();
 
@@ -148,19 +153,14 @@ class _AdminHomePageState extends State<AdminHomePage>
   }
 
   Future<void> _refreshAll() async {
-    await Future.wait<void>([
-      _loadDashboard(),
-      _loadPKLs(),
-    ]);
+    await Future.wait<void>([_loadDashboard(), _loadPKLs()]);
   }
 
   void _showLogoutDialog() {
     showDialog(
       context: context,
       builder: (context) => Dialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(24),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         child: Container(
           padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
@@ -177,14 +177,10 @@ class _AdminHomePageState extends State<AdminHomePage>
                   color: Colors.red.shade50,
                   shape: BoxShape.circle,
                 ),
-                child: Icon(
-                  Icons.logout,
-                  size: 40,
-                  color: Colors.red.shade400,
-                ),
+                child: Icon(Icons.logout, size: 40, color: Colors.red.shade400),
               ),
               const SizedBox(height: 20),
-              
+
               // Title
               const Text(
                 'Keluar dari Akun?',
@@ -195,7 +191,7 @@ class _AdminHomePageState extends State<AdminHomePage>
                 ),
               ),
               const SizedBox(height: 12),
-              
+
               // Description
               Text(
                 'Anda akan keluar dari panel admin GoMuter. Pastikan semua pekerjaan sudah tersimpan.',
@@ -207,7 +203,7 @@ class _AdminHomePageState extends State<AdminHomePage>
                 ),
               ),
               const SizedBox(height: 24),
-              
+
               // Buttons
               Row(
                 children: [
@@ -373,7 +369,10 @@ class _AdminHomePageState extends State<AdminHomePage>
                         padding: const EdgeInsets.only(top: 8),
                         child: Text(
                           errorText!,
-                          style: const TextStyle(color: Colors.red, fontSize: 12),
+                          style: const TextStyle(
+                            color: Colors.red,
+                            fontSize: 12,
+                          ),
                         ),
                       ),
                     const SizedBox(height: 24),
@@ -424,7 +423,9 @@ class _AdminHomePageState extends State<AdminHomePage>
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.transparent,
                                 shadowColor: Colors.transparent,
-                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 14,
+                                ),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
                                 ),
@@ -489,15 +490,17 @@ class _AdminHomePageState extends State<AdminHomePage>
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(approve ? 'PKL diterima dan diaktifkan.' : 'PKL ditolak.'),
+          content: Text(
+            approve ? 'PKL diterima dan diaktifkan.' : 'PKL ditolak.',
+          ),
         ),
       );
       await _refreshAll();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Gagal memproses PKL: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Gagal memproses PKL: $e')));
     } finally {
       if (mounted) {
         setState(() {
@@ -507,7 +510,10 @@ class _AdminHomePageState extends State<AdminHomePage>
     }
   }
 
-  Future<void> _updateActiveStatus(Map<String, dynamic> pkl, bool shouldBeActive) async {
+  Future<void> _updateActiveStatus(
+    Map<String, dynamic> pkl,
+    bool shouldBeActive,
+  ) async {
     final id = pkl['id'] as int?;
     if (id == null) return;
     if (!mounted) return;
@@ -532,7 +538,9 @@ class _AdminHomePageState extends State<AdminHomePage>
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(shouldBeActive ? 'PKL diaktifkan.' : 'PKL dinonaktifkan.'),
+          content: Text(
+            shouldBeActive ? 'PKL diaktifkan.' : 'PKL dinonaktifkan.',
+          ),
         ),
       );
       await _refreshAll();
@@ -559,7 +567,7 @@ class _AdminHomePageState extends State<AdminHomePage>
         final latestUpdate = pkl['latest_timestamp'] as String?;
         final status = (pkl['status_verifikasi'] ?? '-').toString();
         final isActive = pkl['status_aktif'] == true;
-        
+
         return Container(
           height: MediaQuery.of(context).size.height * 0.75,
           decoration: const BoxDecoration(
@@ -689,7 +697,10 @@ class _AdminHomePageState extends State<AdminHomePage>
                     _buildDetailCard(
                       icon: Icons.star,
                       title: 'Rating',
-                      value: _formatRating(pkl['average_rating'], pkl['rating_count']),
+                      value: _formatRating(
+                        pkl['average_rating'],
+                        pkl['rating_count'],
+                      ),
                       valueColor: _goldColor,
                     ),
                   ],
@@ -1016,18 +1027,13 @@ class _AdminHomePageState extends State<AdminHomePage>
         controller: _tabController,
         indicator: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
-          gradient: LinearGradient(
-            colors: [_primaryColor, _secondaryColor],
-          ),
+          gradient: LinearGradient(colors: [_primaryColor, _secondaryColor]),
         ),
         indicatorSize: TabBarIndicatorSize.tab,
         dividerColor: Colors.transparent,
         labelColor: Colors.white,
         unselectedLabelColor: Colors.grey.shade600,
-        labelStyle: const TextStyle(
-          fontWeight: FontWeight.w600,
-          fontSize: 13,
-        ),
+        labelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
         labelPadding: EdgeInsets.zero,
         tabs: [

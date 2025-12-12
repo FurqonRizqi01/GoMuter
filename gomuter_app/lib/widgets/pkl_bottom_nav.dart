@@ -96,9 +96,14 @@ class PklBottomNavBar extends StatelessWidget {
                   onTap: () => _handleTap(context, item),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 8,
+                      horizontal: 6,
+                    ),
                     decoration: BoxDecoration(
-                      color: isActive ? const Color(0xFFE8F9EF) : Colors.transparent,
+                      color: isActive
+                          ? const Color(0xFFE8F9EF)
+                          : Colors.transparent,
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: Column(
@@ -111,8 +116,12 @@ class PklBottomNavBar extends StatelessWidget {
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             fontSize: 12,
-                            fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
-                            color: isActive ? const Color(0xFF0D8A3A) : Colors.black87,
+                            fontWeight: isActive
+                                ? FontWeight.w600
+                                : FontWeight.w500,
+                            color: isActive
+                                ? const Color(0xFF0D8A3A)
+                                : Colors.black87,
                           ),
                         ),
                       ],

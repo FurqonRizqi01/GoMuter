@@ -10,7 +10,8 @@ class AdminPKLCard extends StatelessWidget {
   final Map<String, dynamic> pkl;
   final bool isProcessing;
   final void Function(Map<String, dynamic> pkl, bool approve)? onVerify;
-  final void Function(Map<String, dynamic> pkl, bool shouldBeActive)? onToggleActive;
+  final void Function(Map<String, dynamic> pkl, bool shouldBeActive)?
+  onToggleActive;
   final void Function(Map<String, dynamic> pkl)? onShowDetail;
 
   AdminPKLCard({
@@ -134,7 +135,7 @@ class AdminPKLCard extends StatelessWidget {
                               vertical: 4,
                             ),
                             decoration: BoxDecoration(
-                              color: isActive 
+                              color: isActive
                                   ? Colors.green.withValues(alpha: 0.12)
                                   : Colors.grey.withValues(alpha: 0.12),
                               borderRadius: BorderRadius.circular(20),
@@ -146,7 +147,9 @@ class AdminPKLCard extends StatelessWidget {
                                   width: 6,
                                   height: 6,
                                   decoration: BoxDecoration(
-                                    color: isActive ? Colors.green : Colors.grey,
+                                    color: isActive
+                                        ? Colors.green
+                                        : Colors.grey,
                                     shape: BoxShape.circle,
                                   ),
                                 ),
@@ -154,7 +157,9 @@ class AdminPKLCard extends StatelessWidget {
                                 Text(
                                   isActive ? 'Aktif' : 'Offline',
                                   style: TextStyle(
-                                    color: isActive ? Colors.green : Colors.grey,
+                                    color: isActive
+                                        ? Colors.green
+                                        : Colors.grey,
                                     fontSize: 11,
                                     fontWeight: FontWeight.w600,
                                   ),
@@ -176,7 +181,9 @@ class AdminPKLCard extends StatelessWidget {
                   child: Material(
                     color: Colors.transparent,
                     child: InkWell(
-                      onTap: onShowDetail == null ? null : () => onShowDetail!(pkl),
+                      onTap: onShowDetail == null
+                          ? null
+                          : () => onShowDetail!(pkl),
                       borderRadius: BorderRadius.circular(12),
                       child: const Padding(
                         padding: EdgeInsets.all(10),
@@ -192,7 +199,7 @@ class AdminPKLCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 16),
-            
+
             // Info Chips Row
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
@@ -201,7 +208,10 @@ class AdminPKLCard extends StatelessWidget {
                   _InfoChip(
                     icon: Icons.star,
                     iconColor: Colors.amber,
-                    label: _formatRating(pkl['average_rating'], pkl['rating_count']),
+                    label: _formatRating(
+                      pkl['average_rating'],
+                      pkl['rating_count'],
+                    ),
                   ),
                   if (latestUpdate != null) ...[
                     const SizedBox(width: 10),
@@ -215,7 +225,7 @@ class AdminPKLCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 16),
-            
+
             // Action Buttons
             if (isPending)
               Column(
@@ -246,7 +256,9 @@ class AdminPKLCard extends StatelessWidget {
                                   : () => onVerify!(pkl, true),
                               borderRadius: BorderRadius.circular(12),
                               child: Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 12,
+                                ),
                                 child: Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
@@ -288,7 +300,9 @@ class AdminPKLCard extends StatelessWidget {
                                   : () => onVerify!(pkl, false),
                               borderRadius: BorderRadius.circular(12),
                               child: Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 12,
+                                ),
                                 child: Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
@@ -321,7 +335,9 @@ class AdminPKLCard extends StatelessWidget {
                         borderRadius: BorderRadius.circular(10),
                         child: const LinearProgressIndicator(
                           backgroundColor: Color(0xFFE8F5F0),
-                          valueColor: AlwaysStoppedAnimation<Color>(_primaryColor),
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            _primaryColor,
+                          ),
                           minHeight: 4,
                         ),
                       ),
@@ -357,15 +373,21 @@ class AdminPKLCard extends StatelessWidget {
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 Icon(
-                                  isActive ? Icons.power_settings_new : Icons.play_arrow,
-                                  color: isActive ? Colors.orange : _primaryColor,
+                                  isActive
+                                      ? Icons.power_settings_new
+                                      : Icons.play_arrow,
+                                  color: isActive
+                                      ? Colors.orange
+                                      : _primaryColor,
                                   size: 18,
                                 ),
                                 const SizedBox(width: 6),
                                 Text(
                                   isActive ? 'Set Offline' : 'Aktifkan',
                                   style: TextStyle(
-                                    color: isActive ? Colors.orange : _primaryColor,
+                                    color: isActive
+                                        ? Colors.orange
+                                        : _primaryColor,
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),

@@ -41,6 +41,9 @@ class _PklDetailPageState extends State<PklDetailPage> {
   String? _userRatingComment;
   bool _isRatingLoading = false;
 
+  bool _isBuyerMarkerSelected = false;
+  bool _isPklMarkerSelected = false;
+
   @override
   void initState() {
     super.initState();
@@ -139,6 +142,90 @@ class _PklDetailPageState extends State<PklDetailPage> {
     } catch (_) {
       // Buyer position is optional for this view.
     }
+  }
+
+  void _toggleBuyerMarker() {
+    setState(() {
+      _isBuyerMarkerSelected = !_isBuyerMarkerSelected;
+    });
+  }
+
+  void _togglePklMarker() {
+    setState(() {
+      _isPklMarkerSelected = !_isPklMarkerSelected;
+    });
+  }
+
+  String _formatDistance(double meters) {
+    if (meters >= 1000) {
+      final km = meters / 1000;
+      return '${km.toStringAsFixed(km < 10 ? 1 : 0)} km';
+    }
+    return '${meters.round()} m';
+  }
+
+  LatLng _midpoint(LatLng a, LatLng b) {
+    return LatLng(
+      (a.latitude + b.latitude) / 2,
+      (a.longitude + b.longitude) / 2,
+    );
+  }
+
+  Widget _buildDistanceLabel(String text) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: Colors.black.withValues(alpha: 0.08)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.12),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Text(
+        text,
+        style: const TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+          color: Colors.black87,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMapMarker({
+    required IconData icon,
+    required Color color,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        curve: Curves.easeOut,
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(20),
+          border: selected
+              ? Border.all(color: Colors.white, width: 2)
+              : Border.all(color: Colors.white.withValues(alpha: 0.2)),
+          boxShadow: [
+            BoxShadow(
+              color: color.withValues(alpha: 0.35),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        padding: const EdgeInsets.all(8),
+        child: Icon(icon, color: Colors.white, size: 22),
+      ),
+    );
   }
 
   Future<void> _loadRatingSummary() async {
@@ -447,83 +534,158 @@ class _PklDetailPageState extends State<PklDetailPage> {
   void _showMapSheet() {
     final location = _pklLatLng;
     if (location == null) return;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       builder: (ctx) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        return StatefulBuilder(
+          builder: (ctx, setSheetState) {
+            final buyer = _buyerLatLng;
+            final showLine =
+                buyer != null && _isBuyerMarkerSelected && _isPklMarkerSelected;
+
+            final distanceMeters = showLine
+                ? (_distanceMeters ?? _computeDistance(buyer, location))
+                : null;
+            final distanceText = distanceMeters != null
+                ? _formatDistance(distanceMeters)
+                : null;
+            final labelPoint = distanceText != null
+                ? _midpoint(buyer!, location)
+                : null;
+
+            void toggleBuyerMarker() {
+              setState(() {
+                _isBuyerMarkerSelected = !_isBuyerMarkerSelected;
+              });
+              setSheetState(() {});
+            }
+
+            void togglePklMarker() {
+              setState(() {
+                _isPklMarkerSelected = !_isPklMarkerSelected;
+              });
+              setSheetState(() {});
+            }
+
+            return SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Lokasi PKL',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    IconButton(
-                      onPressed: () => Navigator.of(ctx).pop(),
-                      icon: const Icon(Icons.close),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                SizedBox(
-                  height: MediaQuery.of(ctx).size.height * 0.4,
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(16),
-                    child: FlutterMap(
-                      options: MapOptions(
-                        initialCenter: location,
-                        initialZoom: 16,
-                      ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        TileLayer(
-                          urlTemplate:
-                              'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-                          subdomains: const ['a', 'b', 'c'],
-                          userAgentPackageName: 'com.example.gomuter_app',
+                        const Text(
+                          'Lokasi PKL',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
-                        MarkerLayer(
-                          markers: [
-                            Marker(
-                              point: location,
-                              width: 36,
-                              height: 36,
-                              child: const Icon(
-                                Icons.location_pin,
-                                size: 36,
-                                color: Colors.red,
-                              ),
-                            ),
-                          ],
+                        IconButton(
+                          onPressed: () => Navigator.of(ctx).pop(),
+                          icon: const Icon(Icons.close),
                         ),
                       ],
                     ),
-                  ),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      height: MediaQuery.of(ctx).size.height * 0.4,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(16),
+                        child: FlutterMap(
+                          options: MapOptions(
+                            initialCenter: location,
+                            initialZoom: 16,
+                          ),
+                          children: [
+                            TileLayer(
+                              urlTemplate:
+                                  'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+                              subdomains: const ['a', 'b', 'c'],
+                              userAgentPackageName: 'com.example.gomuter_app',
+                            ),
+                            if (showLine)
+                              PolylineLayer(
+                                polylines: [
+                                  Polyline(
+                                    points: [buyer, location],
+                                    strokeWidth: 4,
+                                    color: _secondaryGreen.withValues(
+                                      alpha: 0.9,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            if (labelPoint != null && distanceText != null)
+                              MarkerLayer(
+                                markers: [
+                                  Marker(
+                                    point: labelPoint,
+                                    width: 140,
+                                    height: 40,
+                                    child: IgnorePointer(
+                                      child: Center(
+                                        child: _buildDistanceLabel(
+                                          distanceText,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            MarkerLayer(
+                              markers: [
+                                if (buyer != null)
+                                  Marker(
+                                    point: buyer,
+                                    width: 44,
+                                    height: 44,
+                                    child: _buildMapMarker(
+                                      icon: Icons.person_pin_circle_rounded,
+                                      color: _accentPeach,
+                                      selected: _isBuyerMarkerSelected,
+                                      onTap: toggleBuyerMarker,
+                                    ),
+                                  ),
+                                Marker(
+                                  point: location,
+                                  width: 44,
+                                  height: 44,
+                                  child: _buildMapMarker(
+                                    icon: Icons.storefront_rounded,
+                                    color: _primaryGreen,
+                                    selected: _isPklMarkerSelected,
+                                    onTap: togglePklMarker,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          Navigator.of(ctx).pop();
+                          _openExternalMap();
+                        },
+                        icon: const Icon(Icons.map_outlined),
+                        label: const Text('Buka di Google Maps'),
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 12),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      Navigator.of(ctx).pop();
-                      _openExternalMap();
-                    },
-                    icon: const Icon(Icons.map_outlined),
-                    label: const Text('Buka di Google Maps'),
-                  ),
-                ),
-              ],
-            ),
-          ),
+              ),
+            );
+          },
         );
       },
     );
@@ -1120,10 +1282,8 @@ class _PklDetailPageState extends State<PklDetailPage> {
   }
 
   Widget _buildAboutSection(Map<String, dynamic> data) {
-    final catatan = (data['catatan_verifikasi'] ?? '') as String;
-    final description = catatan.isNotEmpty
-        ? catatan
-        : 'Warung dengan menu legendaris yang menggunakan bahan-bahan pilihan berkualitas tinggi dan bumbu racikan khusus yang membuat cita rasa unik dan nikmat.';
+    final tentang = (data['tentang'] ?? '') as String;
+    final description = tentang.isNotEmpty ? tentang : 'Belum ada deskripsi.';
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -1152,7 +1312,19 @@ class _PklDetailPageState extends State<PklDetailPage> {
     );
   }
 
-  Widget _buildPhotoSection() {
+  Widget _buildPhotoSection(Map<String, dynamic> data) {
+    final productsRaw = data['products'];
+    final products = productsRaw is List ? productsRaw : const [];
+    final imageUrls = <String>[];
+    for (final item in products) {
+      if (item is Map) {
+        final url = item['image_url'];
+        if (url is String && url.isNotEmpty) {
+          imageUrls.add(url);
+        }
+      }
+    }
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
@@ -1171,8 +1343,38 @@ class _PklDetailPageState extends State<PklDetailPage> {
             height: 90,
             child: ListView.builder(
               scrollDirection: Axis.horizontal,
-              itemCount: 3,
+              itemCount: imageUrls.isEmpty ? 3 : imageUrls.length,
               itemBuilder: (context, index) {
+                if (imageUrls.isNotEmpty) {
+                  final url = imageUrls[index];
+                  return Container(
+                    width: 90,
+                    height: 90,
+                    margin: EdgeInsets.only(
+                      right: index < imageUrls.length - 1 ? 12 : 0,
+                    ),
+                    decoration: BoxDecoration(
+                      color: _lightGreen,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(16),
+                      child: Image.network(
+                        url,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) {
+                          return Icon(
+                            _getCategoryIcon(
+                              _detail?['jenis_dagangan'] as String? ?? '',
+                            ),
+                            color: _primaryGreen.withValues(alpha: 0.5),
+                            size: 32,
+                          );
+                        },
+                      ),
+                    ),
+                  );
+                }
                 return Container(
                   width: 90,
                   height: 90,
@@ -1267,6 +1469,20 @@ class _PklDetailPageState extends State<PklDetailPage> {
       return const SizedBox.shrink();
     }
 
+    final buyer = _buyerLatLng;
+    final showLine =
+        buyer != null && _isBuyerMarkerSelected && _isPklMarkerSelected;
+
+    final distanceMeters = showLine
+        ? (_distanceMeters ?? _computeDistance(buyer, _pklLatLng))
+        : null;
+    final distanceText = distanceMeters != null
+        ? _formatDistance(distanceMeters)
+        : null;
+    final labelPoint = distanceText != null
+        ? _midpoint(buyer!, _pklLatLng!)
+        : null;
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
@@ -1309,29 +1525,54 @@ class _PklDetailPageState extends State<PklDetailPage> {
                         subdomains: const ['a', 'b', 'c'],
                         userAgentPackageName: 'com.example.gomuter_app',
                       ),
+                      if (showLine)
+                        PolylineLayer(
+                          polylines: [
+                            Polyline(
+                              points: [buyer, _pklLatLng!],
+                              strokeWidth: 4,
+                              color: _secondaryGreen.withValues(alpha: 0.9),
+                            ),
+                          ],
+                        ),
+                      if (labelPoint != null && distanceText != null)
+                        MarkerLayer(
+                          markers: [
+                            Marker(
+                              point: labelPoint,
+                              width: 140,
+                              height: 40,
+                              child: IgnorePointer(
+                                child: Center(
+                                  child: _buildDistanceLabel(distanceText),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       MarkerLayer(
                         markers: [
+                          if (buyer != null)
+                            Marker(
+                              point: buyer,
+                              width: 44,
+                              height: 44,
+                              child: _buildMapMarker(
+                                icon: Icons.person_pin_circle_rounded,
+                                color: _accentPeach,
+                                selected: _isBuyerMarkerSelected,
+                                onTap: _toggleBuyerMarker,
+                              ),
+                            ),
                           Marker(
                             point: _pklLatLng!,
-                            width: 40,
-                            height: 40,
-                            child: Container(
-                              decoration: BoxDecoration(
-                                color: _primaryGreen,
-                                borderRadius: BorderRadius.circular(20),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: _primaryGreen.withValues(alpha: 0.4),
-                                    blurRadius: 8,
-                                    offset: const Offset(0, 2),
-                                  ),
-                                ],
-                              ),
-                              child: const Icon(
-                                Icons.storefront_rounded,
-                                color: Colors.white,
-                                size: 24,
-                              ),
+                            width: 44,
+                            height: 44,
+                            child: _buildMapMarker(
+                              icon: Icons.storefront_rounded,
+                              color: _primaryGreen,
+                              selected: _isPklMarkerSelected,
+                              onTap: _togglePklMarker,
                             ),
                           ),
                         ],
@@ -1417,7 +1658,7 @@ class _PklDetailPageState extends State<PklDetailPage> {
                         const SizedBox(height: 24),
                         _buildAboutSection(data),
                         const SizedBox(height: 24),
-                        _buildPhotoSection(),
+                        _buildPhotoSection(data),
                         const SizedBox(height: 24),
                         _buildRatingSection(),
                         const SizedBox(height: 24),

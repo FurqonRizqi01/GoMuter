@@ -14,7 +14,8 @@ class AdminDataPKLTab extends StatefulWidget {
   final Future<void> Function() onRefresh;
   final Future<void> Function() onRetry;
   final void Function(Map<String, dynamic> pkl, bool approve) onVerify;
-  final void Function(Map<String, dynamic> pkl, bool shouldBeActive) onToggleActive;
+  final void Function(Map<String, dynamic> pkl, bool shouldBeActive)
+  onToggleActive;
   final void Function(Map<String, dynamic> pkl) onShowDetail;
   final int? processingId;
 
@@ -61,22 +62,28 @@ class _AdminDataPKLTabState extends State<AdminDataPKLTab> {
 
   List<Map<String, dynamic>> get _filteredPkls {
     final searchTerm = _searchController.text.trim().toLowerCase();
-    return widget.pkls.where((item) {
-      final map = Map<String, dynamic>.from(item as Map);
-      final status = (map['status_verifikasi'] ?? '').toString().toUpperCase();
-      if (_statusFilter != 'ALL' && status != _statusFilter) return false;
-      if (_activeFilter != null && (map['status_aktif'] == true) != _activeFilter) {
-        return false;
-      }
-      if (searchTerm.isNotEmpty) {
-        final name = (map['nama_usaha'] ?? '').toString().toLowerCase();
-        final type = (map['jenis_dagangan'] ?? '').toString().toLowerCase();
-        if (!name.contains(searchTerm) && !type.contains(searchTerm)) {
-          return false;
-        }
-      }
-      return true;
-    }).map((item) => Map<String, dynamic>.from(item as Map)).toList();
+    return widget.pkls
+        .where((item) {
+          final map = Map<String, dynamic>.from(item as Map);
+          final status = (map['status_verifikasi'] ?? '')
+              .toString()
+              .toUpperCase();
+          if (_statusFilter != 'ALL' && status != _statusFilter) return false;
+          if (_activeFilter != null &&
+              (map['status_aktif'] == true) != _activeFilter) {
+            return false;
+          }
+          if (searchTerm.isNotEmpty) {
+            final name = (map['nama_usaha'] ?? '').toString().toLowerCase();
+            final type = (map['jenis_dagangan'] ?? '').toString().toLowerCase();
+            if (!name.contains(searchTerm) && !type.contains(searchTerm)) {
+              return false;
+            }
+          }
+          return true;
+        })
+        .map((item) => Map<String, dynamic>.from(item as Map))
+        .toList();
   }
 
   @override
@@ -107,10 +114,7 @@ class _AdminDataPKLTabState extends State<AdminDataPKLTab> {
             const SizedBox(height: 20),
             Text(
               'Memuat data PKL...',
-              style: TextStyle(
-                color: Colors.grey.shade600,
-                fontSize: 14,
-              ),
+              style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
             ),
           ],
         ),
@@ -164,10 +168,7 @@ class _AdminDataPKLTabState extends State<AdminDataPKLTab> {
                   ),
                 ),
                 hintText: 'Cari nama usaha atau jenis dagangan...',
-                hintStyle: TextStyle(
-                  color: Colors.grey.shade400,
-                  fontSize: 14,
-                ),
+                hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 14),
                 border: InputBorder.none,
                 contentPadding: const EdgeInsets.symmetric(
                   horizontal: 20,
@@ -197,7 +198,7 @@ class _AdminDataPKLTabState extends State<AdminDataPKLTab> {
             ),
           ),
           const SizedBox(height: 24),
-          
+
           // Filter Card
           Container(
             padding: const EdgeInsets.all(20),
@@ -244,7 +245,7 @@ class _AdminDataPKLTabState extends State<AdminDataPKLTab> {
                   ],
                 ),
                 const SizedBox(height: 20),
-                
+
                 // Status Verifikasi
                 Text(
                   'Status Verifikasi',
@@ -265,7 +266,9 @@ class _AdminDataPKLTabState extends State<AdminDataPKLTab> {
                         child: Material(
                           color: Colors.transparent,
                           child: InkWell(
-                            onTap: () => setState(() => _statusFilter = option['value'] as String),
+                            onTap: () => setState(
+                              () => _statusFilter = option['value'] as String,
+                            ),
                             borderRadius: BorderRadius.circular(12),
                             child: AnimatedContainer(
                               duration: const Duration(milliseconds: 200),
@@ -276,7 +279,10 @@ class _AdminDataPKLTabState extends State<AdminDataPKLTab> {
                               decoration: BoxDecoration(
                                 gradient: selected
                                     ? const LinearGradient(
-                                        colors: [_primaryColor, _secondaryColor],
+                                        colors: [
+                                          _primaryColor,
+                                          _secondaryColor,
+                                        ],
                                       )
                                     : null,
                                 color: selected ? null : Colors.grey.shade100,
@@ -284,7 +290,9 @@ class _AdminDataPKLTabState extends State<AdminDataPKLTab> {
                                 boxShadow: selected
                                     ? [
                                         BoxShadow(
-                                          color: _primaryColor.withValues(alpha: 0.3),
+                                          color: _primaryColor.withValues(
+                                            alpha: 0.3,
+                                          ),
                                           blurRadius: 8,
                                           offset: const Offset(0, 4),
                                         ),
@@ -297,14 +305,20 @@ class _AdminDataPKLTabState extends State<AdminDataPKLTab> {
                                   Icon(
                                     option['icon'] as IconData,
                                     size: 16,
-                                    color: selected ? Colors.white : Colors.grey.shade600,
+                                    color: selected
+                                        ? Colors.white
+                                        : Colors.grey.shade600,
                                   ),
                                   const SizedBox(width: 6),
                                   Text(
                                     option['label'] as String,
                                     style: TextStyle(
-                                      color: selected ? Colors.white : Colors.grey.shade700,
-                                      fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                                      color: selected
+                                          ? Colors.white
+                                          : Colors.grey.shade700,
+                                      fontWeight: selected
+                                          ? FontWeight.w600
+                                          : FontWeight.w500,
                                       fontSize: 13,
                                     ),
                                   ),
@@ -318,7 +332,7 @@ class _AdminDataPKLTabState extends State<AdminDataPKLTab> {
                   ),
                 ),
                 const SizedBox(height: 20),
-                
+
                 // Status Aktif
                 Text(
                   'Status Aktif PKL',
@@ -339,7 +353,8 @@ class _AdminDataPKLTabState extends State<AdminDataPKLTab> {
                         child: Material(
                           color: Colors.transparent,
                           child: InkWell(
-                            onTap: () => setState(() => _activeFilter = option.value),
+                            onTap: () =>
+                                setState(() => _activeFilter = option.value),
                             borderRadius: BorderRadius.circular(12),
                             child: AnimatedContainer(
                               duration: const Duration(milliseconds: 200),
@@ -350,7 +365,10 @@ class _AdminDataPKLTabState extends State<AdminDataPKLTab> {
                               decoration: BoxDecoration(
                                 gradient: selected
                                     ? const LinearGradient(
-                                        colors: [_primaryColor, _secondaryColor],
+                                        colors: [
+                                          _primaryColor,
+                                          _secondaryColor,
+                                        ],
                                       )
                                     : null,
                                 color: selected ? null : Colors.grey.shade100,
@@ -358,7 +376,9 @@ class _AdminDataPKLTabState extends State<AdminDataPKLTab> {
                                 boxShadow: selected
                                     ? [
                                         BoxShadow(
-                                          color: _primaryColor.withValues(alpha: 0.3),
+                                          color: _primaryColor.withValues(
+                                            alpha: 0.3,
+                                          ),
                                           blurRadius: 8,
                                           offset: const Offset(0, 4),
                                         ),
@@ -371,14 +391,20 @@ class _AdminDataPKLTabState extends State<AdminDataPKLTab> {
                                   Icon(
                                     option.icon,
                                     size: 16,
-                                    color: selected ? Colors.white : Colors.grey.shade600,
+                                    color: selected
+                                        ? Colors.white
+                                        : Colors.grey.shade600,
                                   ),
                                   const SizedBox(width: 6),
                                   Text(
                                     option.label,
                                     style: TextStyle(
-                                      color: selected ? Colors.white : Colors.grey.shade700,
-                                      fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                                      color: selected
+                                          ? Colors.white
+                                          : Colors.grey.shade700,
+                                      fontWeight: selected
+                                          ? FontWeight.w600
+                                          : FontWeight.w500,
                                       fontSize: 13,
                                     ),
                                   ),
@@ -395,7 +421,7 @@ class _AdminDataPKLTabState extends State<AdminDataPKLTab> {
             ),
           ),
           const SizedBox(height: 24),
-          
+
           // Result Count
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -405,11 +431,7 @@ class _AdminDataPKLTabState extends State<AdminDataPKLTab> {
             ),
             child: Row(
               children: [
-                Icon(
-                  Icons.store,
-                  size: 18,
-                  color: _primaryColor,
-                ),
+                Icon(Icons.store, size: 18, color: _primaryColor),
                 const SizedBox(width: 8),
                 Text(
                   '${data.length} PKL ditemukan',
@@ -422,10 +444,12 @@ class _AdminDataPKLTabState extends State<AdminDataPKLTab> {
             ),
           ),
           const SizedBox(height: 16),
-          
+
           // PKL List
           if (data.isEmpty)
-            const AdminEmptyState(message: 'Tidak ada PKL sesuai filter saat ini.')
+            const AdminEmptyState(
+              message: 'Tidak ada PKL sesuai filter saat ini.',
+            )
           else
             ...data.map(
               (pkl) => AdminPKLCard(

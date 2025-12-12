@@ -16,10 +16,7 @@ class ChatBadgeManager {
 
   static Future<void> markChatsSeen(ChatRole role) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
-      _key(role),
-      DateTime.now().toUtc().toIso8601String(),
-    );
+    await prefs.setString(_key(role), DateTime.now().toUtc().toIso8601String());
   }
 
   static Future<int> countUnreadChats(

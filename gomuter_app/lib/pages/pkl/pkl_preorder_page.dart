@@ -514,290 +514,295 @@ class _PklPreOrderPageState extends State<PklPreOrderPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE8F5E9),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: const Icon(
-                  Icons.person_rounded,
-                  color: Color(0xFF0D8A3A),
-                  size: 24,
-                ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      pembeli,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 16,
-                        letterSpacing: -0.3,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Dibuat: $createdLabel',
-                      style: TextStyle(
-                        color: Colors.black.withValues(alpha: 0.5),
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      _statusColor(status).withValues(alpha: 0.15),
-                      _statusColor(status).withValues(alpha: 0.10),
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: _statusColor(status).withValues(alpha: 0.3),
-                    width: 1.5,
-                  ),
-                ),
-                child: Text(
-                  status,
-                  style: TextStyle(
-                    color: _statusColor(status),
-                    fontWeight: FontWeight.w700,
-                    fontSize: 13,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 18),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF8F9FA),
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: Colors.black.withValues(alpha: 0.06)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Icon(
-                      Icons.description_rounded,
-                      size: 18,
-                      color: Colors.black.withValues(alpha: 0.6),
-                    ),
-                    const SizedBox(width: 8),
-                    const Text(
-                      'Detail Pesanan',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 13,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  deskripsi,
-                  style: const TextStyle(fontSize: 14, height: 1.5),
-                ),
-                if (catatan != null && catatan.isNotEmpty) ...[
-                  const SizedBox(height: 12),
+              Row(
+                children: [
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFFFF9E6),
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: const Color(0xFFFFE082)),
+                      color: const Color(0xFFE8F5E9),
+                      borderRadius: BorderRadius.circular(16),
                     ),
-                    child: Row(
+                    child: const Icon(
+                      Icons.person_rounded,
+                      color: Color(0xFF0D8A3A),
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Icon(
-                          Icons.note_alt_rounded,
-                          size: 18,
-                          color: Color(0xFFF57C00),
+                        Text(
+                          pembeli,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 16,
+                            letterSpacing: -0.3,
+                          ),
                         ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'Catatan Pembeli',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 12,
-                                  color: Color(0xFFF57C00),
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                catatan,
-                                style: const TextStyle(
-                                  fontSize: 13,
-                                  height: 1.4,
-                                ),
-                              ),
-                            ],
+                        const SizedBox(height: 4),
+                        Text(
+                          'Dibuat: $createdLabel',
+                          style: TextStyle(
+                            color: Colors.black.withValues(alpha: 0.5),
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
                           ),
                         ),
                       ],
                     ),
                   ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          _statusColor(status).withValues(alpha: 0.15),
+                          _statusColor(status).withValues(alpha: 0.10),
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: _statusColor(status).withValues(alpha: 0.3),
+                        width: 1.5,
+                      ),
+                    ),
+                    child: Text(
+                      status,
+                      style: TextStyle(
+                        color: _statusColor(status),
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
                 ],
-              ],
-            ),
-          ),
-          const SizedBox(height: 14),
-          _buildInfoRow(
-            Icons.location_on_rounded,
-            'Alamat pickup',
-            pickupAddress,
-          ),
-          if (latitude != null && longitude != null)
-            _buildInfoRow(
-              Icons.pin_drop_rounded,
-              'Koordinat',
-              '$latitude / $longitude',
-            ),
-          _buildInfoRow(Icons.payments_rounded, 'DP', 'Rp$dpAmount'),
-          _buildInfoRow(
-            Icons.account_balance_wallet_rounded,
-            'Status DP',
-            dpStatus,
-          ),
-          if (buktiDp != null && buktiDp.isNotEmpty)
-            ..._buildDpSection(buktiDp),
-          const SizedBox(height: 18),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              PopupMenuButton<String>(
-                enabled: !_updatingOrderIds.contains(order['id'] as int),
-                onSelected: (value) => _changeStatus(order['id'] as int, value),
-                itemBuilder: (context) {
-                  return _availableStatuses(status)
-                      .map(
-                        (statusOption) => PopupMenuItem(
-                          value: statusOption,
-                          child: Text(statusOption),
-                        ),
-                      )
-                      .toList();
-                },
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
+              ),
+              const SizedBox(height: 18),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8F9FA),
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(
+                    color: Colors.black.withValues(alpha: 0.06),
+                  ),
                 ),
-                child: _updatingOrderIds.contains(order['id'] as int)
-                    ? const SizedBox(
-                        width: 28,
-                        height: 28,
-                        child: CircularProgressIndicator(strokeWidth: 2.5),
-                      )
-                    : Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 18,
-                          vertical: 12,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.description_rounded,
+                          size: 18,
+                          color: Colors.black.withValues(alpha: 0.6),
                         ),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'Detail Pesanan',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      deskripsi,
+                      style: const TextStyle(fontSize: 14, height: 1.5),
+                    ),
+                    if (catatan != null && catatan.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF0D8A3A),
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: [
-                            BoxShadow(
-                              color: const Color(
-                                0xFF0D8A3A,
-                              ).withValues(alpha: 0.3),
-                              blurRadius: 12,
-                              offset: const Offset(0, 6),
-                            ),
-                          ],
+                          color: const Color(0xFFFFF9E6),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: const Color(0xFFFFE082)),
                         ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Icon(
-                              Icons.edit_rounded,
-                              color: Colors.white,
+                            const Icon(
+                              Icons.note_alt_rounded,
                               size: 18,
+                              color: Color(0xFFF57C00),
                             ),
-                            SizedBox(width: 8),
-                            Text(
-                              'Ubah Status',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w700,
-                                fontSize: 14,
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Catatan Pembeli',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 12,
+                                      color: Color(0xFFF57C00),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    catatan,
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      height: 1.4,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ],
                         ),
                       ),
+                    ],
+                  ],
+                ),
               ),
-            ],
-          ),
-          if (dpStatus == 'MENUNGGU_KONFIRMASI')
-            Padding(
-              padding: const EdgeInsets.only(top: 12),
-              child: Row(
+              const SizedBox(height: 14),
+              _buildInfoRow(
+                Icons.location_on_rounded,
+                'Alamat pickup',
+                pickupAddress,
+              ),
+              if (latitude != null && longitude != null)
+                _buildInfoRow(
+                  Icons.pin_drop_rounded,
+                  'Koordinat',
+                  '$latitude / $longitude',
+                ),
+              _buildInfoRow(Icons.payments_rounded, 'DP', 'Rp$dpAmount'),
+              _buildInfoRow(
+                Icons.account_balance_wallet_rounded,
+                'Status DP',
+                dpStatus,
+              ),
+              if (buktiDp != null && buktiDp.isNotEmpty)
+                ..._buildDpSection(buktiDp),
+              const SizedBox(height: 18),
+              Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  TextButton.icon(
-                    onPressed: _updatingOrderIds.contains(order['id'] as int)
-                        ? null
-                        : () => _handleDPAction(order['id'] as int, true),
-                    style: TextButton.styleFrom(
-                      foregroundColor: const Color(0xFF0D8A3A),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 12,
-                      ),
+                  PopupMenuButton<String>(
+                    enabled: !_updatingOrderIds.contains(order['id'] as int),
+                    onSelected: (value) =>
+                        _changeStatus(order['id'] as int, value),
+                    itemBuilder: (context) {
+                      return _availableStatuses(status)
+                          .map(
+                            (statusOption) => PopupMenuItem(
+                              value: statusOption,
+                              child: Text(statusOption),
+                            ),
+                          )
+                          .toList();
+                    },
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
                     ),
-                    icon: const Icon(Icons.verified_rounded, size: 18),
-                    label: const Text(
-                      'DP valid',
-                      style: TextStyle(fontWeight: FontWeight.w700),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  TextButton.icon(
-                    onPressed: _updatingOrderIds.contains(order['id'] as int)
-                        ? null
-                        : () => _handleDPAction(order['id'] as int, false),
-                    style: TextButton.styleFrom(
-                      foregroundColor: const Color(0xFFD32F2F),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 12,
-                      ),
-                    ),
-                    icon: const Icon(Icons.cancel_rounded, size: 18),
-                    label: const Text(
-                      'Tolak DP',
-                      style: TextStyle(fontWeight: FontWeight.w700),
-                    ),
+                    child: _updatingOrderIds.contains(order['id'] as int)
+                        ? const SizedBox(
+                            width: 28,
+                            height: 28,
+                            child: CircularProgressIndicator(strokeWidth: 2.5),
+                          )
+                        : Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 18,
+                              vertical: 12,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF0D8A3A),
+                              borderRadius: BorderRadius.circular(16),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(
+                                    0xFF0D8A3A,
+                                  ).withValues(alpha: 0.3),
+                                  blurRadius: 12,
+                                  offset: const Offset(0, 6),
+                                ),
+                              ],
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.edit_rounded,
+                                  color: Colors.white,
+                                  size: 18,
+                                ),
+                                SizedBox(width: 8),
+                                Text(
+                                  'Ubah Status',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                   ),
                 ],
               ),
-            ),
-        ],
-      ),
+              if (dpStatus == 'MENUNGGU_KONFIRMASI')
+                Padding(
+                  padding: const EdgeInsets.only(top: 12),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton.icon(
+                        onPressed:
+                            _updatingOrderIds.contains(order['id'] as int)
+                            ? null
+                            : () => _handleDPAction(order['id'] as int, true),
+                        style: TextButton.styleFrom(
+                          foregroundColor: const Color(0xFF0D8A3A),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
+                          ),
+                        ),
+                        icon: const Icon(Icons.verified_rounded, size: 18),
+                        label: const Text(
+                          'DP valid',
+                          style: TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      TextButton.icon(
+                        onPressed:
+                            _updatingOrderIds.contains(order['id'] as int)
+                            ? null
+                            : () => _handleDPAction(order['id'] as int, false),
+                        style: TextButton.styleFrom(
+                          foregroundColor: const Color(0xFFD32F2F),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
+                          ),
+                        ),
+                        icon: const Icon(Icons.cancel_rounded, size: 18),
+                        label: const Text(
+                          'Tolak DP',
+                          style: TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
           ),
         ),
+      ),
     );
   }
 
