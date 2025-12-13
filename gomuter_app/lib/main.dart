@@ -145,20 +145,36 @@ class GoMuterApp extends StatelessWidget {
         title: 'GoMuter',
         theme: _buildTheme(themeManager),
         home: const AuthPage(),
-        routes: {
-          PklRoutes.home: (_) => const PklHomePage(),
-          PklRoutes.profile: (_) => const PklEditInfoPage(),
-          PklRoutes.payment: (_) => const PklPaymentSettingsPage(),
-          PklRoutes.preorder: (_) => const PklPreOrderPage(),
-          PklRoutes.chat: (_) => const PklChatListPage(),
-        },
+        routes: const {},
         onGenerateRoute: _onGenerateRoute,
       ),
     );
   }
 
   Route<dynamic>? _onGenerateRoute(RouteSettings settings) {
+    PageRouteBuilder<T> noTransitionRoute<T>(WidgetBuilder builder) {
+      return PageRouteBuilder<T>(
+        settings: settings,
+        transitionDuration: Duration.zero,
+        reverseTransitionDuration: Duration.zero,
+        pageBuilder: (context, animation, secondaryAnimation) =>
+            builder(context),
+        transitionsBuilder: (context, animation, secondaryAnimation, child) =>
+            child,
+      );
+    }
+
     switch (settings.name) {
+      case PklRoutes.home:
+        return noTransitionRoute((_) => const PklHomePage());
+      case PklRoutes.profile:
+        return noTransitionRoute((_) => const PklEditInfoPage());
+      case PklRoutes.payment:
+        return noTransitionRoute((_) => const PklPaymentSettingsPage());
+      case PklRoutes.preorder:
+        return noTransitionRoute((_) => const PklPreOrderPage());
+      case PklRoutes.chat:
+        return noTransitionRoute((_) => const PklChatListPage());
       case AdminRoutes.dashboard:
       case AdminRoutes.dataPKL:
       case AdminRoutes.reports:
