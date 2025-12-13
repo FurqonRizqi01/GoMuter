@@ -26,6 +26,18 @@ class UserMeSerializer(serializers.ModelSerializer):
         fields = ['id', 'username', 'email', 'role', 'is_staff', 'is_superuser']
 
 
+class UserMeUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['username']
+
+    def validate_username(self, value):
+        value = (value or '').strip()
+        if not value:
+            raise serializers.ValidationError('Username tidak boleh kosong.')
+        return value
+
+
 class PasswordResetRequestSerializer(serializers.Serializer):
     identifier = serializers.CharField(max_length=254)
 

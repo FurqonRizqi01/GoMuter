@@ -1032,6 +1032,7 @@ class _PklEditInfoPageState extends State<PklEditInfoPage> {
                     label: 'Kategori / Jenis Dagangan',
                     controller: _jenisDaganganController,
                     icon: Icons.category_rounded,
+                    hintText: 'Contoh: Makanan atau Minuman',
                   ),
                   const SizedBox(height: 18),
                   _buildRoundedField(
@@ -1113,6 +1114,7 @@ class _PklEditInfoPageState extends State<PklEditInfoPage> {
     required String label,
     required TextEditingController controller,
     required IconData icon,
+    String? hintText,
     int maxLines = 1,
   }) {
     final borderColor = _themeManager.borderColor;
@@ -1162,6 +1164,8 @@ class _PklEditInfoPageState extends State<PklEditInfoPage> {
               horizontal: 20,
               vertical: 18,
             ),
+            hintText: hintText,
+            hintStyle: TextStyle(color: _themeManager.hintTextColor),
           ),
           style: TextStyle(color: textColor),
           cursorColor: _themeManager.primaryGreen,

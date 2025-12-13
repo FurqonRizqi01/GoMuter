@@ -500,6 +500,27 @@ class ApiService {
     }
   }
 
+  static Future<Map<String, dynamic>> updateCurrentUsername({
+    required String accessToken,
+    required String username,
+  }) async {
+    final url = Uri.parse('$baseUrl/api/accounts/me/');
+
+    final response = await http.patch(
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $accessToken',
+      },
+      body: jsonEncode({'username': username}),
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    }
+    throw Exception('Gagal memperbarui username: ${response.body}');
+  }
+
   // === Chat endpoints ===
 
   static Future<Map<String, dynamic>> startChat({

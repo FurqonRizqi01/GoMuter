@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:gomuter_app/api_service.dart';
 import 'package:gomuter_app/pages/pembeli/pembeli_chat_list_page.dart';
+import 'package:gomuter_app/pages/pembeli/pembeli_profile_page.dart';
 import 'package:gomuter_app/pages/pembeli/pkl_detail_page.dart';
 // ignore: unused_import
 import 'package:gomuter_app/pages/pembeli/preorder_page.dart';
@@ -41,9 +42,10 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
   // ignore: unused_field
   LatLng _initialCenter = const LatLng(-6.2, 106.8);
   int? _selectedPklMarkerId;
-  final List<int> _radiusOptions = [300, 500, 1000, 1500];
+  final List<int> _radiusOptions = [300, 500, 1000];
   int? _selectedRadius = 300;
   Timer? _locationTimer;
+  StreamSubscription<Position>? _positionStreamSub;
   static const Duration _locationInterval = Duration(minutes: 5);
   SharedPreferences? _prefs;
   Position? _buyerPosition;
@@ -76,6 +78,7 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
     _searchController.dispose();
     _pklListController.dispose();
     _locationTimer?.cancel();
+    _positionStreamSub?.cancel();
     _mapController.dispose();
     super.dispose();
   }
@@ -125,7 +128,40 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
       _loadChatBadge(),
     ]);
     await _syncLocation();
+    await _startLiveLocationStream();
     _startLocationTimer();
+  }
+
+  Future<void> _startLiveLocationStream() async {
+    await _positionStreamSub?.cancel();
+
+    final hasPermission = await _ensureLocationPermission();
+    if (!hasPermission) return;
+
+    const settings = LocationSettings(
+      accuracy: LocationAccuracy.high,
+      distanceFilter: 10,
+    );
+
+    _positionStreamSub =
+        Geolocator.getPositionStream(locationSettings: settings).listen((
+          position,
+        ) {
+          if (!mounted) return;
+          setState(() {
+            _buyerPosition = position;
+          });
+        });
+  }
+
+  Future<void> _openProfile() async {
+    final changed = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(builder: (_) => const PembeliProfilePage()),
+    );
+    if (changed == true) {
+      await _loadBuyerName();
+    }
   }
 
   Future<void> _loadBuyerName() async {
@@ -135,33 +171,6 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
     setState(() {
       _buyerName = (username == null || username.isEmpty) ? null : username;
     });
-  }
-
-  Future<void> _logout() async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Keluar dari aplikasi?'),
-        content: const Text('Anda akan kembali ke halaman login.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Batal'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Keluar'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirm == true) {
-      await TokenManager.clearTokens();
-      if (!mounted) return;
-      Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
-    }
   }
 
   Future<void> _openChatInbox() async {
@@ -1449,13 +1458,9 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   _buildHeaderIconButton(
-                    icon: _themeManager.isDarkMode
-                        ? Icons.light_mode
-                        : Icons.dark_mode,
+                    icon: Icons.person_rounded,
                     badgeCount: 0,
-                    onTap: () {
-                      _themeManager.toggleTheme();
-                    },
+                    onTap: _openProfile,
                     iconColor: textColor,
                   ),
                   const SizedBox(width: 8),
@@ -1478,14 +1483,6 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
                     icon: Icons.notifications_rounded,
                     badgeCount: _unreadNotificationsCount,
                     onTap: _showNotificationsSheet,
-                    iconColor: textColor,
-                  ),
-                  const SizedBox(width: 8),
-                  _buildHeaderIconButton(
-                    icon: Icons.logout_rounded,
-                    badgeCount: 0,
-                    onTap: _logout,
-                    highlightColor: Colors.redAccent,
                     iconColor: textColor,
                   ),
                 ],
@@ -1562,42 +1559,54 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
   }
 
   Widget _buildSearchBar(Color cardColor, Color textColor) {
-    return Container(
-      margin: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: textColor.withValues(alpha: 0.1)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
-            blurRadius: 15,
-            offset: const Offset(0, 4),
+    final isDark = _themeManager.isDarkMode;
+    final effectiveCardColor = isDark ? cardColor : Colors.white;
+
+    return Align(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 520),
+        child: Container(
+          margin: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: effectiveCardColor,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: textColor.withValues(alpha: 0.1)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.1),
+                blurRadius: 15,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
-        ],
-      ),
-      child: TextField(
-        controller: _searchController,
-        style: TextStyle(color: textColor),
-        cursorColor: _themeManager.primaryGreen,
-        onSubmitted: (value) => _loadPkls(jenis: value.isEmpty ? null : value),
-        decoration: InputDecoration(
-          hintText: 'Cari PKL atau jenis dagangan...',
-          hintStyle: TextStyle(color: _themeManager.hintTextColor),
-          prefixIcon: Icon(Icons.search, color: _themeManager.primaryGreen),
-          suffixIcon: _searchController.text.isNotEmpty
-              ? IconButton(
-                  icon: Icon(Icons.clear, color: _themeManager.hintTextColor),
-                  onPressed: () {
-                    _searchController.clear();
-                    _loadPkls();
-                  },
-                )
-              : null,
-          border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 20,
-            vertical: 16,
+          child: TextField(
+            controller: _searchController,
+            style: TextStyle(color: textColor),
+            cursorColor: _themeManager.primaryGreen,
+            onSubmitted: (value) =>
+                _loadPkls(jenis: value.isEmpty ? null : value),
+            decoration: InputDecoration(
+              hintText: 'Cari PKL atau jenis dagangan...',
+              hintStyle: TextStyle(color: _themeManager.hintTextColor),
+              prefixIcon: Icon(Icons.search, color: _themeManager.primaryGreen),
+              suffixIcon: _searchController.text.isNotEmpty
+                  ? IconButton(
+                      icon: Icon(
+                        Icons.clear,
+                        color: _themeManager.hintTextColor,
+                      ),
+                      onPressed: () {
+                        _searchController.clear();
+                        _loadPkls();
+                      },
+                    )
+                  : null,
+              border: InputBorder.none,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 20,
+                vertical: 16,
+              ),
+            ),
           ),
         ),
       ),
@@ -1620,107 +1629,129 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
         : formatRadius(_selectedRadius!);
     final cardColor = _themeManager.cardColor;
 
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: cardColor.withValues(alpha: 0.92),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: textColor.withValues(alpha: 0.08)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.10),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Icon(Icons.my_location, color: _themeManager.primaryGreen),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Radius pencarian',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      color: textColor,
-                    ),
-                  ),
-                ],
-              ),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (_selectedRadius != null)
-                    TextButton(
-                      onPressed: () => _onRadiusChanged(null),
-                      child: Text(
-                        'Hapus radius',
-                        style: TextStyle(
-                          color: textColor.withValues(alpha: 0.55),
-                        ),
-                      ),
-                    ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: _themeManager.primaryGreen.withValues(alpha: 0.18),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Text(
-                      badgeText,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: _themeManager.primaryGreen,
-                      ),
-                    ),
-                  ),
-                ],
+    return Align(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 520),
+        child: Container(
+          margin: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: cardColor.withValues(alpha: 0.92),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: textColor.withValues(alpha: 0.08)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.10),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: _radiusOptions.map((radius) {
-              final isSelected = radius == _selectedRadius;
-              return ChoiceChip(
-                label: Text(formatRadius(radius)),
-                selected: isSelected,
-                onSelected: (selected) {
-                  _onRadiusChanged(selected ? radius : null);
-                },
-                selectedColor: _themeManager.primaryGreen,
-                backgroundColor: _themeManager.isDarkMode
-                    ? Colors.white.withValues(alpha: 0.06)
-                    : Colors.grey[100],
-                labelStyle: TextStyle(
-                  color: isSelected
-                      ? Colors.white
-                      : textColor.withValues(alpha: 0.7),
-                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                ),
-                side: BorderSide(
-                  color: isSelected
-                      ? _themeManager.primaryGreen
-                      : textColor.withValues(alpha: 0.10),
-                ),
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              );
-            }).toList(),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.my_location, color: _themeManager.primaryGreen),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Radius pencarian',
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        color: textColor,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: _themeManager.primaryGreen.withValues(
+                            alpha: 0.18,
+                          ),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text(
+                          badgeText,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: _themeManager.primaryGreen,
+                          ),
+                        ),
+                      ),
+                      if (_selectedRadius != null) ...[
+                        const SizedBox(height: 4),
+                        TextButton(
+                          onPressed: () => _onRadiusChanged(null),
+                          style: TextButton.styleFrom(
+                            minimumSize: Size.zero,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 6,
+                            ),
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                          child: Text(
+                            'Hapus radius',
+                            style: TextStyle(
+                              color: textColor.withValues(alpha: 0.55),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: _radiusOptions.map((radius) {
+                  final isSelected = radius == _selectedRadius;
+                  return ChoiceChip(
+                    label: Text(formatRadius(radius)),
+                    selected: isSelected,
+                    onSelected: (selected) {
+                      _onRadiusChanged(selected ? radius : null);
+                    },
+                    selectedColor: _themeManager.primaryGreen,
+                    backgroundColor: _themeManager.isDarkMode
+                        ? Colors.white.withValues(alpha: 0.06)
+                        : Colors.grey[100],
+                    labelStyle: TextStyle(
+                      color: isSelected
+                          ? Colors.white
+                          : textColor.withValues(alpha: 0.7),
+                      fontWeight: isSelected
+                          ? FontWeight.bold
+                          : FontWeight.w500,
+                    ),
+                    side: BorderSide(
+                      color: isSelected
+                          ? _themeManager.primaryGreen
+                          : textColor.withValues(alpha: 0.10),
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                  );
+                }).toList(),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
