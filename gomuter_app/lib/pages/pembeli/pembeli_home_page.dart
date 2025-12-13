@@ -3,16 +3,18 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:gomuter_app/api_service.dart';
-import 'package:gomuter_app/pages/pembeli/chat_page.dart';
 import 'package:gomuter_app/pages/pembeli/pembeli_chat_list_page.dart';
 import 'package:gomuter_app/pages/pembeli/pkl_detail_page.dart';
 // ignore: unused_import
 import 'package:gomuter_app/pages/pembeli/preorder_page.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:geocoding/geocoding.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:gomuter_app/utils/chat_badge_manager.dart';
 import 'package:gomuter_app/utils/token_manager.dart';
+import 'package:gomuter_app/utils/theme_manager.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class PembeliHomePage extends StatefulWidget {
   const PembeliHomePage({super.key});
@@ -22,17 +24,16 @@ class PembeliHomePage extends StatefulWidget {
 }
 
 class _PembeliHomePageState extends State<PembeliHomePage> {
-  // Theme Colors
-  static const Color _primaryGreen = Color(0xFF1B7B5A);
-  static const Color _secondaryGreen = Color(0xFF2D9D78);
-  static const Color _lightGreen = Color(0xFFE8F5F0);
-  // ignore: unused_field
-  static const Color _accentPeach = Color(0xFFFAD4C0);
+  final ThemeManager _themeManager = ThemeManager();
+  final MapController _mapController = MapController();
+  final ScrollController _pklListController = ScrollController();
 
   bool _isLoading = true;
   bool _isSyncingLocation = false;
   bool _isLoadingNotifications = false;
+  bool _hasCenteredMap = false;
   String? _error;
+  String? _currentLocation;
   List<dynamic> _pkls = [];
   List<dynamic> _favorites = [];
   Set<int> _favoriteIds = {};
@@ -67,14 +68,22 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
   @override
   void initState() {
     super.initState();
+    _themeManager.addListener(_onThemeChanged);
     _initializePage();
   }
 
   @override
   void dispose() {
+    _themeManager.removeListener(_onThemeChanged);
     _searchController.dispose();
+    _pklListController.dispose();
     _locationTimer?.cancel();
+    _mapController.dispose();
     super.dispose();
+  }
+
+  void _onThemeChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<SharedPreferences> _getPrefs() async {
@@ -297,13 +306,40 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
         desiredAccuracy: LocationAccuracy.high,
       );
 
+      String? address;
+      try {
+        List<Placemark> placemarks = await placemarkFromCoordinates(
+          position.latitude,
+          position.longitude,
+        );
+        if (placemarks.isNotEmpty) {
+          Placemark place = placemarks[0];
+          address = "${place.street}, ${place.subLocality}";
+        }
+      } catch (e) {
+        debugPrint('Error getting address: $e');
+      }
+
       final token = await _getAccessToken();
       if (token == null) return false;
 
       if (mounted) {
         setState(() {
           _buyerPosition = position;
+          if (address != null) {
+            _currentLocation = address;
+          } else {
+            _currentLocation = 'Lokasi Anda';
+          }
         });
+
+        if (!_hasCenteredMap) {
+          _hasCenteredMap = true;
+          _mapController.move(
+            LatLng(position.latitude, position.longitude),
+            15.0,
+          );
+        }
       }
 
       await ApiService.updateBuyerLocation(
@@ -617,7 +653,10 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
                           Navigator.of(ctx).pop();
                           _loadFavorites();
                         },
-                        icon: Icon(Icons.refresh_rounded, color: _primaryGreen),
+                        icon: Icon(
+                          Icons.refresh_rounded,
+                          color: _themeManager.primaryGreen,
+                        ),
                         tooltip: 'Muat ulang',
                       ),
                     ],
@@ -675,12 +714,12 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
                                 width: 48,
                                 height: 48,
                                 decoration: BoxDecoration(
-                                  color: _lightGreen,
+                                  color: _themeManager.lightGreen,
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: Icon(
                                   _getCategoryIcon(jenis),
-                                  color: _primaryGreen,
+                                  color: _themeManager.primaryGreen,
                                 ),
                               ),
                               title: Text(
@@ -763,9 +802,12 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
 
             return Container(
               height: MediaQuery.of(ctx).size.height * 0.7,
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              decoration: BoxDecoration(
+                color: _themeManager.isDarkMode
+                    ? const Color(0xFF1E1E1E)
+                    : Colors.white,
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(24)),
               ),
               child: Column(
                 children: [
@@ -802,9 +844,12 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
                                 const SizedBox(width: 12),
                                 Text(
                                   'Notifikasi (${_notifications.length})',
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 18,
                                     fontWeight: FontWeight.bold,
+                                    color: _themeManager.isDarkMode
+                                        ? Colors.white
+                                        : Colors.black87,
                                   ),
                                 ),
                               ],
@@ -812,7 +857,7 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
                             IconButton(
                               icon: Icon(
                                 Icons.refresh_rounded,
-                                color: _primaryGreen,
+                                color: _themeManager.primaryGreen,
                               ),
                               onPressed: _isLoadingNotifications
                                   ? null
@@ -826,7 +871,9 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
                   if (_isLoadingNotifications)
                     LinearProgressIndicator(
                       backgroundColor: Colors.grey[200],
-                      valueColor: AlwaysStoppedAnimation<Color>(_primaryGreen),
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        _themeManager.primaryGreen,
+                      ),
                     ),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -838,7 +885,7 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
                             : markAll,
                         child: Text(
                           'Tandai semua dibaca',
-                          style: TextStyle(color: _primaryGreen),
+                          style: TextStyle(color: _themeManager.primaryGreen),
                         ),
                       ),
                     ),
@@ -885,12 +932,25 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
 
                               return Container(
                                 decoration: BoxDecoration(
-                                  color: isRead ? Colors.grey[50] : _lightGreen,
+                                  color: isRead
+                                      ? (_themeManager.isDarkMode
+                                          ? Colors.transparent
+                                          : Colors.grey[50])
+                                      : (_themeManager.isDarkMode
+                                          ? _themeManager.primaryGreen
+                                              .withValues(alpha: 0.1)
+                                          : _themeManager.lightGreen),
                                   borderRadius: BorderRadius.circular(16),
                                   border: isRead
-                                      ? null
+                                      ? Border.all(
+                                          color: _themeManager.isDarkMode
+                                              ? Colors.white
+                                                  .withValues(alpha: 0.1)
+                                              : Colors.transparent,
+                                        )
                                       : Border.all(
-                                          color: _primaryGreen.withValues(
+                                          color: _themeManager.primaryGreen
+                                              .withValues(
                                             alpha: 0.3,
                                           ),
                                         ),
@@ -901,8 +961,11 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
                                     padding: const EdgeInsets.all(10),
                                     decoration: BoxDecoration(
                                       color: isRead
-                                          ? Colors.grey[200]
-                                          : _primaryGreen.withValues(
+                                          ? (_themeManager.isDarkMode
+                                              ? Colors.grey[800]
+                                              : Colors.grey[200])
+                                          : _themeManager.primaryGreen
+                                              .withValues(
                                               alpha: 0.1,
                                             ),
                                       borderRadius: BorderRadius.circular(12),
@@ -913,7 +976,7 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
                                           : Icons.notifications_active_rounded,
                                       color: isRead
                                           ? Colors.grey
-                                          : _primaryGreen,
+                                          : _themeManager.primaryGreen,
                                     ),
                                   ),
                                   title: Text(
@@ -923,6 +986,9 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
                                           ? FontWeight.normal
                                           : FontWeight.w600,
                                       fontSize: 14,
+                                      color: _themeManager.isDarkMode
+                                          ? Colors.white
+                                          : Colors.black87,
                                     ),
                                   ),
                                   subtitle: Column(
@@ -934,7 +1000,7 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
                                         Text(
                                           pklName,
                                           style: TextStyle(
-                                            color: _primaryGreen,
+                                            color: _themeManager.primaryGreen,
                                             fontSize: 12,
                                           ),
                                         ),
@@ -956,7 +1022,7 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
                                           child: Text(
                                             'Baca',
                                             style: TextStyle(
-                                              color: _primaryGreen,
+                                              color: _themeManager.primaryGreen,
                                               fontSize: 12,
                                             ),
                                           ),
@@ -1041,114 +1107,231 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = _themeManager.isDarkMode;
+    final bgColor = _themeManager.backgroundColor;
+    final textColor = _themeManager.textColor;
+    final cardColor = _themeManager.cardColor;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F7FA),
-      body: SafeArea(
-        child: Column(
-          children: [
-            _buildHeader(),
-            _buildSearchBar(),
-            _buildRadiusFilter(),
-            _buildCategoryChips(),
-            Expanded(
+      backgroundColor: bgColor,
+      body: Stack(
+        children: [
+          Positioned.fill(
+            child: FlutterMap(
+              mapController: _mapController,
+              options: MapOptions(
+                initialCenter: _initialCenter,
+                initialZoom: 15.0,
+              ),
+              children: [
+                TileLayer(
+                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                  userAgentPackageName: 'com.gomuter.app',
+                  tileBuilder: (context, widget, tile) {
+                    if (isDark) {
+                      return ColorFiltered(
+                        colorFilter: const ColorFilter.matrix(<double>[
+                          -1, 0, 0, 0, 255,
+                          0, -1, 0, 0, 255,
+                          0, 0, -1, 0, 255,
+                          0, 0, 0, 1, 0,
+                        ]),
+                        child: widget,
+                      );
+                    }
+                    return widget;
+                  },
+                ),
+                MarkerLayer(markers: _markers),
+                if (_buyerPosition != null)
+                  MarkerLayer(
+                    markers: [
+                      Marker(
+                        point: LatLng(
+                          _buyerPosition!.latitude,
+                          _buyerPosition!.longitude,
+                        ),
+                        width: 24,
+                        height: 24,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Colors.blueAccent,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 2),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.blueAccent.withValues(alpha: 0.5),
+                                blurRadius: 8,
+                              ),
+                            ],
+                          ),
+                          child: const Icon(
+                            Icons.person,
+                            color: Colors.white,
+                            size: 14,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+              ],
+            ),
+          ),
+          Positioned(
+            bottom: 260,
+            right: 16,
+            child: FloatingActionButton(
+              heroTag: 'my_location_fab',
+              backgroundColor: const Color(0xFFE67E22), // Orange color like image
+              onPressed: () {
+                if (_buyerPosition != null) {
+                  _mapController.move(
+                    LatLng(
+                      _buyerPosition!.latitude,
+                      _buyerPosition!.longitude,
+                    ),
+                    15.0,
+                  );
+                } else {
+                  _syncLocation();
+                }
+              },
+              child: const Icon(Icons.my_location, color: Colors.white),
+            ),
+          ),
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    isDark
+                        ? Colors.black.withValues(alpha: 0.9)
+                        : Colors.white.withValues(alpha: 0.95),
+                    isDark
+                        ? Colors.transparent
+                        : Colors.white.withValues(alpha: 0.0),
+                  ],
+                ),
+              ),
+              child: SafeArea(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _buildHeader(textColor),
+                    _buildSearchBar(cardColor, textColor),
+                    _buildCategoryChips(cardColor, textColor),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            bottom: 20,
+            left: 0,
+            right: 0,
+            child: SizedBox(
+              height: 180, // Smaller height
               child: _isLoading
                   ? const Center(child: CircularProgressIndicator())
                   : _error != null
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.error_outline,
-                            size: 48,
-                            color: Colors.red[300],
-                          ),
-                          const SizedBox(height: 16),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 32),
+                      ? Center(
+                          child: Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: cardColor,
+                              borderRadius: BorderRadius.circular(12),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.1),
+                                  blurRadius: 8,
+                                ),
+                              ],
+                            ),
                             child: Text(
                               _error!,
-                              textAlign: TextAlign.center,
-                              style: TextStyle(color: Colors.grey[600]),
+                              style: TextStyle(color: textColor),
                             ),
                           ),
-                          const SizedBox(height: 16),
-                          ElevatedButton(
-                            onPressed: () => _loadPkls(),
-                            child: const Text('Coba Lagi'),
-                          ),
-                        ],
-                      ),
-                    )
-                  : RefreshIndicator(
-                      onRefresh: () async {
-                        await _loadPkls();
-                        await _loadFavorites();
-                      },
-                      child: _buildPKLList(),
-                    ),
+                        )
+                      : _buildPKLList(cardColor, textColor),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildHeader(Color textColor) {
     return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [_primaryGreen, _secondaryGreen],
-        ),
-      ),
+      padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Selamat Datang,',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
                     Text(
-                      _buyerName ?? 'Pembeli',
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Colors.white,
+                      'Halo, ${_buyerName ?? 'Pembeli'}!',
+                      style: TextStyle(
+                        color: textColor,
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
                       ),
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Siap jelajahi kuliner favoritmu hari ini?',
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.9),
-                        fontSize: 14,
-                      ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.location_on,
+                          color: textColor.withValues(alpha: 0.7),
+                          size: 16,
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            _currentLocation ?? 'Memuat lokasi...',
+                            style: TextStyle(
+                              color: textColor.withValues(alpha: 0.7),
+                              fontSize: 14,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
               ),
               const SizedBox(width: 12),
               Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
+                  _buildHeaderIconButton(
+                    icon: _themeManager.isDarkMode
+                        ? Icons.light_mode
+                        : Icons.dark_mode,
+                    badgeCount: 0,
+                    onTap: () {
+                      _themeManager.toggleTheme();
+                    },
+                    iconColor: textColor,
+                  ),
+                  const SizedBox(width: 8),
                   _buildHeaderIconButton(
                     icon: Icons.favorite_rounded,
                     badgeCount: _favorites.length,
                     onTap: _showFavoritesSheet,
+                    iconColor: textColor,
                   ),
                   const SizedBox(width: 8),
                   _buildHeaderIconButton(
@@ -1156,12 +1339,14 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
                     badgeCount: _unreadChatCount,
                     onTap: _openChatInbox,
                     highlightColor: Colors.blueAccent,
+                    iconColor: textColor,
                   ),
                   const SizedBox(width: 8),
                   _buildHeaderIconButton(
                     icon: Icons.notifications_rounded,
                     badgeCount: _unreadNotificationsCount,
                     onTap: _showNotificationsSheet,
+                    iconColor: textColor,
                   ),
                   const SizedBox(width: 8),
                   _buildHeaderIconButton(
@@ -1169,11 +1354,14 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
                     badgeCount: 0,
                     onTap: _logout,
                     highlightColor: Colors.redAccent,
+                    iconColor: textColor,
                   ),
                 ],
               ),
             ],
           ),
+          const SizedBox(height: 16),
+          _buildRadiusFilter(textColor),
         ],
       ),
     );
@@ -1184,19 +1372,28 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
     required int badgeCount,
     required VoidCallback onTap,
     Color? highlightColor,
+    Color? iconColor,
   }) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
-          color: (highlightColor ?? Colors.white).withValues(alpha: 0.2),
+          color: (highlightColor ?? iconColor ?? Colors.white)
+              .withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: (iconColor ?? Colors.white).withValues(alpha: 0.1),
+          ),
         ),
         child: Stack(
           clipBehavior: Clip.none,
           children: [
-            Icon(icon, color: highlightColor ?? Colors.white, size: 22),
+            Icon(
+              icon,
+              color: highlightColor ?? iconColor ?? Colors.white,
+              size: 22,
+            ),
             if (badgeCount > 0)
               Positioned(
                 right: -6,
@@ -1231,15 +1428,16 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
     );
   }
 
-  Widget _buildSearchBar() {
+  Widget _buildSearchBar(Color cardColor, Color textColor) {
     return Container(
       margin: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: cardColor,
         borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: textColor.withValues(alpha: 0.1)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 15,
             offset: const Offset(0, 4),
           ),
@@ -1247,14 +1445,19 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
       ),
       child: TextField(
         controller: _searchController,
+        style: TextStyle(color: textColor),
+        cursorColor: _themeManager.primaryGreen,
         onSubmitted: (value) => _loadPkls(jenis: value.isEmpty ? null : value),
         decoration: InputDecoration(
           hintText: 'Cari PKL atau jenis dagangan...',
-          hintStyle: TextStyle(color: Colors.grey[400]),
-          prefixIcon: Icon(Icons.search, color: _primaryGreen),
+          hintStyle: TextStyle(color: textColor.withValues(alpha: 0.5)),
+          prefixIcon: const Icon(Icons.search, color: Color(0xFF1B7B5A)),
           suffixIcon: _searchController.text.isNotEmpty
               ? IconButton(
-                  icon: const Icon(Icons.clear),
+                  icon: Icon(
+                    Icons.clear,
+                    color: textColor.withValues(alpha: 0.5),
+                  ),
                   onPressed: () {
                     _searchController.clear();
                     _loadPkls();
@@ -1271,7 +1474,7 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
     );
   }
 
-  Widget _buildRadiusFilter() {
+  Widget _buildRadiusFilter(Color textColor) {
     String formatRadius(int value) {
       if (value >= 1000) {
         final km = value / 1000;
@@ -1290,11 +1493,12 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
       margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: _themeManager.isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
         borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: textColor.withValues(alpha: 0.1)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -1308,11 +1512,14 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
             children: [
               Row(
                 children: [
-                  Icon(Icons.my_location, color: _primaryGreen),
+                  const Icon(Icons.my_location, color: Color(0xFF1B7B5A)),
                   const SizedBox(width: 8),
-                  const Text(
+                  Text(
                     'Radius pencarian',
-                    style: TextStyle(fontWeight: FontWeight.w700),
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      color: textColor,
+                    ),
                   ),
                 ],
               ),
@@ -1321,7 +1528,12 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
                   if (_selectedRadius != null)
                     TextButton(
                       onPressed: () => _onRadiusChanged(null),
-                      child: const Text('Hapus radius'),
+                      child: Text(
+                        'Hapus radius',
+                        style: TextStyle(
+                          color: textColor.withValues(alpha: 0.5),
+                        ),
+                      ),
                     ),
                   Container(
                     padding: const EdgeInsets.symmetric(
@@ -1329,7 +1541,7 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
                       vertical: 4,
                     ),
                     decoration: BoxDecoration(
-                      color: _lightGreen,
+                      color: const Color(0xFF1B7B5A).withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
@@ -1337,7 +1549,7 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
                       style: const TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
-                        color: Color(0xFF0F5132),
+                        color: Color(0xFF1B7B5A),
                       ),
                     ),
                   ),
@@ -1357,11 +1569,20 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
                 onSelected: (selected) {
                   _onRadiusChanged(selected ? radius : null);
                 },
-                selectedColor: _primaryGreen,
-                backgroundColor: const Color(0xFFF5F7FA),
+                selectedColor: const Color(0xFF1B7B5A),
+                backgroundColor: _themeManager.isDarkMode
+                    ? const Color(0xFF2C2C2C)
+                    : Colors.grey[100],
                 labelStyle: TextStyle(
-                  color: isSelected ? Colors.white : Colors.grey[700],
+                  color: isSelected
+                      ? Colors.white
+                      : textColor.withValues(alpha: 0.6),
                   fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                ),
+                side: BorderSide(
+                  color: isSelected
+                      ? const Color(0xFF1B7B5A)
+                      : textColor.withValues(alpha: 0.1),
                 ),
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               );
@@ -1372,7 +1593,7 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
     );
   }
 
-  Widget _buildCategoryChips() {
+  Widget _buildCategoryChips(Color cardColor, Color textColor) {
     return SizedBox(
       height: 50,
       child: ListView.builder(
@@ -1397,11 +1618,18 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
                   _loadPkls(jenis: category);
                 }
               },
-              selectedColor: _primaryGreen,
-              backgroundColor: Colors.white,
+              selectedColor: const Color(0xFF1B7B5A),
+              backgroundColor: cardColor,
               labelStyle: TextStyle(
-                color: isSelected ? Colors.white : Colors.grey[700],
+                color: isSelected
+                    ? Colors.white
+                    : textColor.withValues(alpha: 0.6),
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+              ),
+              side: BorderSide(
+                color: isSelected
+                    ? const Color(0xFF1B7B5A)
+                    : textColor.withValues(alpha: 0.1),
               ),
             ),
           );
@@ -1410,7 +1638,7 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
     );
   }
 
-  Widget _buildPKLList() {
+  Widget _buildPKLList(Color cardColor, Color textColor) {
     final visiblePkls = _getVisiblePkls();
 
     if (visiblePkls.isEmpty) {
@@ -1421,7 +1649,7 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
             Icon(
               Icons.store_mall_directory_outlined,
               size: 64,
-              color: Colors.grey[400],
+              color: textColor.withValues(alpha: 0.5),
             ),
             const SizedBox(height: 16),
             Text(
@@ -1429,26 +1657,90 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
-                color: Colors.grey[600],
+                color: textColor.withValues(alpha: 0.7),
               ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Coba ubah radius pencarian atau lokasi Anda',
-              style: TextStyle(color: Colors.grey[500], fontSize: 14),
             ),
           ],
         ),
       );
     }
 
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: visiblePkls.length,
-      itemBuilder: (context, index) {
-        final pkl = visiblePkls[index];
-        return _buildPKLCard(pkl);
-      },
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        ListView.builder(
+          controller: _pklListController,
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          itemCount: visiblePkls.length,
+          itemBuilder: (context, index) {
+            final pkl = visiblePkls[index];
+            return _buildPKLCard(pkl, cardColor, textColor);
+          },
+        ),
+        Positioned(
+          left: 0,
+          child: Center(
+            child: IconButton(
+              onPressed: () {
+                _pklListController.animateTo(
+                  _pklListController.offset - 280,
+                  duration: const Duration(milliseconds: 300),
+                  curve: Curves.easeInOut,
+                );
+              },
+              icon: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: cardColor.withValues(alpha: 0.8),
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.2),
+                      blurRadius: 4,
+                    ),
+                  ],
+                ),
+                child: Icon(
+                  Icons.chevron_left,
+                  color: textColor,
+                ),
+              ),
+            ),
+          ),
+        ),
+        Positioned(
+          right: 0,
+          child: Center(
+            child: IconButton(
+              onPressed: () {
+                _pklListController.animateTo(
+                  _pklListController.offset + 280,
+                  duration: const Duration(milliseconds: 300),
+                  curve: Curves.easeInOut,
+                );
+              },
+              icon: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: cardColor.withValues(alpha: 0.8),
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.2),
+                      blurRadius: 4,
+                    ),
+                  ],
+                ),
+                child: Icon(
+                  Icons.chevron_right,
+                  color: textColor,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -1466,34 +1758,38 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
     }).toList();
   }
 
-  Widget _buildPKLCard(Map<String, dynamic> pkl) {
+  Widget _buildPKLCard(
+    Map<String, dynamic> pkl,
+    Color cardColor,
+    Color textColor,
+  ) {
     final pklId = (pkl['id'] as num?)?.toInt();
     final nama = (pkl['nama_usaha'] ?? '-') as String;
     final jenis = (pkl['jenis_dagangan'] ?? '-') as String;
-    final deskripsi = (pkl['deskripsi'] ?? '') as String;
-    final isFavorite = pklId != null && _favoriteIds.contains(pklId);
     final distance = _distanceLabelForPKL(pkl);
     final avgRating = (pkl['average_rating'] as num?)?.toDouble();
-    final ratingCount = (pkl['rating_count'] as num?)?.toInt() ?? 0;
+    final lat = (pkl['latest_latitude'] as num?)?.toDouble();
+    final lng = (pkl['latest_longitude'] as num?)?.toDouble();
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
+      width: 240, // Smaller width
+      margin: const EdgeInsets.only(right: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
+        color: cardColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: textColor.withValues(alpha: 0.1)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 15,
-            offset: const Offset(0, 4),
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
       child: Material(
         color: Colors.transparent,
-        borderRadius: BorderRadius.circular(20),
         child: InkWell(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(16),
           onTap: pklId == null
               ? null
               : () async {
@@ -1505,154 +1801,148 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
                   );
                   await _loadChatBadge();
                 },
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                Container(
-                  width: 70,
-                  height: 70,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                flex: 3,
+                child: Container(
                   decoration: BoxDecoration(
-                    color: _lightGreen,
-                    borderRadius: BorderRadius.circular(16),
+                    color: _themeManager.isDarkMode
+                        ? Colors.grey[800]
+                        : Colors.grey[200],
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(16),
+                    ),
                   ),
-                  child: Icon(
-                    _getCategoryIcon(jenis),
-                    size: 32,
-                    color: _primaryGreen,
+                  child: Center(
+                    child: Icon(
+                      _getCategoryIcon(jenis),
+                      size: 40,
+                      color: textColor.withValues(alpha: 0.5),
+                    ),
                   ),
                 ),
-                const SizedBox(width: 16),
-                Expanded(
+              ),
+              Expanded(
+                flex: 3, // Increased flex for content
+                child: Padding(
+                  padding: const EdgeInsets.all(10),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        nama,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: _primaryGreen.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          jenis,
-                          style: TextStyle(
-                            color: _primaryGreen,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                      if (deskripsi.isNotEmpty) ...[
-                        const SizedBox(height: 8),
-                        Text(
-                          deskripsi,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: Colors.grey[600],
-                            fontSize: 13,
-                          ),
-                        ),
-                      ],
-                      const SizedBox(height: 8),
                       Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Icon(
-                            Icons.star_rounded,
-                            size: 16,
-                            color: Colors.amber[600] ?? Colors.amber,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            avgRating != null
-                                ? avgRating.toStringAsFixed(1)
-                                : 'Belum ada rating',
-                            style: TextStyle(
-                              color: Colors.grey[800],
-                              fontWeight: FontWeight.w600,
-                              fontSize: 13,
-                            ),
-                          ),
-                          if (ratingCount > 0) ...[
-                            const SizedBox(width: 6),
-                            Text(
-                              '($ratingCount ulasan)',
+                          Expanded(
+                            child: Text(
+                              nama,
                               style: TextStyle(
-                                color: Colors.grey[500],
-                                fontSize: 12,
+                                color: textColor,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
                               ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
-                          ],
+                          ),
+                          if (avgRating != null)
+                            Row(
+                              children: [
+                                const Icon(
+                                  Icons.star_rounded,
+                                  color: Colors.amber,
+                                  size: 14,
+                                ),
+                                const SizedBox(width: 2),
+                                Text(
+                                  avgRating.toStringAsFixed(1),
+                                  style: TextStyle(
+                                    color: textColor,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 11,
+                                  ),
+                                ),
+                              ],
+                            ),
                         ],
                       ),
-                      const SizedBox(height: 8),
                       Row(
                         children: [
                           Icon(
                             Icons.location_on,
-                            size: 14,
-                            color: Colors.grey[500],
+                            color: textColor.withValues(alpha: 0.5),
+                            size: 12,
                           ),
-                          const SizedBox(width: 4),
+                          const SizedBox(width: 2),
                           Text(
                             distance,
                             style: TextStyle(
-                              color: Colors.grey[600],
-                              fontSize: 12,
+                              color: textColor.withValues(alpha: 0.5),
+                              fontSize: 11,
+                            ),
+                          ),
+                          const Spacer(),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: _themeManager.primaryGreen
+                                  .withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              jenis,
+                              style: TextStyle(
+                                color: _themeManager.primaryGreen,
+                                fontSize: 9,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
                         ],
                       ),
+                      const SizedBox(height: 4),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 32,
+                        child: ElevatedButton.icon(
+                          onPressed: (lat != null && lng != null)
+                              ? () async {
+                                  final url = Uri.parse(
+                                    'https://www.google.com/maps/search/?api=1&query=$lat,$lng',
+                                  );
+                                  if (await canLaunchUrl(url)) {
+                                    await launchUrl(
+                                      url,
+                                      mode: LaunchMode.externalApplication,
+                                    );
+                                  }
+                                }
+                              : null,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFE67E22),
+                            foregroundColor: Colors.white,
+                            padding: EdgeInsets.zero,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          icon: const Icon(Icons.navigation, size: 14),
+                          label: const Text(
+                            'Navigasi',
+                            style: TextStyle(fontSize: 12),
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),
-                Column(
-                  children: [
-                    IconButton(
-                      icon: Icon(
-                        isFavorite ? Icons.favorite : Icons.favorite_border,
-                        color: isFavorite ? Colors.pink : Colors.grey[400],
-                      ),
-                      onPressed: pklId == null
-                          ? null
-                          : () => _toggleFavorite(pklId),
-                    ),
-                    IconButton(
-                      icon: Icon(
-                        Icons.chat_bubble_outline,
-                        color: _primaryGreen,
-                      ),
-                      onPressed: pklId == null
-                          ? null
-                          : () async {
-                              await Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) =>
-                                      ChatPage(pklId: pklId, pklNama: nama),
-                                ),
-                              );
-                              await ChatBadgeManager.markChatsSeen(
-                                ChatRole.pembeli,
-                              );
-                              await _loadChatBadge();
-                            },
-                    ),
-                  ],
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),

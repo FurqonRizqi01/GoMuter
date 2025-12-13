@@ -71,12 +71,12 @@ class _PembeliChatListPageState extends State<PembeliChatListPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F6FB),
+      backgroundColor: const Color(0xFF121212),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
-        foregroundColor: Colors.black87,
+        foregroundColor: Colors.white,
         title: const Text('Pesan Saya'),
         actions: [
           IconButton(
@@ -86,11 +86,13 @@ class _PembeliChatListPageState extends State<PembeliChatListPage> {
         ],
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(child: CircularProgressIndicator(color: Color(0xFF1B7B5A)))
           : SafeArea(
               bottom: false,
               child: RefreshIndicator(
                 onRefresh: _loadChats,
+                color: const Color(0xFF1B7B5A),
+                backgroundColor: const Color(0xFF1E1E1E),
                 child: ListView(
                   physics: const AlwaysScrollableScrollPhysics(),
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
@@ -119,19 +121,16 @@ class _PembeliChatListPageState extends State<PembeliChatListPage> {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF25A0D7), Color(0xFF4FC3F7)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
+        gradient: LinearGradient(
+          colors: [
+            const Color(0xFF1B7B5A).withValues(alpha: 0.8),
+            const Color(0xFF121212).withValues(alpha: 0.0),
+          ],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
         ),
         borderRadius: BorderRadius.circular(30),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF4FC3F7).withValues(alpha: 0.25),
-            blurRadius: 24,
-            offset: const Offset(0, 12),
-          ),
-        ],
+        border: Border.all(color: const Color(0xFF1B7B5A).withValues(alpha: 0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -159,18 +158,18 @@ class _PembeliChatListPageState extends State<PembeliChatListPage> {
       margin: const EdgeInsets.only(bottom: 14),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFE5E7),
+        color: Colors.red.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(22),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.error_outline, color: Color(0xFFD32F2F)),
+          Icon(Icons.error_outline, color: Colors.red.shade400),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
               message,
-              style: const TextStyle(color: Color(0xFFD32F2F)),
+              style: TextStyle(color: Colors.red.shade200),
             ),
           ),
         ],
@@ -182,29 +181,23 @@ class _PembeliChatListPageState extends State<PembeliChatListPage> {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: const Color(0xFF1E1E1E),
         borderRadius: BorderRadius.circular(28),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 18,
-            offset: const Offset(0, 10),
-          ),
-        ],
+        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
       ),
       child: Column(
         children: const [
-          Icon(Icons.chat_bubble_outline, size: 44, color: Color(0xFF25A0D7)),
+          Icon(Icons.chat_bubble_outline, size: 44, color: Color(0xFF1B7B5A)),
           SizedBox(height: 10),
           Text(
             'Belum ada chat dengan PKL.',
-            style: TextStyle(fontWeight: FontWeight.w600),
+            style: TextStyle(fontWeight: FontWeight.w600, color: Colors.white),
           ),
           SizedBox(height: 4),
           Text(
             'Mulai obrolan dari halaman PKL favoritmu.',
             textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.black54),
+            style: TextStyle(color: Colors.grey),
           ),
         ],
       ),
@@ -218,15 +211,9 @@ class _PembeliChatListPageState extends State<PembeliChatListPage> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: const Color(0xFF1E1E1E),
         borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 18,
-            offset: const Offset(0, 10),
-          ),
-        ],
+        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(24),
@@ -243,8 +230,8 @@ class _PembeliChatListPageState extends State<PembeliChatListPage> {
         child: Row(
           children: [
             CircleAvatar(
-              backgroundColor: const Color(0xFFE3F2FD),
-              foregroundColor: const Color(0xFF1976D2),
+              backgroundColor: const Color(0xFF1B7B5A).withValues(alpha: 0.2),
+              foregroundColor: const Color(0xFF1B7B5A),
               child: Text(pklName.isEmpty ? '?' : pklName[0].toUpperCase()),
             ),
             const SizedBox(width: 14),
@@ -257,17 +244,18 @@ class _PembeliChatListPageState extends State<PembeliChatListPage> {
                     style: const TextStyle(
                       fontWeight: FontWeight.w700,
                       fontSize: 15,
+                      color: Colors.white,
                     ),
                   ),
                   const SizedBox(height: 2),
                   Text(
                     'Update terakhir: $updatedAt',
-                    style: const TextStyle(color: Colors.black54, fontSize: 12),
+                    style: const TextStyle(color: Colors.grey, fontSize: 12),
                   ),
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right),
+            const Icon(Icons.chevron_right, color: Colors.grey),
           ],
         ),
       ),
