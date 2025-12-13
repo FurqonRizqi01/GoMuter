@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 from pathlib import Path
+import os
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -142,3 +143,20 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # CORS configuration to allow Flutter dev server
 CORS_ALLOW_ALL_ORIGINS = True
+
+# Email (password reset)
+# - Default: console backend (dev) so emails appear in the runserver terminal
+# - If credentials are provided via env vars, use Gmail SMTP
+
+EMAIL_HOST_USER = os.getenv('GOMUTER_EMAIL_HOST_USER', '').strip()
+EMAIL_HOST_PASSWORD = os.getenv('GOMUTER_EMAIL_HOST_PASSWORD', '').strip()
+
+if EMAIL_HOST_USER and EMAIL_HOST_PASSWORD:
+    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+    EMAIL_HOST = os.getenv('GOMUTER_EMAIL_HOST', 'smtp.gmail.com')
+    EMAIL_PORT = int(os.getenv('GOMUTER_EMAIL_PORT', '587'))
+    EMAIL_USE_TLS = os.getenv('GOMUTER_EMAIL_USE_TLS', 'true').lower() == 'true'
+    DEFAULT_FROM_EMAIL = os.getenv('GOMUTER_DEFAULT_FROM_EMAIL', EMAIL_HOST_USER)
+else:
+    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+    DEFAULT_FROM_EMAIL = 'no-reply@gomuter.local'

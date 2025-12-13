@@ -74,6 +74,42 @@ class ApiService {
     throw Exception('Gagal menyegarkan token: ${response.body}');
   }
 
+  static Future<void> requestPasswordReset({required String identifier}) async {
+    final url = Uri.parse('$baseUrl/api/auth/password-reset/request/');
+    final response = await http.post(
+      url,
+      headers: _jsonHeaders(),
+      body: jsonEncode({'identifier': identifier}),
+    );
+
+    if (response.statusCode == 200) {
+      return;
+    }
+    throw Exception('Gagal meminta reset password: ${response.body}');
+  }
+
+  static Future<void> confirmPasswordReset({
+    required String uid,
+    required String token,
+    required String newPassword,
+  }) async {
+    final url = Uri.parse('$baseUrl/api/auth/password-reset/confirm/');
+    final response = await http.post(
+      url,
+      headers: _jsonHeaders(),
+      body: jsonEncode({
+        'uid': uid,
+        'token': token,
+        'new_password': newPassword,
+      }),
+    );
+
+    if (response.statusCode == 200) {
+      return;
+    }
+    throw Exception('Gagal reset password: ${response.body}');
+  }
+
   // === Endpoint PKL (role PKL) ===
 
   static Future<Map<String, dynamic>?> getPKLProfile(String token) async {

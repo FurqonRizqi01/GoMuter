@@ -13,9 +13,9 @@ void main() {
   testWidgets('Login page renders correctly', (WidgetTester tester) async {
     await tester.pumpWidget(const GoMuterApp());
 
-    expect(find.text('Login GoMuter'), findsOneWidget);
+    expect(find.text('Selamat Datang'), findsOneWidget);
     expect(find.text('Username'), findsOneWidget);
-    expect(find.text('Password'), findsOneWidget);
-    expect(find.text('Login'), findsOneWidget);
+    expect(find.text('Kata Sandi'), findsOneWidget);
+    expect(find.text('Masuk'), findsWidgets);
   });
 }

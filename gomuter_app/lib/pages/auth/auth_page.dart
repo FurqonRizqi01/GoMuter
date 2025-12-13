@@ -24,6 +24,14 @@ class _AuthPageState extends State<AuthPage> {
   final _passwordController = TextEditingController();
   final _emailController = TextEditingController();
 
+  final _resetIdentifierController = TextEditingController();
+  final _resetUidController = TextEditingController();
+  final _resetTokenController = TextEditingController();
+  final _resetNewPasswordController = TextEditingController();
+  final _resetConfirmPasswordController = TextEditingController();
+
+  bool _forgotPreferConfirmStep = false;
+
   String _selectedRole = 'USER';
   bool _isLoading = false;
   String? _errorText;
@@ -34,7 +42,320 @@ class _AuthPageState extends State<AuthPage> {
     _usernameController.dispose();
     _passwordController.dispose();
     _emailController.dispose();
+    _resetIdentifierController.dispose();
+    _resetUidController.dispose();
+    _resetTokenController.dispose();
+    _resetNewPasswordController.dispose();
+    _resetConfirmPasswordController.dispose();
     super.dispose();
+  }
+
+  Future<void> _openForgotPasswordSheet() async {
+    final colorScheme = Theme.of(context).colorScheme;
+    final primary = colorScheme.primary;
+
+    if (_resetIdentifierController.text.trim().isEmpty) {
+      _resetIdentifierController.text = _usernameController.text.trim();
+    }
+
+    // Don't clear UID/TOKEN so user can open Gmail and come back without re-requesting.
+    // Always clear the password fields for safety.
+    _resetNewPasswordController.clear();
+    _resetConfirmPasswordController.clear();
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        bool isRequesting = false;
+        bool isConfirming = false;
+        bool showConfirmStep = _forgotPreferConfirmStep;
+        String? sheetError;
+
+        return StatefulBuilder(
+          builder: (ctx, setSheetState) {
+            Future<void> requestReset() async {
+              setSheetState(() {
+                isRequesting = true;
+                sheetError = null;
+              });
+
+              try {
+                final identifier = _resetIdentifierController.text.trim();
+                if (identifier.isEmpty) {
+                  throw Exception('Identifier kosong');
+                }
+
+                await ApiService.requestPasswordReset(identifier: identifier);
+
+                if (!ctx.mounted) return;
+                setSheetState(() {
+                  showConfirmStep = true;
+                  _forgotPreferConfirmStep = true;
+                });
+
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'Jika akun ditemukan, instruksi reset dikirim ke email. Cek inbox/spam.',
+                    ),
+                  ),
+                );
+              } catch (_) {
+                setSheetState(() {
+                  sheetError = 'Gagal mengirim permintaan reset. Coba lagi.';
+                });
+              } finally {
+                setSheetState(() {
+                  isRequesting = false;
+                });
+              }
+            }
+
+            Future<void> confirmReset() async {
+              setSheetState(() {
+                isConfirming = true;
+                sheetError = null;
+              });
+
+              try {
+                final uid = _resetUidController.text.trim();
+                final token = _resetTokenController.text.trim();
+                final newPassword = _resetNewPasswordController.text;
+                final confirmPassword = _resetConfirmPasswordController.text;
+
+                if (uid.isEmpty || token.isEmpty) {
+                  throw Exception('Token kosong');
+                }
+                if (newPassword.isEmpty || newPassword.length < 6) {
+                  throw Exception('Password terlalu pendek');
+                }
+                if (newPassword != confirmPassword) {
+                  throw Exception('Password tidak sama');
+                }
+
+                await ApiService.confirmPasswordReset(
+                  uid: uid,
+                  token: token,
+                  newPassword: newPassword,
+                );
+
+                if (!ctx.mounted) return;
+                Navigator.of(ctx).pop();
+
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Password berhasil diubah. Silakan login.'),
+                  ),
+                );
+
+                setState(() {
+                  _forgotPreferConfirmStep = false;
+                });
+              } catch (_) {
+                setSheetState(() {
+                  sheetError =
+                      'Gagal reset password. Pastikan UID/TOKEN benar dan belum kadaluarsa.';
+                });
+              } finally {
+                setSheetState(() {
+                  isConfirming = false;
+                });
+              }
+            }
+
+            final viewInsets = MediaQuery.of(ctx).viewInsets;
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 16,
+                right: 16,
+                bottom: viewInsets.bottom + 16,
+                top: 16,
+              ),
+              child: _GlassCard(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        const Expanded(
+                          child: Text(
+                            'Lupa Password',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: () => Navigator.of(ctx).pop(),
+                          icon: Icon(
+                            Icons.close,
+                            color: Colors.white.withValues(alpha: 0.85),
+                          ),
+                        ),
+                      ],
+                    ),
+                    Text(
+                      showConfirmStep
+                          ? 'Masukkan UID dan TOKEN dari email, lalu buat password baru.'
+                          : 'Masukkan email atau username. Kami akan mengirim UID & TOKEN ke email akun (cek spam).',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.70),
+                        height: 1.4,
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    if (!showConfirmStep) ...[
+                      _SheetTextField(
+                        controller: _resetIdentifierController,
+                        hintText: 'Email atau Username',
+                        icon: Icons.alternate_email_rounded,
+                        textInputAction: TextInputAction.done,
+                      ),
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        height: 50,
+                        child: ElevatedButton(
+                          onPressed: isRequesting ? null : requestReset,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: primary,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                          ),
+                          child: isRequesting
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    color: Colors.white,
+                                    strokeWidth: 2.2,
+                                  ),
+                                )
+                              : const Text(
+                                  'Kirim Instruksi Reset',
+                                  style: TextStyle(fontWeight: FontWeight.w800),
+                                ),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      TextButton(
+                        onPressed: () {
+                          setSheetState(() {
+                            showConfirmStep = true;
+                            sheetError = null;
+                            _forgotPreferConfirmStep = true;
+                          });
+                        },
+                        child: Text(
+                          'Saya sudah punya UID/TOKEN',
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.75),
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ] else ...[
+                      _SheetTextField(
+                        controller: _resetUidController,
+                        hintText: 'UID (dari email)',
+                        icon: Icons.badge_outlined,
+                        textInputAction: TextInputAction.next,
+                      ),
+                      const SizedBox(height: 10),
+                      _SheetTextField(
+                        controller: _resetTokenController,
+                        hintText: 'TOKEN (dari email)',
+                        icon: Icons.key_rounded,
+                        textInputAction: TextInputAction.next,
+                      ),
+                      const SizedBox(height: 10),
+                      _SheetTextField(
+                        controller: _resetNewPasswordController,
+                        hintText: 'Password baru',
+                        icon: Icons.lock_outline_rounded,
+                        obscureText: true,
+                        textInputAction: TextInputAction.next,
+                      ),
+                      const SizedBox(height: 10),
+                      _SheetTextField(
+                        controller: _resetConfirmPasswordController,
+                        hintText: 'Konfirmasi password baru',
+                        icon: Icons.lock_rounded,
+                        obscureText: true,
+                        textInputAction: TextInputAction.done,
+                      ),
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        height: 50,
+                        child: ElevatedButton(
+                          onPressed: isConfirming ? null : confirmReset,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: primary,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                          ),
+                          child: isConfirming
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    color: Colors.white,
+                                    strokeWidth: 2.2,
+                                  ),
+                                )
+                              : const Text(
+                                  'Ubah Password',
+                                  style: TextStyle(fontWeight: FontWeight.w800),
+                                ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextButton(
+                        onPressed: () {
+                          setSheetState(() {
+                            showConfirmStep = false;
+                            sheetError = null;
+                            _forgotPreferConfirmStep = false;
+                          });
+                        },
+                        child: Text(
+                          'Kembali',
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.75),
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ],
+                    if (sheetError != null) ...[
+                      const SizedBox(height: 10),
+                      Text(
+                        sheetError!,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.error,
+                          fontWeight: FontWeight.w700,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   Future<void> _handleLogin() async {
@@ -212,6 +533,27 @@ class _AuthPageState extends State<AuthPage> {
                                 ),
                         ),
                       ),
+                      if (_isLogin) ...[
+                        const SizedBox(height: 10),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton(
+                            onPressed: _isLoading
+                                ? null
+                                : _openForgotPasswordSheet,
+                            style: TextButton.styleFrom(
+                              foregroundColor: Colors.white,
+                            ),
+                            child: Text(
+                              'Lupa password?',
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.8),
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: 14),
                       if (_errorText != null)
                         Padding(
@@ -351,6 +693,52 @@ class _GlowBlob extends StatelessWidget {
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         gradient: RadialGradient(colors: [color, color.withValues(alpha: 0.0)]),
+      ),
+    );
+  }
+}
+
+class _SheetTextField extends StatelessWidget {
+  const _SheetTextField({
+    required this.controller,
+    required this.hintText,
+    required this.icon,
+    this.obscureText = false,
+    this.textInputAction,
+  });
+
+  final TextEditingController controller;
+  final String hintText;
+  final IconData icon;
+  final bool obscureText;
+  final TextInputAction? textInputAction;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
+      ),
+      child: TextField(
+        controller: controller,
+        obscureText: obscureText,
+        textInputAction: textInputAction,
+        style: const TextStyle(color: Colors.white),
+        decoration: InputDecoration(
+          filled: false,
+          border: InputBorder.none,
+          enabledBorder: InputBorder.none,
+          focusedBorder: InputBorder.none,
+          hintText: hintText,
+          hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.65)),
+          prefixIcon: Icon(icon, color: Colors.white.withValues(alpha: 0.70)),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 16,
+          ),
+        ),
       ),
     );
   }
