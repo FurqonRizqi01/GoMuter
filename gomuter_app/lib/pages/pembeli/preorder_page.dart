@@ -1,6 +1,7 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:gomuter_app/api_service.dart';
+import 'package:gomuter_app/utils/theme_manager.dart';
 import 'package:gomuter_app/utils/token_manager.dart';
 
 enum _DPProofAction { uploadFile, manualUrl }
@@ -17,6 +18,8 @@ class PreOrderPage extends StatefulWidget {
 
 class _PreOrderPageState extends State<PreOrderPage>
     with SingleTickerProviderStateMixin {
+  final ThemeManager _themeManager = ThemeManager();
+
   final _formKey = GlobalKey<FormState>();
   final _deskripsiController = TextEditingController();
   final _catatanController = TextEditingController();
@@ -37,15 +40,18 @@ class _PreOrderPageState extends State<PreOrderPage>
   int _dpAmount = 5000;
   int? _uploadingDPOrderId;
 
-  // Theme colors
-  static const Color _primaryColor = Color(0xFF0D7377);
-  static const Color _accentColor = Color(0xFF14FFEC);
-  static const Color _darkColor = Color(0xFF212121);
-  static const Color _lightBg = Color(0xFFF5F7FA);
+  Color get _primaryColor => _themeManager.primaryGreen;
+  Color get _secondaryColor =>
+      _themeManager.primaryGreen.withValues(alpha: 0.85);
+  Color get _accentColor => _themeManager.accentSurfaceColor;
+  Color get _darkColor => _themeManager.textColor;
+  Color get _mutedTextColor => _themeManager.mutedTextColor;
+  Color get _borderColor => _themeManager.borderColor;
 
   @override
   void initState() {
     super.initState();
+    _themeManager.addListener(_onThemeChanged);
     _tabController = TabController(length: 2, vsync: this);
     _loadPKLDetail();
     _loadMyOrders();
@@ -53,6 +59,7 @@ class _PreOrderPageState extends State<PreOrderPage>
 
   @override
   void dispose() {
+    _themeManager.removeListener(_onThemeChanged);
     _tabController.dispose();
     _deskripsiController.dispose();
     _catatanController.dispose();
@@ -61,6 +68,10 @@ class _PreOrderPageState extends State<PreOrderPage>
     _lngController.dispose();
     _perkiraanTotalController.dispose();
     super.dispose();
+  }
+
+  void _onThemeChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<String?> _getToken() async {
@@ -243,9 +254,9 @@ class _PreOrderPageState extends State<PreOrderPage>
       context: context,
       backgroundColor: Colors.transparent,
       builder: (context) => Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        decoration: BoxDecoration(
+          color: _themeManager.cardColor,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
         ),
         child: SafeArea(
           child: Column(
@@ -256,13 +267,13 @@ class _PreOrderPageState extends State<PreOrderPage>
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
+                  color: _borderColor,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
               const SizedBox(height: 20),
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 20),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Text(
                   'Upload Bukti Pembayaran',
                   style: TextStyle(
@@ -277,7 +288,7 @@ class _PreOrderPageState extends State<PreOrderPage>
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Text(
                   'Pilih metode untuk mengirim bukti DP',
-                  style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
+                  style: TextStyle(color: _mutedTextColor, fontSize: 14),
                 ),
               ),
               const SizedBox(height: 24),
@@ -330,23 +341,29 @@ class _PreOrderPageState extends State<PreOrderPage>
     required String subtitle,
     required VoidCallback onTap,
   }) {
+    final isDark = _themeManager.isDarkMode;
+    final optionBg = isDark ? _themeManager.surfaceColor : Colors.grey.shade50;
+    final optionBorder = isDark ? _borderColor : Colors.grey.shade200;
+    final subtitleColor = isDark ? _mutedTextColor : Colors.grey.shade600;
+    final chevronColor = isDark ? _mutedTextColor : Colors.grey.shade400;
+
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.grey.shade50,
+          color: optionBg,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.grey.shade200),
+          border: Border.all(color: optionBorder),
         ),
         child: Row(
           children: [
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [_primaryColor, Color(0xFF14A3A8)],
+                gradient: LinearGradient(
+                  colors: [_primaryColor, _secondaryColor],
                 ),
                 borderRadius: BorderRadius.circular(12),
               ),
@@ -359,7 +376,7 @@ class _PreOrderPageState extends State<PreOrderPage>
                 children: [
                   Text(
                     title,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontWeight: FontWeight.bold,
                       color: _darkColor,
                       fontSize: 15,
@@ -368,16 +385,12 @@ class _PreOrderPageState extends State<PreOrderPage>
                   const SizedBox(height: 2),
                   Text(
                     subtitle,
-                    style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+                    style: TextStyle(color: subtitleColor, fontSize: 13),
                   ),
                 ],
               ),
             ),
-            Icon(
-              Icons.arrow_forward_ios,
-              size: 16,
-              color: Colors.grey.shade400,
-            ),
+            Icon(Icons.arrow_forward_ios, size: 16, color: chevronColor),
           ],
         ),
       ),
@@ -448,9 +461,12 @@ class _PreOrderPageState extends State<PreOrderPage>
 
   Future<void> _promptManualDPUrl(int preorderId) async {
     final controller = TextEditingController();
+    final isDark = _themeManager.isDarkMode;
+
     final result = await showDialog<String?>(
       context: context,
       builder: (context) => Dialog(
+        backgroundColor: _themeManager.cardColor,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         child: Padding(
           padding: const EdgeInsets.all(24),
@@ -460,15 +476,15 @@ class _PreOrderPageState extends State<PreOrderPage>
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [_primaryColor, Color(0xFF14A3A8)],
+                  gradient: LinearGradient(
+                    colors: [_primaryColor, _secondaryColor],
                   ),
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: const Icon(Icons.link, color: Colors.white, size: 32),
               ),
               const SizedBox(height: 20),
-              const Text(
+              Text(
                 'Kirim Bukti DP via URL',
                 style: TextStyle(
                   fontSize: 18,
@@ -479,21 +495,25 @@ class _PreOrderPageState extends State<PreOrderPage>
               const SizedBox(height: 8),
               Text(
                 'Masukkan URL bukti pembayaran DP Anda',
-                style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
+                style: TextStyle(color: _mutedTextColor, fontSize: 14),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 20),
               Container(
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade50,
+                  color: isDark
+                      ? _themeManager.surfaceColor
+                      : Colors.grey.shade50,
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.grey.shade200),
+                  border: Border.all(
+                    color: isDark ? _borderColor : Colors.grey.shade200,
+                  ),
                 ),
                 child: TextField(
                   controller: controller,
                   decoration: InputDecoration(
                     hintText: 'https://drive.google.com/...',
-                    hintStyle: TextStyle(color: Colors.grey.shade400),
+                    hintStyle: TextStyle(color: _themeManager.hintTextColor),
                     prefixIcon: Icon(Icons.link, color: _primaryColor),
                     border: InputBorder.none,
                     contentPadding: const EdgeInsets.all(16),
@@ -514,7 +534,11 @@ class _PreOrderPageState extends State<PreOrderPage>
                       ),
                       child: Text(
                         'Batal',
-                        style: TextStyle(color: Colors.grey.shade600),
+                        style: TextStyle(
+                          color: isDark
+                              ? _mutedTextColor
+                              : Colors.grey.shade600,
+                        ),
                       ),
                     ),
                   ),
@@ -522,8 +546,8 @@ class _PreOrderPageState extends State<PreOrderPage>
                   Expanded(
                     child: Container(
                       decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [_primaryColor, Color(0xFF14A3A8)],
+                        gradient: LinearGradient(
+                          colors: [_primaryColor, _secondaryColor],
                         ),
                         borderRadius: BorderRadius.circular(12),
                       ),
@@ -649,9 +673,12 @@ class _PreOrderPageState extends State<PreOrderPage>
     String? Function(String?)? validator,
     void Function(String)? onChanged,
   }) {
+    final isDark = _themeManager.isDarkMode;
+    final cardBg = _themeManager.cardColor;
+    final fieldFill = isDark ? _themeManager.surfaceColor : Colors.white;
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: cardBg,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
@@ -668,7 +695,7 @@ class _PreOrderPageState extends State<PreOrderPage>
         keyboardType: keyboardType,
         validator: validator,
         onChanged: onChanged,
-        style: const TextStyle(fontSize: 15, color: _darkColor),
+        style: TextStyle(fontSize: 15, color: _darkColor),
         decoration: InputDecoration(
           labelText: label,
           hintText: hint,
@@ -676,15 +703,19 @@ class _PreOrderPageState extends State<PreOrderPage>
             margin: const EdgeInsets.all(8),
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [_primaryColor, Color(0xFF14A3A8)],
+              gradient: LinearGradient(
+                colors: [_primaryColor, _secondaryColor],
               ),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(icon, color: Colors.white, size: 20),
           ),
-          labelStyle: TextStyle(color: Colors.grey.shade600),
-          hintStyle: TextStyle(color: Colors.grey.shade400),
+          labelStyle: TextStyle(
+            color: isDark ? _mutedTextColor : Colors.grey.shade600,
+          ),
+          hintStyle: TextStyle(
+            color: isDark ? _themeManager.hintTextColor : Colors.grey.shade400,
+          ),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(16),
             borderSide: BorderSide.none,
@@ -695,14 +726,14 @@ class _PreOrderPageState extends State<PreOrderPage>
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(16),
-            borderSide: const BorderSide(color: _primaryColor, width: 2),
+            borderSide: BorderSide(color: _primaryColor, width: 2),
           ),
           errorBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(16),
             borderSide: const BorderSide(color: Colors.red, width: 1),
           ),
           filled: true,
-          fillColor: Colors.white,
+          fillColor: fieldFill,
           contentPadding: const EdgeInsets.symmetric(
             horizontal: 20,
             vertical: 16,
@@ -713,6 +744,7 @@ class _PreOrderPageState extends State<PreOrderPage>
   }
 
   Widget _buildHeader() {
+    final primary = _primaryColor;
     return Container(
       padding: EdgeInsets.only(
         top: MediaQuery.of(context).padding.top + 16,
@@ -720,11 +752,11 @@ class _PreOrderPageState extends State<PreOrderPage>
         right: 20,
         bottom: 24,
       ),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [_primaryColor, Color(0xFF14A3A8)],
+          colors: [primary, _secondaryColor],
         ),
       ),
       child: Column(
@@ -827,11 +859,14 @@ class _PreOrderPageState extends State<PreOrderPage>
   }
 
   Widget _buildTabBar() {
+    final isDark = _themeManager.isDarkMode;
+    final cardBg = _themeManager.cardColor;
     return Container(
       margin: const EdgeInsets.fromLTRB(20, 20, 20, 0),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: cardBg,
         borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: _borderColor),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.08),
@@ -844,14 +879,12 @@ class _PreOrderPageState extends State<PreOrderPage>
         controller: _tabController,
         indicator: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
-          gradient: const LinearGradient(
-            colors: [_primaryColor, Color(0xFF14A3A8)],
-          ),
+          gradient: LinearGradient(colors: [_primaryColor, _secondaryColor]),
         ),
         indicatorSize: TabBarIndicatorSize.tab,
         dividerColor: Colors.transparent,
         labelColor: Colors.white,
-        unselectedLabelColor: Colors.grey.shade600,
+        unselectedLabelColor: isDark ? _mutedTextColor : Colors.grey.shade600,
         labelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
         padding: const EdgeInsets.all(6),
         tabs: [
@@ -885,7 +918,7 @@ class _PreOrderPageState extends State<PreOrderPage>
                     ),
                     child: Text(
                       '${_myOrders.length}',
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: _darkColor,
                         fontSize: 11,
                         fontWeight: FontWeight.bold,
@@ -978,8 +1011,8 @@ class _PreOrderPageState extends State<PreOrderPage>
               width: double.infinity,
               height: 56,
               decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [_primaryColor, Color(0xFF14A3A8)],
+                gradient: LinearGradient(
+                  colors: [_primaryColor, _secondaryColor],
                 ),
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
@@ -1047,6 +1080,8 @@ class _PreOrderPageState extends State<PreOrderPage>
   }
 
   Widget _buildDPCard() {
+    final isDark = _themeManager.isDarkMode;
+
     return Container(
       decoration: BoxDecoration(
         gradient: LinearGradient(
@@ -1065,8 +1100,8 @@ class _PreOrderPageState extends State<PreOrderPage>
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [_primaryColor, Color(0xFF14A3A8)],
+              gradient: LinearGradient(
+                colors: [_primaryColor, _secondaryColor],
               ),
               borderRadius: const BorderRadius.vertical(
                 top: Radius.circular(19),
@@ -1103,12 +1138,14 @@ class _PreOrderPageState extends State<PreOrderPage>
                     vertical: 6,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: isDark
+                        ? _themeManager.accentSurfaceColor
+                        : Colors.white,
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
                     'Rp $_dpAmount',
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: _primaryColor,
                       fontWeight: FontWeight.bold,
                       fontSize: 14,
@@ -1121,7 +1158,7 @@ class _PreOrderPageState extends State<PreOrderPage>
           Padding(
             padding: const EdgeInsets.all(16),
             child: _isLoadingPKL
-                ? const Center(
+                ? Center(
                     child: Padding(
                       padding: EdgeInsets.all(20),
                       child: CircularProgressIndicator(color: _primaryColor),
@@ -1131,17 +1168,26 @@ class _PreOrderPageState extends State<PreOrderPage>
                 ? Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: Colors.red.shade50,
+                      color: Colors.red.withValues(alpha: isDark ? 0.18 : 0.08),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Row(
                       children: [
-                        Icon(Icons.error_outline, color: Colors.red.shade400),
+                        Icon(
+                          Icons.error_outline,
+                          color: isDark
+                              ? Colors.red.shade300
+                              : Colors.red.shade400,
+                        ),
                         const SizedBox(width: 12),
                         Expanded(
                           child: Text(
                             _pklError!,
-                            style: TextStyle(color: Colors.red.shade700),
+                            style: TextStyle(
+                              color: isDark
+                                  ? Colors.red.shade200
+                                  : Colors.red.shade700,
+                            ),
                           ),
                         ),
                       ],
@@ -1156,7 +1202,9 @@ class _PreOrderPageState extends State<PreOrderPage>
                           padding: const EdgeInsets.all(12),
                           margin: const EdgeInsets.only(bottom: 12),
                           decoration: BoxDecoration(
-                            color: Colors.white,
+                            color: isDark
+                                ? _themeManager.surfaceColor
+                                : Colors.white,
                             borderRadius: BorderRadius.circular(12),
                             boxShadow: [
                               BoxShadow(
@@ -1176,7 +1224,7 @@ class _PreOrderPageState extends State<PreOrderPage>
                               Expanded(
                                 child: Text(
                                   _pklString('nama_rekening')!,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontWeight: FontWeight.w600,
                                     color: _darkColor,
                                   ),
@@ -1188,7 +1236,9 @@ class _PreOrderPageState extends State<PreOrderPage>
                       if ((_pklString('qris_image_url') ?? '').isNotEmpty)
                         Container(
                           decoration: BoxDecoration(
-                            color: Colors.white,
+                            color: isDark
+                                ? _themeManager.surfaceColor
+                                : Colors.white,
                             borderRadius: BorderRadius.circular(16),
                             boxShadow: [
                               BoxShadow(
@@ -1205,7 +1255,9 @@ class _PreOrderPageState extends State<PreOrderPage>
                                   vertical: 12,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: Colors.grey.shade50,
+                                  color: isDark
+                                      ? _themeManager.surfaceColor
+                                      : Colors.grey.shade50,
                                   borderRadius: const BorderRadius.vertical(
                                     top: Radius.circular(16),
                                   ),
@@ -1215,13 +1267,13 @@ class _PreOrderPageState extends State<PreOrderPage>
                                     Image.asset(
                                       'assets/qris_logo.png',
                                       height: 24,
-                                      errorBuilder: (_, __, ___) => const Icon(
+                                      errorBuilder: (_, __, ___) => Icon(
                                         Icons.qr_code_2,
                                         color: _primaryColor,
                                       ),
                                     ),
                                     const SizedBox(width: 8),
-                                    const Text(
+                                    Text(
                                       'Scan QRIS untuk bayar',
                                       style: TextStyle(
                                         fontWeight: FontWeight.w600,
@@ -1241,7 +1293,9 @@ class _PreOrderPageState extends State<PreOrderPage>
                                     _pklString('qris_image_url')!,
                                     fit: BoxFit.contain,
                                     errorBuilder: (_, __, ___) => Container(
-                                      color: Colors.grey.shade100,
+                                      color: isDark
+                                          ? _themeManager.surfaceColor
+                                          : Colors.grey.shade100,
                                       child: Column(
                                         mainAxisAlignment:
                                             MainAxisAlignment.center,
@@ -1249,13 +1303,17 @@ class _PreOrderPageState extends State<PreOrderPage>
                                           Icon(
                                             Icons.broken_image,
                                             size: 48,
-                                            color: Colors.grey.shade400,
+                                            color: isDark
+                                                ? _mutedTextColor
+                                                : Colors.grey.shade400,
                                           ),
                                           const SizedBox(height: 8),
                                           Text(
                                             'QRIS tidak dapat dimuat',
                                             style: TextStyle(
-                                              color: Colors.grey.shade600,
+                                              color: isDark
+                                                  ? _mutedTextColor
+                                                  : Colors.grey.shade600,
                                             ),
                                           ),
                                         ],
@@ -1271,7 +1329,9 @@ class _PreOrderPageState extends State<PreOrderPage>
                         Container(
                           padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
-                            color: Colors.white,
+                            color: isDark
+                                ? _themeManager.surfaceColor
+                                : Colors.white,
                             borderRadius: BorderRadius.circular(12),
                             boxShadow: [
                               BoxShadow(
@@ -1287,7 +1347,7 @@ class _PreOrderPageState extends State<PreOrderPage>
                               Expanded(
                                 child: Text(
                                   _pklString('qris_link')!,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     color: _primaryColor,
                                     decoration: TextDecoration.underline,
                                   ),
@@ -1302,21 +1362,27 @@ class _PreOrderPageState extends State<PreOrderPage>
                         Container(
                           padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
-                            color: Colors.orange.shade50,
+                            color: isDark
+                                ? _themeManager.accentSurfaceColor
+                                : Colors.orange.shade50,
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Row(
                             children: [
                               Icon(
                                 Icons.warning_amber_rounded,
-                                color: Colors.orange.shade700,
+                                color: isDark
+                                    ? Colors.orange.shade300
+                                    : Colors.orange.shade700,
                               ),
                               const SizedBox(width: 12),
                               Expanded(
                                 child: Text(
                                   'PKL belum mengunggah QRIS. Hubungi PKL untuk info pembayaran.',
                                   style: TextStyle(
-                                    color: Colors.orange.shade800,
+                                    color: isDark
+                                        ? _mutedTextColor
+                                        : Colors.orange.shade800,
                                   ),
                                 ),
                               ),
@@ -1328,14 +1394,24 @@ class _PreOrderPageState extends State<PreOrderPage>
                 : Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: Colors.grey.shade100,
+                      color: isDark
+                          ? _themeManager.surfaceColor
+                          : Colors.grey.shade100,
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Row(
                       children: [
-                        Icon(Icons.info_outline, color: Colors.grey.shade600),
+                        Icon(
+                          Icons.info_outline,
+                          color: isDark
+                              ? _mutedTextColor
+                              : Colors.grey.shade600,
+                        ),
                         const SizedBox(width: 12),
-                        const Text('Informasi PKL belum tersedia.'),
+                        Text(
+                          'Informasi PKL belum tersedia.',
+                          style: TextStyle(color: _darkColor),
+                        ),
                       ],
                     ),
                   ),
@@ -1357,12 +1433,16 @@ class _PreOrderPageState extends State<PreOrderPage>
                 color: _primaryColor.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
-              child: const CircularProgressIndicator(color: _primaryColor),
+              child: CircularProgressIndicator(color: _primaryColor),
             ),
             const SizedBox(height: 16),
             Text(
               'Memuat riwayat...',
-              style: TextStyle(color: Colors.grey.shade600),
+              style: TextStyle(
+                color: _themeManager.isDarkMode
+                    ? _mutedTextColor
+                    : Colors.grey.shade600,
+              ),
             ),
           ],
         ),
@@ -1426,7 +1506,7 @@ class _PreOrderPageState extends State<PreOrderPage>
                 ),
               ),
               const SizedBox(height: 20),
-              const Text(
+              Text(
                 'Belum ada pre-order',
                 style: TextStyle(
                   fontSize: 18,
@@ -1437,7 +1517,11 @@ class _PreOrderPageState extends State<PreOrderPage>
               const SizedBox(height: 8),
               Text(
                 'Pre-order Anda untuk PKL ini akan muncul di sini',
-                style: TextStyle(color: Colors.grey.shade600),
+                style: TextStyle(
+                  color: _themeManager.isDarkMode
+                      ? _mutedTextColor
+                      : Colors.grey.shade600,
+                ),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 20),
@@ -1464,6 +1548,8 @@ class _PreOrderPageState extends State<PreOrderPage>
   }
 
   Widget _buildOrderCard(Map<String, dynamic> order) {
+    final isDark = _themeManager.isDarkMode;
+
     final orderId = order['id'] as int;
     final deskripsi = order['deskripsi_pesanan'] as String? ?? '-';
     final status = order['status'] as String? ?? 'PENDING';
@@ -1479,7 +1565,7 @@ class _PreOrderPageState extends State<PreOrderPage>
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: _themeManager.cardColor,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
@@ -1521,7 +1607,7 @@ class _PreOrderPageState extends State<PreOrderPage>
                     children: [
                       Text(
                         'Order #$orderId',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontWeight: FontWeight.bold,
                           color: _darkColor,
                         ),
@@ -1531,7 +1617,9 @@ class _PreOrderPageState extends State<PreOrderPage>
                         createdText,
                         style: TextStyle(
                           fontSize: 12,
-                          color: Colors.grey.shade600,
+                          color: isDark
+                              ? _mutedTextColor
+                              : Colors.grey.shade600,
                         ),
                       ),
                     ],
@@ -1566,7 +1654,7 @@ class _PreOrderPageState extends State<PreOrderPage>
               children: [
                 Text(
                   deskripsi,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w600,
                     color: _darkColor,
@@ -1577,7 +1665,9 @@ class _PreOrderPageState extends State<PreOrderPage>
                   Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: Colors.grey.shade50,
+                      color: isDark
+                          ? _themeManager.surfaceColor
+                          : Colors.grey.shade50,
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Row(
@@ -1586,7 +1676,9 @@ class _PreOrderPageState extends State<PreOrderPage>
                         Icon(
                           Icons.notes,
                           size: 16,
-                          color: Colors.grey.shade600,
+                          color: isDark
+                              ? _mutedTextColor
+                              : Colors.grey.shade600,
                         ),
                         const SizedBox(width: 8),
                         Expanded(
@@ -1594,7 +1686,9 @@ class _PreOrderPageState extends State<PreOrderPage>
                             catatan,
                             style: TextStyle(
                               fontSize: 13,
-                              color: Colors.grey.shade700,
+                              color: isDark
+                                  ? _mutedTextColor
+                                  : Colors.grey.shade700,
                             ),
                           ),
                         ),
@@ -1628,12 +1722,14 @@ class _PreOrderPageState extends State<PreOrderPage>
                               'DP',
                               style: TextStyle(
                                 fontSize: 12,
-                                color: Colors.grey.shade600,
+                                color: isDark
+                                    ? _mutedTextColor
+                                    : Colors.grey.shade600,
                               ),
                             ),
                             Text(
                               'Rp $dpAmount',
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontWeight: FontWeight.bold,
                                 color: _primaryColor,
                               ),
@@ -1669,7 +1765,9 @@ class _PreOrderPageState extends State<PreOrderPage>
                   Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: Colors.green.shade50,
+                      color: isDark
+                          ? Colors.green.withValues(alpha: 0.18)
+                          : Colors.green.shade50,
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Row(
@@ -1677,7 +1775,9 @@ class _PreOrderPageState extends State<PreOrderPage>
                         Icon(
                           Icons.check_circle,
                           size: 16,
-                          color: Colors.green.shade600,
+                          color: isDark
+                              ? Colors.green.shade300
+                              : Colors.green.shade600,
                         ),
                         const SizedBox(width: 8),
                         Expanded(
@@ -1685,7 +1785,9 @@ class _PreOrderPageState extends State<PreOrderPage>
                             'Bukti DP sudah dikirim',
                             style: TextStyle(
                               fontSize: 12,
-                              color: Colors.green.shade700,
+                              color: isDark
+                                  ? Colors.green.shade200
+                                  : Colors.green.shade700,
                             ),
                           ),
                         ),
@@ -1708,7 +1810,7 @@ class _PreOrderPageState extends State<PreOrderPage>
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                const SizedBox(
+                                SizedBox(
                                   width: 18,
                                   height: 18,
                                   child: CircularProgressIndicator(
@@ -1717,7 +1819,7 @@ class _PreOrderPageState extends State<PreOrderPage>
                                   ),
                                 ),
                                 const SizedBox(width: 12),
-                                const Text(
+                                Text(
                                   'Mengunggah...',
                                   style: TextStyle(
                                     color: _primaryColor,
@@ -1737,7 +1839,7 @@ class _PreOrderPageState extends State<PreOrderPage>
                             ),
                             style: OutlinedButton.styleFrom(
                               foregroundColor: _primaryColor,
-                              side: const BorderSide(color: _primaryColor),
+                              side: BorderSide(color: _primaryColor),
                               padding: const EdgeInsets.symmetric(vertical: 12),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
@@ -1781,7 +1883,7 @@ class _PreOrderPageState extends State<PreOrderPage>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _lightBg,
+      backgroundColor: _themeManager.backgroundColor,
       body: Column(
         children: [
           _buildHeader(),

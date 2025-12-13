@@ -14,7 +14,6 @@ import 'package:gomuter_app/utils/chat_badge_manager.dart';
 import 'package:gomuter_app/utils/token_manager.dart';
 import 'package:gomuter_app/utils/theme_manager.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 class PembeliHomePage extends StatefulWidget {
   const PembeliHomePage({super.key});
@@ -41,8 +40,7 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
   final TextEditingController _searchController = TextEditingController();
   // ignore: unused_field
   LatLng _initialCenter = const LatLng(-6.2, 106.8);
-  // ignore: unused_field
-  List<Marker> _markers = [];
+  int? _selectedPklMarkerId;
   final List<int> _radiusOptions = [300, 500, 1000, 1500];
   int? _selectedRadius = 300;
   Timer? _locationTimer;
@@ -206,7 +204,6 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
         query: jenis,
       );
 
-      final markers = <Marker>[];
       LatLng? firstCenter;
 
       for (final item in data) {
@@ -218,22 +215,12 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
 
         final point = LatLng((lat as num).toDouble(), (lng as num).toDouble());
         firstCenter ??= point;
-
-        markers.add(
-          Marker(
-            point: point,
-            width: 40,
-            height: 40,
-            child: const Icon(Icons.location_on, size: 40, color: Colors.red),
-          ),
-        );
       }
 
       if (!mounted) return;
 
       setState(() {
         _pkls = data;
-        _markers = markers;
         if (firstCenter != null) {
           _initialCenter = firstCenter;
         }
@@ -249,6 +236,137 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
         });
       }
     }
+  }
+
+  void _focusOnPklMarker({
+    required int? pklId,
+    required String name,
+    required double? lat,
+    required double? lng,
+  }) {
+    if (lat == null || lng == null) return;
+    final point = LatLng(lat, lng);
+    _mapController.move(point, 16.0);
+    setState(() {
+      _selectedPklMarkerId = pklId;
+    });
+  }
+
+  void _togglePklMarkerSelection(int markerId) {
+    setState(() {
+      if (_selectedPklMarkerId == markerId) {
+        _selectedPklMarkerId = null;
+      } else {
+        _selectedPklMarkerId = markerId;
+      }
+    });
+  }
+
+  Widget _buildPklMarkerWidget({required String name, required bool selected}) {
+    final markerColor = _themeManager.primaryGreen;
+    final borderBase = _themeManager.isDarkMode
+        ? _themeManager.textColor
+        : Colors.white;
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (selected)
+          Container(
+            constraints: const BoxConstraints(maxWidth: 190),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: _themeManager.cardColor.withValues(alpha: 0.96),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: _themeManager.borderColor),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(
+                    alpha: _themeManager.isDarkMode ? 0.45 : 0.18,
+                  ),
+                  blurRadius: 12,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: Text(
+              name,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: _themeManager.textColor,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                height: 1.2,
+              ),
+            ),
+          ),
+        if (selected) const SizedBox(height: 8),
+        AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          curve: Curves.easeOut,
+          padding: EdgeInsets.all(selected ? 10 : 8),
+          decoration: BoxDecoration(
+            color: markerColor,
+            borderRadius: BorderRadius.circular(20),
+            border: selected
+                ? Border.all(color: borderBase, width: 2)
+                : Border.all(color: borderBase.withValues(alpha: 0.22)),
+            boxShadow: [
+              BoxShadow(
+                color: markerColor.withValues(alpha: 0.35),
+                blurRadius: 10,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
+          child: const Icon(
+            Icons.storefront_rounded,
+            color: Colors.white,
+            size: 22,
+          ),
+        ),
+      ],
+    );
+  }
+
+  List<Marker> _buildPklMarkers() {
+    final pkls = _pkls.whereType<Map<String, dynamic>>().toList();
+    final markers = <Marker>[];
+
+    for (var index = 0; index < pkls.length; index++) {
+      final pkl = pkls[index];
+      final latRaw = pkl['latest_latitude'];
+      final lngRaw = pkl['latest_longitude'];
+      if (latRaw == null || lngRaw == null) continue;
+
+      final pklId = (pkl['id'] as num?)?.toInt();
+      final markerId = pklId ?? (-index - 1);
+      final name = (pkl['nama_usaha'] ?? '-') as String;
+
+      final point = LatLng(
+        (latRaw as num).toDouble(),
+        (lngRaw as num).toDouble(),
+      );
+
+      final selected = _selectedPklMarkerId == markerId;
+
+      markers.add(
+        Marker(
+          point: point,
+          alignment: Alignment.bottomCenter,
+          width: selected ? 210 : 60,
+          height: selected ? 95 : 60,
+          child: GestureDetector(
+            onTap: () => _togglePklMarkerSelection(markerId),
+            child: _buildPklMarkerWidget(name: name, selected: selected),
+          ),
+        ),
+      );
+    }
+
+    return markers;
   }
 
   void _startLocationTimer() {
@@ -598,10 +716,15 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) {
+        final isDark = _themeManager.isDarkMode;
+        final sheetBg = _themeManager.cardColor;
+        final sheetText = _themeManager.textColor;
+        final sheetMuted = _themeManager.mutedTextColor;
+        final tileBg = _themeManager.surfaceColor;
         return Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          decoration: BoxDecoration(
+            color: sheetBg,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
           ),
           child: SafeArea(
             child: Padding(
@@ -615,7 +738,9 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
                       width: 40,
                       height: 4,
                       decoration: BoxDecoration(
-                        color: Colors.grey[300],
+                        color: isDark
+                            ? Colors.white.withValues(alpha: 0.18)
+                            : Colors.grey[300],
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
@@ -629,21 +754,22 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
                           Container(
                             padding: const EdgeInsets.all(10),
                             decoration: BoxDecoration(
-                              color: Colors.pink[50],
+                              color: _themeManager.accentSurfaceColor,
                               borderRadius: BorderRadius.circular(12),
                             ),
-                            child: const Icon(
+                            child: Icon(
                               Icons.favorite_rounded,
-                              color: Colors.pinkAccent,
+                              color: _themeManager.primaryGreen,
                               size: 20,
                             ),
                           ),
                           const SizedBox(width: 12),
                           Text(
                             'PKL Favorit (${_favorites.length})',
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
+                              color: sheetText,
                             ),
                           ),
                         ],
@@ -666,7 +792,7 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
                     Container(
                       padding: const EdgeInsets.all(24),
                       decoration: BoxDecoration(
-                        color: Colors.grey[50],
+                        color: tileBg,
                         borderRadius: BorderRadius.circular(16),
                       ),
                       child: Column(
@@ -674,15 +800,12 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
                           Icon(
                             Icons.favorite_border_rounded,
                             size: 48,
-                            color: Colors.grey[400],
+                            color: sheetMuted,
                           ),
                           const SizedBox(height: 12),
                           Text(
                             'Belum ada PKL favorit',
-                            style: TextStyle(
-                              color: Colors.grey[600],
-                              fontSize: 14,
-                            ),
+                            style: TextStyle(color: sheetMuted, fontSize: 14),
                           ),
                         ],
                       ),
@@ -702,7 +825,7 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
 
                           return Container(
                             decoration: BoxDecoration(
-                              color: Colors.grey[50],
+                              color: tileBg,
                               borderRadius: BorderRadius.circular(16),
                             ),
                             child: ListTile(
@@ -714,7 +837,7 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
                                 width: 48,
                                 height: 48,
                                 decoration: BoxDecoration(
-                                  color: _themeManager.lightGreen,
+                                  color: _themeManager.accentSurfaceColor,
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: Icon(
@@ -724,14 +847,15 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
                               ),
                               title: Text(
                                 nama,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontWeight: FontWeight.w600,
+                                  color: sheetText,
                                 ),
                               ),
                               subtitle: Text(
                                 jenis,
                                 style: TextStyle(
-                                  color: Colors.grey[600],
+                                  color: sheetMuted,
                                   fontSize: 12,
                                 ),
                               ),
@@ -803,11 +927,10 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
             return Container(
               height: MediaQuery.of(ctx).size.height * 0.7,
               decoration: BoxDecoration(
-                color: _themeManager.isDarkMode
-                    ? const Color(0xFF1E1E1E)
-                    : Colors.white,
-                borderRadius:
-                    const BorderRadius.vertical(top: Radius.circular(24)),
+                color: _themeManager.cardColor,
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(24),
+                ),
               ),
               child: Column(
                 children: [
@@ -819,7 +942,7 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
                           width: 40,
                           height: 4,
                           decoration: BoxDecoration(
-                            color: Colors.grey[300],
+                            color: _themeManager.borderColor,
                             borderRadius: BorderRadius.circular(2),
                           ),
                         ),
@@ -832,12 +955,12 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
                                 Container(
                                   padding: const EdgeInsets.all(10),
                                   decoration: BoxDecoration(
-                                    color: Colors.orange[50],
+                                    color: _themeManager.accentSurfaceColor,
                                     borderRadius: BorderRadius.circular(12),
                                   ),
                                   child: Icon(
                                     Icons.notifications_rounded,
-                                    color: Colors.orange[700],
+                                    color: _themeManager.primaryGreen,
                                     size: 20,
                                   ),
                                 ),
@@ -847,9 +970,7 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
                                   style: TextStyle(
                                     fontSize: 18,
                                     fontWeight: FontWeight.bold,
-                                    color: _themeManager.isDarkMode
-                                        ? Colors.white
-                                        : Colors.black87,
+                                    color: _themeManager.textColor,
                                   ),
                                 ),
                               ],
@@ -934,25 +1055,24 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
                                 decoration: BoxDecoration(
                                   color: isRead
                                       ? (_themeManager.isDarkMode
-                                          ? Colors.transparent
-                                          : Colors.grey[50])
+                                            ? Colors.transparent
+                                            : Colors.grey[50])
                                       : (_themeManager.isDarkMode
-                                          ? _themeManager.primaryGreen
-                                              .withValues(alpha: 0.1)
-                                          : _themeManager.lightGreen),
+                                            ? _themeManager.primaryGreen
+                                                  .withValues(alpha: 0.1)
+                                            : _themeManager.lightGreen),
                                   borderRadius: BorderRadius.circular(16),
                                   border: isRead
                                       ? Border.all(
                                           color: _themeManager.isDarkMode
-                                              ? Colors.white
-                                                  .withValues(alpha: 0.1)
+                                              ? Colors.white.withValues(
+                                                  alpha: 0.1,
+                                                )
                                               : Colors.transparent,
                                         )
                                       : Border.all(
                                           color: _themeManager.primaryGreen
-                                              .withValues(
-                                            alpha: 0.3,
-                                          ),
+                                              .withValues(alpha: 0.3),
                                         ),
                                 ),
                                 child: ListTile(
@@ -962,12 +1082,10 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
                                     decoration: BoxDecoration(
                                       color: isRead
                                           ? (_themeManager.isDarkMode
-                                              ? Colors.grey[800]
-                                              : Colors.grey[200])
+                                                ? Colors.grey[800]
+                                                : Colors.grey[200])
                                           : _themeManager.primaryGreen
-                                              .withValues(
-                                              alpha: 0.1,
-                                            ),
+                                                .withValues(alpha: 0.1),
                                       borderRadius: BorderRadius.circular(12),
                                     ),
                                     child: Icon(
@@ -1112,6 +1230,11 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
     final textColor = _themeManager.textColor;
     final cardColor = _themeManager.cardColor;
 
+    final bottomInset = MediaQuery.of(context).padding.bottom;
+    const pklListHeight = 144.0;
+    final pklListBottom = 16.0 + bottomInset;
+    final fabBottom = pklListBottom + pklListHeight + 16.0;
+
     return Scaffold(
       backgroundColor: bgColor,
       body: Stack(
@@ -1131,10 +1254,26 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
                     if (isDark) {
                       return ColorFiltered(
                         colorFilter: const ColorFilter.matrix(<double>[
-                          -1, 0, 0, 0, 255,
-                          0, -1, 0, 0, 255,
-                          0, 0, -1, 0, 255,
-                          0, 0, 0, 1, 0,
+                          -1,
+                          0,
+                          0,
+                          0,
+                          255,
+                          0,
+                          -1,
+                          0,
+                          0,
+                          255,
+                          0,
+                          0,
+                          -1,
+                          0,
+                          255,
+                          0,
+                          0,
+                          0,
+                          1,
+                          0,
                         ]),
                         child: widget,
                       );
@@ -1142,7 +1281,7 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
                     return widget;
                   },
                 ),
-                MarkerLayer(markers: _markers),
+                MarkerLayer(markers: _buildPklMarkers()),
                 if (_buyerPosition != null)
                   MarkerLayer(
                     markers: [
@@ -1153,20 +1292,23 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
                         ),
                         width: 24,
                         height: 24,
+                        alignment: Alignment.center,
                         child: Container(
                           decoration: BoxDecoration(
-                            color: Colors.blueAccent,
+                            color: _themeManager.primaryGreen,
                             shape: BoxShape.circle,
                             border: Border.all(color: Colors.white, width: 2),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.blueAccent.withValues(alpha: 0.5),
+                                color: _themeManager.primaryGreen.withValues(
+                                  alpha: 0.5,
+                                ),
                                 blurRadius: 8,
                               ),
                             ],
                           ),
                           child: const Icon(
-                            Icons.person,
+                            Icons.my_location_rounded,
                             color: Colors.white,
                             size: 14,
                           ),
@@ -1178,18 +1320,15 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
             ),
           ),
           Positioned(
-            bottom: 260,
+            bottom: fabBottom,
             right: 16,
             child: FloatingActionButton(
               heroTag: 'my_location_fab',
-              backgroundColor: const Color(0xFFE67E22), // Orange color like image
+              backgroundColor: _themeManager.primaryGreen,
               onPressed: () {
                 if (_buyerPosition != null) {
                   _mapController.move(
-                    LatLng(
-                      _buyerPosition!.latitude,
-                      _buyerPosition!.longitude,
-                    ),
+                    LatLng(_buyerPosition!.latitude, _buyerPosition!.longitude),
                     15.0,
                   );
                 } else {
@@ -1208,14 +1347,7 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
-                  colors: [
-                    isDark
-                        ? Colors.black.withValues(alpha: 0.9)
-                        : Colors.white.withValues(alpha: 0.95),
-                    isDark
-                        ? Colors.transparent
-                        : Colors.white.withValues(alpha: 0.0),
-                  ],
+                  colors: [_themeManager.overlayScrimColor, Colors.transparent],
                 ),
               ),
               child: SafeArea(
@@ -1231,34 +1363,34 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
             ),
           ),
           Positioned(
-            bottom: 20,
+            bottom: pklListBottom,
             left: 0,
             right: 0,
             child: SizedBox(
-              height: 180, // Smaller height
+              height: pklListHeight,
               child: _isLoading
                   ? const Center(child: CircularProgressIndicator())
                   : _error != null
-                      ? Center(
-                          child: Container(
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: cardColor,
-                              borderRadius: BorderRadius.circular(12),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.1),
-                                  blurRadius: 8,
-                                ),
-                              ],
+                  ? Center(
+                      child: Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: cardColor,
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.1),
+                              blurRadius: 8,
                             ),
-                            child: Text(
-                              _error!,
-                              style: TextStyle(color: textColor),
-                            ),
-                          ),
-                        )
-                      : _buildPKLList(cardColor, textColor),
+                          ],
+                        ),
+                        child: Text(
+                          _error!,
+                          style: TextStyle(color: textColor),
+                        ),
+                      ),
+                    )
+                  : _buildPKLList(cardColor, textColor),
             ),
           ),
         ],
@@ -1379,8 +1511,9 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
       child: Container(
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
-          color: (highlightColor ?? iconColor ?? Colors.white)
-              .withValues(alpha: 0.1),
+          color: (highlightColor ?? iconColor ?? Colors.white).withValues(
+            alpha: 0.1,
+          ),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: (iconColor ?? Colors.white).withValues(alpha: 0.1),
@@ -1450,14 +1583,11 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
         onSubmitted: (value) => _loadPkls(jenis: value.isEmpty ? null : value),
         decoration: InputDecoration(
           hintText: 'Cari PKL atau jenis dagangan...',
-          hintStyle: TextStyle(color: textColor.withValues(alpha: 0.5)),
-          prefixIcon: const Icon(Icons.search, color: Color(0xFF1B7B5A)),
+          hintStyle: TextStyle(color: _themeManager.hintTextColor),
+          prefixIcon: Icon(Icons.search, color: _themeManager.primaryGreen),
           suffixIcon: _searchController.text.isNotEmpty
               ? IconButton(
-                  icon: Icon(
-                    Icons.clear,
-                    color: textColor.withValues(alpha: 0.5),
-                  ),
+                  icon: Icon(Icons.clear, color: _themeManager.hintTextColor),
                   onPressed: () {
                     _searchController.clear();
                     _loadPkls();
@@ -1488,17 +1618,18 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
     final badgeText = _selectedRadius == null
         ? 'Tanpa batas'
         : formatRadius(_selectedRadius!);
+    final cardColor = _themeManager.cardColor;
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: _themeManager.isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: textColor.withValues(alpha: 0.1)),
+        color: cardColor.withValues(alpha: 0.92),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: textColor.withValues(alpha: 0.08)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
+            color: Colors.black.withValues(alpha: 0.10),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -1512,7 +1643,7 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
             children: [
               Row(
                 children: [
-                  const Icon(Icons.my_location, color: Color(0xFF1B7B5A)),
+                  Icon(Icons.my_location, color: _themeManager.primaryGreen),
                   const SizedBox(width: 8),
                   Text(
                     'Radius pencarian',
@@ -1524,6 +1655,7 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
                 ],
               ),
               Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   if (_selectedRadius != null)
                     TextButton(
@@ -1531,7 +1663,7 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
                       child: Text(
                         'Hapus radius',
                         style: TextStyle(
-                          color: textColor.withValues(alpha: 0.5),
+                          color: textColor.withValues(alpha: 0.55),
                         ),
                       ),
                     ),
@@ -1541,15 +1673,15 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
                       vertical: 4,
                     ),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF1B7B5A).withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(20),
+                      color: _themeManager.primaryGreen.withValues(alpha: 0.18),
+                      borderRadius: BorderRadius.circular(999),
                     ),
                     child: Text(
                       badgeText,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF1B7B5A),
+                        fontWeight: FontWeight.w700,
+                        color: _themeManager.primaryGreen,
                       ),
                     ),
                   ),
@@ -1569,20 +1701,20 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
                 onSelected: (selected) {
                   _onRadiusChanged(selected ? radius : null);
                 },
-                selectedColor: const Color(0xFF1B7B5A),
+                selectedColor: _themeManager.primaryGreen,
                 backgroundColor: _themeManager.isDarkMode
-                    ? const Color(0xFF2C2C2C)
+                    ? Colors.white.withValues(alpha: 0.06)
                     : Colors.grey[100],
                 labelStyle: TextStyle(
                   color: isSelected
                       ? Colors.white
-                      : textColor.withValues(alpha: 0.6),
+                      : textColor.withValues(alpha: 0.7),
                   fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
                 ),
                 side: BorderSide(
                   color: isSelected
-                      ? const Color(0xFF1B7B5A)
-                      : textColor.withValues(alpha: 0.1),
+                      ? _themeManager.primaryGreen
+                      : textColor.withValues(alpha: 0.10),
                 ),
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               );
@@ -1618,7 +1750,7 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
                   _loadPkls(jenis: category);
                 }
               },
-              selectedColor: const Color(0xFF1B7B5A),
+              selectedColor: _themeManager.primaryGreen,
               backgroundColor: cardColor,
               labelStyle: TextStyle(
                 color: isSelected
@@ -1628,7 +1760,7 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
               ),
               side: BorderSide(
                 color: isSelected
-                    ? const Color(0xFF1B7B5A)
+                    ? _themeManager.primaryGreen
                     : textColor.withValues(alpha: 0.1),
               ),
             ),
@@ -1701,10 +1833,7 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
                     ),
                   ],
                 ),
-                child: Icon(
-                  Icons.chevron_left,
-                  color: textColor,
-                ),
+                child: Icon(Icons.chevron_left, color: textColor),
               ),
             ),
           ),
@@ -1732,10 +1861,7 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
                     ),
                   ],
                 ),
-                child: Icon(
-                  Icons.chevron_right,
-                  color: textColor,
-                ),
+                child: Icon(Icons.chevron_right, color: textColor),
               ),
             ),
           ),
@@ -1771,8 +1897,10 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
     final lat = (pkl['latest_latitude'] as num?)?.toDouble();
     final lng = (pkl['latest_longitude'] as num?)?.toDouble();
 
+    final thumbUrl = _pickPklThumbnailUrl(pkl);
+
     return Container(
-      width: 240, // Smaller width
+      width: 320,
       margin: const EdgeInsets.only(right: 12),
       decoration: BoxDecoration(
         color: cardColor,
@@ -1801,39 +1929,53 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
                   );
                   await _loadChatBadge();
                 },
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                flex: 3,
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: _themeManager.isDarkMode
-                        ? Colors.grey[800]
-                        : Colors.grey[200],
-                    borderRadius: const BorderRadius.vertical(
-                      top: Radius.circular(16),
-                    ),
-                  ),
-                  child: Center(
-                    child: Icon(
-                      _getCategoryIcon(jenis),
-                      size: 40,
-                      color: textColor.withValues(alpha: 0.5),
-                    ),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(14),
+                  child: SizedBox(
+                    width: 108,
+                    height: 108,
+                    child: thumbUrl == null
+                        ? Container(
+                            color: _themeManager.isDarkMode
+                                ? Colors.white.withValues(alpha: 0.06)
+                                : Colors.grey[200],
+                            child: Center(
+                              child: Icon(
+                                _getCategoryIcon(jenis),
+                                size: 42,
+                                color: textColor.withValues(alpha: 0.55),
+                              ),
+                            ),
+                          )
+                        : Image.network(
+                            thumbUrl,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Container(
+                              color: _themeManager.isDarkMode
+                                  ? Colors.white.withValues(alpha: 0.06)
+                                  : Colors.grey[200],
+                              child: Center(
+                                child: Icon(
+                                  _getCategoryIcon(jenis),
+                                  size: 42,
+                                  color: textColor.withValues(alpha: 0.55),
+                                ),
+                              ),
+                            ),
+                          ),
                   ),
                 ),
-              ),
-              Expanded(
-                flex: 3, // Increased flex for content
-                child: Padding(
-                  padding: const EdgeInsets.all(10),
+                const SizedBox(width: 12),
+                Expanded(
                   child: Column(
+                    mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Expanded(
                             child: Text(
@@ -1847,93 +1989,96 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
-                          if (avgRating != null)
-                            Row(
-                              children: [
-                                const Icon(
-                                  Icons.star_rounded,
-                                  color: Colors.amber,
-                                  size: 14,
-                                ),
-                                const SizedBox(width: 2),
-                                Text(
-                                  avgRating.toStringAsFixed(1),
-                                  style: TextStyle(
-                                    color: textColor,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 11,
-                                  ),
-                                ),
-                              ],
+                          if (avgRating != null) ...[
+                            const SizedBox(width: 8),
+                            const Icon(
+                              Icons.star_rounded,
+                              color: Colors.amber,
+                              size: 14,
                             ),
+                            const SizedBox(width: 2),
+                            Text(
+                              avgRating.toStringAsFixed(1),
+                              style: TextStyle(
+                                color: textColor,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 11,
+                              ),
+                            ),
+                          ],
                         ],
                       ),
+                      const SizedBox(height: 6),
                       Row(
                         children: [
                           Icon(
                             Icons.location_on,
-                            color: textColor.withValues(alpha: 0.5),
+                            color: textColor.withValues(alpha: 0.55),
                             size: 12,
                           ),
                           const SizedBox(width: 2),
-                          Text(
-                            distance,
-                            style: TextStyle(
-                              color: textColor.withValues(alpha: 0.5),
-                              fontSize: 11,
+                          Expanded(
+                            child: Text(
+                              distance,
+                              style: TextStyle(
+                                color: textColor.withValues(alpha: 0.55),
+                                fontSize: 11,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
-                          const Spacer(),
+                          const SizedBox(width: 8),
                           Container(
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 6,
-                              vertical: 2,
+                              horizontal: 8,
+                              vertical: 3,
                             ),
                             decoration: BoxDecoration(
-                              color: _themeManager.primaryGreen
-                                  .withValues(alpha: 0.2),
-                              borderRadius: BorderRadius.circular(6),
+                              color: _themeManager.primaryGreen.withValues(
+                                alpha: 0.18,
+                              ),
+                              borderRadius: BorderRadius.circular(999),
                             ),
                             child: Text(
                               jenis,
                               style: TextStyle(
                                 color: _themeManager.primaryGreen,
-                                fontSize: 9,
-                                fontWeight: FontWeight.bold,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
                               ),
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 10),
                       SizedBox(
                         width: double.infinity,
-                        height: 32,
+                        height: 34,
                         child: ElevatedButton.icon(
                           onPressed: (lat != null && lng != null)
                               ? () async {
-                                  final url = Uri.parse(
-                                    'https://www.google.com/maps/search/?api=1&query=$lat,$lng',
+                                  _focusOnPklMarker(
+                                    pklId: pklId,
+                                    name: nama,
+                                    lat: lat,
+                                    lng: lng,
                                   );
-                                  if (await canLaunchUrl(url)) {
-                                    await launchUrl(
-                                      url,
-                                      mode: LaunchMode.externalApplication,
-                                    );
-                                  }
                                 }
                               : null,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFFE67E22),
+                            backgroundColor: _themeManager.primaryGreen,
                             foregroundColor: Colors.white,
-                            padding: EdgeInsets.zero,
+                            padding: const EdgeInsets.symmetric(horizontal: 10),
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
+                              borderRadius: BorderRadius.circular(10),
                             ),
                           ),
-                          icon: const Icon(Icons.navigation, size: 14),
+                          icon: const Icon(Icons.navigation, size: 16),
                           label: const Text(
                             'Navigasi',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: TextStyle(fontSize: 12),
                           ),
                         ),
@@ -1941,11 +2086,38 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
                     ],
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
     );
+  }
+
+  String? _pickPklThumbnailUrl(Map<String, dynamic> pkl) {
+    final candidates = <dynamic>[
+      pkl['thumbnail_url'],
+      pkl['image_url'],
+      pkl['photo_url'],
+      pkl['foto_url'],
+      pkl['gambar_url'],
+      pkl['foto'],
+      pkl['gambar'],
+    ];
+    for (final c in candidates) {
+      if (c is String && c.trim().isNotEmpty) return c;
+    }
+
+    final products = pkl['products'];
+    if (products is List) {
+      for (final item in products) {
+        if (item is Map) {
+          final img =
+              item['image_url'] ?? item['photo_url'] ?? item['thumbnail_url'];
+          if (img is String && img.trim().isNotEmpty) return img;
+        }
+      }
+    }
+    return null;
   }
 }

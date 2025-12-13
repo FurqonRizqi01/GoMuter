@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:gomuter_app/api_service.dart';
 import 'package:gomuter_app/pages/pkl/pkl_chat_room_page.dart';
 import 'package:gomuter_app/utils/chat_badge_manager.dart';
+import 'package:gomuter_app/utils/theme_manager.dart';
 import 'package:gomuter_app/utils/token_manager.dart';
 import 'package:gomuter_app/widgets/pkl_bottom_nav.dart';
 
@@ -13,6 +14,7 @@ class PklChatListPage extends StatefulWidget {
 }
 
 class _PklChatListPageState extends State<PklChatListPage> {
+  final ThemeManager _themeManager = ThemeManager();
   bool _isLoading = true;
   String? _error;
   List<dynamic> _chats = [];
@@ -20,7 +22,18 @@ class _PklChatListPageState extends State<PklChatListPage> {
   @override
   void initState() {
     super.initState();
+    _themeManager.addListener(_onThemeChanged);
     _loadChats();
+  }
+
+  @override
+  void dispose() {
+    _themeManager.removeListener(_onThemeChanged);
+    super.dispose();
+  }
+
+  void _onThemeChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _loadChats() async {
@@ -70,17 +83,27 @@ class _PklChatListPageState extends State<PklChatListPage> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = _themeManager.isDarkMode;
+    final bgColor = _themeManager.backgroundColor;
+    final textColor = _themeManager.textColor;
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F6FB),
+      backgroundColor: bgColor,
       appBar: AppBar(
         automaticallyImplyLeading: false,
         backgroundColor: Colors.transparent,
         elevation: 0,
         scrolledUnderElevation: 0,
         surfaceTintColor: Colors.transparent,
-        foregroundColor: Colors.black87,
+        foregroundColor: textColor,
         title: const Text('Pesan dari Pembeli'),
         actions: [
+          IconButton(
+            icon: Icon(
+              isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
+            ),
+            onPressed: _themeManager.toggleTheme,
+            tooltip: isDark ? 'Mode terang' : 'Mode gelap',
+          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _isLoading ? null : _loadChats,
@@ -182,10 +205,12 @@ class _PklChatListPageState extends State<PklChatListPage> {
   }
 
   Widget _buildEmptyState() {
+    final textColor = _themeManager.textColor;
+    final mutedText = _themeManager.mutedTextColor;
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: _themeManager.cardColor,
         borderRadius: BorderRadius.circular(28),
         boxShadow: [
           BoxShadow(
@@ -196,18 +221,22 @@ class _PklChatListPageState extends State<PklChatListPage> {
         ],
       ),
       child: Column(
-        children: const [
-          Icon(Icons.chat_bubble_outline, size: 44, color: Color(0xFF0D8A3A)),
-          SizedBox(height: 10),
+        children: [
+          Icon(
+            Icons.chat_bubble_outline,
+            size: 44,
+            color: _themeManager.primaryGreen,
+          ),
+          const SizedBox(height: 10),
           Text(
             'Belum ada chat dari pembeli.',
-            style: TextStyle(fontWeight: FontWeight.w600),
+            style: TextStyle(fontWeight: FontWeight.w600, color: textColor),
           ),
-          SizedBox(height: 4),
+          const SizedBox(height: 4),
           Text(
             'Saat pembeli menghubungi kamu, daftar ini akan terisi.',
             textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.black54),
+            style: TextStyle(color: mutedText),
           ),
         ],
       ),
@@ -215,12 +244,14 @@ class _PklChatListPageState extends State<PklChatListPage> {
   }
 
   Widget _buildChatTile(Map<String, dynamic> chat) {
+    final textColor = _themeManager.textColor;
+    final mutedText = _themeManager.mutedTextColor;
     final pembeli = (chat['pembeli_username'] ?? 'Pembeli') as String;
     final updatedAt = _formatTimestamp(chat['updated_at'] as String?);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: _themeManager.cardColor,
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
@@ -246,8 +277,8 @@ class _PklChatListPageState extends State<PklChatListPage> {
         child: Row(
           children: [
             CircleAvatar(
-              backgroundColor: const Color(0xFFE8F9EF),
-              foregroundColor: const Color(0xFF0D8A3A),
+              backgroundColor: _themeManager.accentSurfaceColor,
+              foregroundColor: _themeManager.primaryGreen,
               child: Text(pembeli.isEmpty ? '?' : pembeli[0].toUpperCase()),
             ),
             const SizedBox(width: 14),
@@ -257,20 +288,21 @@ class _PklChatListPageState extends State<PklChatListPage> {
                 children: [
                   Text(
                     pembeli,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontWeight: FontWeight.w700,
                       fontSize: 15,
+                      color: textColor,
                     ),
                   ),
                   const SizedBox(height: 2),
                   Text(
                     'Update terakhir: $updatedAt',
-                    style: const TextStyle(color: Colors.black54, fontSize: 12),
+                    style: TextStyle(color: mutedText, fontSize: 12),
                   ),
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right),
+            Icon(Icons.chevron_right, color: mutedText),
           ],
         ),
       ),

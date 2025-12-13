@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:gomuter_app/api_service.dart';
 import 'package:gomuter_app/utils/chat_badge_manager.dart';
+import 'package:gomuter_app/utils/theme_manager.dart';
 import 'package:gomuter_app/utils/token_manager.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -17,6 +18,8 @@ class ChatPage extends StatefulWidget {
 }
 
 class _ChatPageState extends State<ChatPage> {
+  final ThemeManager _themeManager = ThemeManager();
+
   bool _isLoading = true;
   bool _isSending = false;
   String? _error;
@@ -27,24 +30,24 @@ class _ChatPageState extends State<ChatPage> {
   final ScrollController _scrollController = ScrollController();
   Timer? _pollingTimer;
 
-  // Theme Colors
-  static const Color _primaryGreen = Color(0xFF1B7B5A);
-  static const Color _secondaryGreen = Color(0xFF2D9D78);
-  static const Color _lightGreen = Color(0xFFE8F5F0);
-  static const Color _accentPeach = Color(0xFFFAD4C0);
-
   @override
   void initState() {
     super.initState();
+    _themeManager.addListener(_onThemeChanged);
     _initChat();
   }
 
   @override
   void dispose() {
+    _themeManager.removeListener(_onThemeChanged);
     _pollingTimer?.cancel();
     _msgController.dispose();
     _scrollController.dispose();
     super.dispose();
+  }
+
+  void _onThemeChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _initChat() async {
@@ -202,8 +205,9 @@ class _ChatPageState extends State<ChatPage> {
 
   @override
   Widget build(BuildContext context) {
+    final bgColor = _themeManager.backgroundColor;
     return Scaffold(
-      backgroundColor: Colors.grey[50],
+      backgroundColor: bgColor,
       appBar: _buildAppBar(),
       body: _isLoading
           ? _buildLoadingState()
@@ -219,9 +223,10 @@ class _ChatPageState extends State<ChatPage> {
   }
 
   PreferredSizeWidget _buildAppBar() {
+    final primary = _themeManager.primaryGreen;
     return AppBar(
       elevation: 0,
-      backgroundColor: _primaryGreen,
+      backgroundColor: primary,
       foregroundColor: Colors.white,
       leading: IconButton(
         icon: Container(
@@ -240,15 +245,18 @@ class _ChatPageState extends State<ChatPage> {
             width: 44,
             height: 44,
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [_secondaryGreen, _primaryGreen],
+              gradient: LinearGradient(
+                colors: [
+                  primary.withValues(alpha: 0.85),
+                  primary,
+                ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
               borderRadius: BorderRadius.circular(14),
               boxShadow: [
                 BoxShadow(
-                  color: _primaryGreen.withValues(alpha: 0.3),
+                  color: primary.withValues(alpha: 0.3),
                   blurRadius: 8,
                   offset: const Offset(0, 2),
                 ),
@@ -283,7 +291,7 @@ class _ChatPageState extends State<ChatPage> {
                       width: 8,
                       height: 8,
                       decoration: BoxDecoration(
-                        color: Colors.greenAccent[400],
+                        color: _themeManager.lightGreen,
                         borderRadius: BorderRadius.circular(4),
                       ),
                     ),
@@ -320,6 +328,7 @@ class _ChatPageState extends State<ChatPage> {
   }
 
   Widget _buildLoadingState() {
+    final primary = _themeManager.primaryGreen;
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -327,18 +336,21 @@ class _ChatPageState extends State<ChatPage> {
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: _lightGreen,
+              color: _themeManager.accentSurfaceColor,
               borderRadius: BorderRadius.circular(20),
             ),
-            child: const CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(_primaryGreen),
+            child: CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(primary),
               strokeWidth: 3,
             ),
           ),
           const SizedBox(height: 20),
           Text(
             'Memuat percakapan...',
-            style: TextStyle(color: Colors.grey[600], fontSize: 14),
+            style: TextStyle(
+              color: _themeManager.mutedTextColor,
+              fontSize: 14,
+            ),
           ),
         ],
       ),
@@ -346,6 +358,7 @@ class _ChatPageState extends State<ChatPage> {
   }
 
   Widget _buildErrorState() {
+    final primary = _themeManager.primaryGreen;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
@@ -369,7 +382,7 @@ class _ChatPageState extends State<ChatPage> {
               _error!,
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: Colors.grey[700],
+                color: _themeManager.textColor,
                 fontSize: 14,
                 height: 1.5,
               ),
@@ -380,7 +393,7 @@ class _ChatPageState extends State<ChatPage> {
               icon: const Icon(Icons.refresh),
               label: const Text('Coba Lagi'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: _primaryGreen,
+                backgroundColor: primary,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(
                   horizontal: 24,
@@ -399,6 +412,7 @@ class _ChatPageState extends State<ChatPage> {
 
   Widget _buildMessages() {
     if (_messages.isEmpty) {
+      final primary = _themeManager.primaryGreen;
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(32),
@@ -408,20 +422,20 @@ class _ChatPageState extends State<ChatPage> {
               Container(
                 padding: const EdgeInsets.all(32),
                 decoration: BoxDecoration(
-                  color: _lightGreen,
+                  color: _themeManager.accentSurfaceColor,
                   borderRadius: BorderRadius.circular(24),
                 ),
                 child: Icon(
                   Icons.chat_bubble_outline_rounded,
                   size: 56,
-                  color: _primaryGreen.withValues(alpha: 0.6),
+                  color: primary.withValues(alpha: 0.7),
                 ),
               ),
               const SizedBox(height: 24),
               Text(
                 'Belum ada percakapan',
                 style: TextStyle(
-                  color: Colors.grey[800],
+                  color: _themeManager.textColor,
                   fontSize: 18,
                   fontWeight: FontWeight.w600,
                 ),
@@ -429,7 +443,10 @@ class _ChatPageState extends State<ChatPage> {
               const SizedBox(height: 8),
               Text(
                 'Mulai sapa PKL sekarang!',
-                style: TextStyle(color: Colors.grey[500], fontSize: 14),
+                style: TextStyle(
+                  color: _themeManager.mutedTextColor,
+                  fontSize: 14,
+                ),
               ),
             ],
           ),
@@ -461,28 +478,38 @@ class _ChatPageState extends State<ChatPage> {
   }
 
   Widget _buildDateDivider(String date) {
+    final isDark = _themeManager.isDarkMode;
+    final dividerColor = isDark
+        ? _themeManager.borderColor
+        : (Colors.grey[300] ?? Colors.grey);
+    final chipBg = isDark
+        ? _themeManager.surfaceColor
+        : (Colors.grey[200] ?? Colors.white);
+    final chipText = isDark
+        ? _themeManager.mutedTextColor
+        : (Colors.grey[600] ?? Colors.black54);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 16),
       child: Row(
         children: [
-          Expanded(child: Divider(color: Colors.grey[300])),
+          Expanded(child: Divider(color: dividerColor)),
           Container(
             margin: const EdgeInsets.symmetric(horizontal: 16),
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
-              color: Colors.grey[200],
+              color: chipBg,
               borderRadius: BorderRadius.circular(20),
             ),
             child: Text(
               date,
               style: TextStyle(
-                color: Colors.grey[600],
+                color: chipText,
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
               ),
             ),
           ),
-          Expanded(child: Divider(color: Colors.grey[300])),
+          Expanded(child: Divider(color: dividerColor)),
         ],
       ),
     );
@@ -494,6 +521,12 @@ class _ChatPageState extends State<ChatPage> {
     final timestamp = msg['created_at'] as String?;
     final isMe = senderName == _currentUsername;
     final time = _formatTime(timestamp);
+    final isDark = _themeManager.isDarkMode;
+    final surfaceColor = _themeManager.surfaceColor;
+    final textColor = _themeManager.textColor;
+    final otherBubbleColor = isDark ? surfaceColor : Colors.white;
+    final otherTextColor = isDark ? textColor : (Colors.grey[800] ?? Colors.black87);
+    final primary = _themeManager.primaryGreen;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -508,8 +541,11 @@ class _ChatPageState extends State<ChatPage> {
               width: 32,
               height: 32,
               decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [_secondaryGreen, _primaryGreen],
+                gradient: LinearGradient(
+                  colors: [
+                    primary.withValues(alpha: 0.85),
+                    primary,
+                  ],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
@@ -532,7 +568,7 @@ class _ChatPageState extends State<ChatPage> {
               ),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
-                color: isMe ? _primaryGreen : Colors.white,
+                color: isMe ? primary : otherBubbleColor,
                 borderRadius: BorderRadius.only(
                   topLeft: const Radius.circular(20),
                   topRight: const Radius.circular(20),
@@ -541,7 +577,7 @@ class _ChatPageState extends State<ChatPage> {
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
+                    color: Colors.black.withValues(alpha: isDark ? 0.18 : 0.05),
                     blurRadius: 10,
                     offset: const Offset(0, 2),
                   ),
@@ -557,17 +593,17 @@ class _ChatPageState extends State<ChatPage> {
                       padding: const EdgeInsets.only(bottom: 4),
                       child: Text(
                         senderName,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
-                          color: _primaryGreen,
+                          color: primary,
                         ),
                       ),
                     ),
                   Text(
                     content,
                     style: TextStyle(
-                      color: isMe ? Colors.white : Colors.grey[800],
+                      color: isMe ? Colors.white : otherTextColor,
                       fontSize: 14,
                       height: 1.4,
                     ),
@@ -582,7 +618,7 @@ class _ChatPageState extends State<ChatPage> {
                           fontSize: 10,
                           color: isMe
                               ? Colors.white.withValues(alpha: 0.7)
-                              : Colors.grey[500],
+                              : _themeManager.mutedTextColor,
                         ),
                       ),
                       if (isMe) ...[
@@ -605,11 +641,15 @@ class _ChatPageState extends State<ChatPage> {
               width: 32,
               height: 32,
               decoration: BoxDecoration(
-                color: _accentPeach,
+                color: _themeManager.accentSurfaceColor,
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: const Center(
-                child: Icon(Icons.person, color: _primaryGreen, size: 16),
+              child: Center(
+                child: Icon(
+                  Icons.person,
+                  color: primary,
+                  size: 16,
+                ),
               ),
             ),
           ],
@@ -619,6 +659,12 @@ class _ChatPageState extends State<ChatPage> {
   }
 
   Widget _buildInputArea() {
+    final isDark = _themeManager.isDarkMode;
+    final primary = _themeManager.primaryGreen;
+    final inputBg = _themeManager.cardColor;
+    final fieldBg = isDark
+        ? _themeManager.surfaceColor
+        : (Colors.grey[100] ?? Colors.white);
     return Container(
       padding: EdgeInsets.only(
         left: 16,
@@ -627,10 +673,10 @@ class _ChatPageState extends State<ChatPage> {
         bottom: MediaQuery.of(context).padding.bottom + 12,
       ),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: inputBg,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
+            color: Colors.black.withValues(alpha: isDark ? 0.18 : 0.05),
             blurRadius: 10,
             offset: const Offset(0, -2),
           ),
@@ -640,11 +686,11 @@ class _ChatPageState extends State<ChatPage> {
         children: [
           Container(
             decoration: BoxDecoration(
-              color: _lightGreen,
+              color: _themeManager.accentSurfaceColor,
               borderRadius: BorderRadius.circular(14),
             ),
             child: IconButton(
-              icon: const Icon(Icons.attach_file_rounded, color: _primaryGreen),
+              icon: Icon(Icons.attach_file_rounded, color: primary),
               onPressed: () {},
             ),
           ),
@@ -652,14 +698,15 @@ class _ChatPageState extends State<ChatPage> {
           Expanded(
             child: Container(
               decoration: BoxDecoration(
-                color: Colors.grey[100],
+                color: fieldBg,
                 borderRadius: BorderRadius.circular(24),
               ),
               child: TextField(
                 controller: _msgController,
+                style: TextStyle(color: _themeManager.textColor),
                 decoration: InputDecoration(
                   hintText: 'Tulis pesan...',
-                  hintStyle: TextStyle(color: Colors.grey[500]),
+                  hintStyle: TextStyle(color: _themeManager.hintTextColor),
                   border: InputBorder.none,
                   contentPadding: const EdgeInsets.symmetric(
                     horizontal: 20,
@@ -675,15 +722,18 @@ class _ChatPageState extends State<ChatPage> {
           const SizedBox(width: 12),
           Container(
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [_secondaryGreen, _primaryGreen],
+              gradient: LinearGradient(
+                colors: [
+                  primary.withValues(alpha: 0.85),
+                  primary,
+                ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
               borderRadius: BorderRadius.circular(14),
               boxShadow: [
                 BoxShadow(
-                  color: _primaryGreen.withValues(alpha: 0.3),
+                  color: primary.withValues(alpha: 0.3),
                   blurRadius: 8,
                   offset: const Offset(0, 2),
                 ),

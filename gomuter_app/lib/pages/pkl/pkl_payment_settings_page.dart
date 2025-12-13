@@ -4,6 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:gomuter_app/api_service.dart';
+import 'package:gomuter_app/utils/theme_manager.dart';
 import 'package:gomuter_app/utils/token_manager.dart';
 import 'package:gomuter_app/widgets/pkl_bottom_nav.dart';
 
@@ -15,6 +16,7 @@ class PklPaymentSettingsPage extends StatefulWidget {
 }
 
 class _PklPaymentSettingsPageState extends State<PklPaymentSettingsPage> {
+  final ThemeManager _themeManager = ThemeManager();
   static const List<String> _allowedExtensions = [
     '.png',
     '.jpg',
@@ -36,6 +38,7 @@ class _PklPaymentSettingsPageState extends State<PklPaymentSettingsPage> {
   @override
   void initState() {
     super.initState();
+    _themeManager.addListener(_onThemeChanged);
     _loadProfile();
   }
 
@@ -43,7 +46,12 @@ class _PklPaymentSettingsPageState extends State<PklPaymentSettingsPage> {
   void dispose() {
     _qrisLinkController.dispose();
     _qrisImageController.dispose();
+    _themeManager.removeListener(_onThemeChanged);
     super.dispose();
+  }
+
+  void _onThemeChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<String?> _getToken() async {
@@ -510,7 +518,7 @@ class _PklPaymentSettingsPageState extends State<PklPaymentSettingsPage> {
     return Container(
       padding: const EdgeInsets.all(26),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: _themeManager.cardColor,
         borderRadius: BorderRadius.circular(32),
         boxShadow: [
           BoxShadow(
@@ -531,17 +539,18 @@ class _PklPaymentSettingsPageState extends State<PklPaymentSettingsPage> {
   }
 
   Widget _buildSectionHeading(String title, String subtitle) {
+    final mutedText = _themeManager.mutedTextColor;
     return Row(
       children: [
         Container(
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
-            color: const Color(0xFFE8F5E9),
+            color: _themeManager.accentSurfaceColor,
             borderRadius: BorderRadius.circular(14),
           ),
           child: Icon(
             title.contains('Link') ? Icons.link_rounded : Icons.image_rounded,
-            color: const Color(0xFF0D8A3A),
+            color: _themeManager.primaryGreen,
             size: 22,
           ),
         ),
@@ -562,7 +571,7 @@ class _PklPaymentSettingsPageState extends State<PklPaymentSettingsPage> {
               Text(
                 subtitle,
                 style: TextStyle(
-                  color: Colors.black.withValues(alpha: 0.6),
+                  color: mutedText,
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
                   height: 1.3,
@@ -576,6 +585,9 @@ class _PklPaymentSettingsPageState extends State<PklPaymentSettingsPage> {
   }
 
   Widget _buildLinkCard() {
+    final borderColor = _themeManager.borderColor;
+    final hintText = _themeManager.hintTextColor;
+    final textColor = _themeManager.textColor;
     return _buildCardShell(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -592,30 +604,24 @@ class _PklPaymentSettingsPageState extends State<PklPaymentSettingsPage> {
                 margin: const EdgeInsets.all(12),
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFE8F5E9),
+                  color: _themeManager.accentSurfaceColor,
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.link_rounded,
-                  color: Color(0xFF0D8A3A),
+                  color: _themeManager.primaryGreen,
                   size: 20,
                 ),
               ),
               filled: true,
-              fillColor: const Color(0xFFF8F9FA),
+              fillColor: _themeManager.surfaceColor,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(20),
-                borderSide: BorderSide(
-                  color: Colors.black.withValues(alpha: 0.08),
-                  width: 1.5,
-                ),
+                borderSide: BorderSide(color: borderColor, width: 1.5),
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(20),
-                borderSide: BorderSide(
-                  color: Colors.black.withValues(alpha: 0.08),
-                  width: 1.5,
-                ),
+                borderSide: BorderSide(color: borderColor, width: 1.5),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(20),
@@ -630,10 +636,11 @@ class _PklPaymentSettingsPageState extends State<PklPaymentSettingsPage> {
               ),
               hintText: 'https://contoh.qris.id/pay',
               hintStyle: TextStyle(
-                color: Colors.black.withValues(alpha: 0.4),
+                color: hintText,
                 fontWeight: FontWeight.w500,
               ),
             ),
+            style: TextStyle(color: textColor),
           ),
           const SizedBox(height: 18),
           SizedBox(
@@ -738,7 +745,10 @@ class _PklPaymentSettingsPageState extends State<PklPaymentSettingsPage> {
               _qrisImageController.text,
               textAlign: TextAlign.center,
               maxLines: 2,
-              style: const TextStyle(fontSize: 12, color: Colors.black54),
+              style: TextStyle(
+                fontSize: 12,
+                color: _themeManager.mutedTextColor,
+              ),
             ),
           ],
         ],
@@ -748,17 +758,27 @@ class _PklPaymentSettingsPageState extends State<PklPaymentSettingsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = _themeManager.isDarkMode;
+    final bgColor = _themeManager.backgroundColor;
+    final textColor = _themeManager.textColor;
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F6FB),
+      backgroundColor: bgColor,
       appBar: AppBar(
         automaticallyImplyLeading: false,
         backgroundColor: Colors.transparent,
         elevation: 0,
         scrolledUnderElevation: 0,
         surfaceTintColor: Colors.transparent,
-        foregroundColor: Colors.black87,
+        foregroundColor: textColor,
         title: const Text('Pembayaran & QRIS'),
         actions: [
+          IconButton(
+            icon: Icon(
+              isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
+            ),
+            onPressed: _themeManager.toggleTheme,
+            tooltip: isDark ? 'Mode terang' : 'Mode gelap',
+          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _isLoading ? null : _loadProfile,
@@ -803,10 +823,12 @@ class _PklPaymentSettingsPageState extends State<PklPaymentSettingsPage> {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(20),
             color: _isHoveringDrop
-                ? const Color(0xFFE8F9EF)
-                : const Color(0xFFF5F7FB),
+                ? _themeManager.accentSurfaceColor
+                : _themeManager.surfaceColor,
             border: Border.all(
-              color: _isHoveringDrop ? const Color(0xFF1ABC9C) : Colors.black12,
+              color: _isHoveringDrop
+                  ? _themeManager.primaryGreen
+                  : _themeManager.borderColor,
               width: 1.4,
             ),
           ),
@@ -832,10 +854,13 @@ class _PklPaymentSettingsPageState extends State<PklPaymentSettingsPage> {
                 style: TextStyle(fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 4),
-              const Text(
+              Text(
                 'Atau klik untuk pilih file (PNG/JPG/WEBP)',
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 12, color: Colors.black54),
+                style: TextStyle(
+                  fontSize: 12,
+                  color: _themeManager.mutedTextColor,
+                ),
               ),
             ],
           ),

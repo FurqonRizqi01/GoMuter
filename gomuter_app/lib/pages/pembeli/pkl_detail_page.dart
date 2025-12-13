@@ -10,6 +10,7 @@ import 'package:gomuter_app/api_service.dart';
 import 'package:gomuter_app/pages/pembeli/chat_page.dart';
 import 'package:gomuter_app/pages/pembeli/preorder_page.dart';
 import 'package:gomuter_app/utils/chat_badge_manager.dart';
+import 'package:gomuter_app/utils/theme_manager.dart';
 import 'package:gomuter_app/utils/token_manager.dart';
 
 class PklDetailPage extends StatefulWidget {
@@ -23,11 +24,12 @@ class PklDetailPage extends StatefulWidget {
 }
 
 class _PklDetailPageState extends State<PklDetailPage> {
-  // Theme Colors
-  static const Color _primaryGreen = Color(0xFF1B7B5A);
-  static const Color _secondaryGreen = Color(0xFF2D9D78);
-  static const Color _lightGreen = Color(0xFFE8F5F0);
-  static const Color _accentPeach = Color(0xFFFAD4C0);
+  final ThemeManager _themeManager = ThemeManager();
+
+  Color get _primary => _themeManager.primaryGreen;
+  Color get _secondary => _themeManager.primaryGreen.withValues(alpha: 0.85);
+  Color get _softSurface => _themeManager.accentSurfaceColor;
+  Color get _ctaAccent => _themeManager.accentGold;
 
   Map<String, dynamic>? _detail;
   bool _isLoading = false;
@@ -47,6 +49,7 @@ class _PklDetailPageState extends State<PklDetailPage> {
   @override
   void initState() {
     super.initState();
+    _themeManager.addListener(_onThemeChanged);
     if (widget.initialData != null) {
       _detail = Map<String, dynamic>.from(widget.initialData!);
       _pklLatLng = _extractLatLng(_detail);
@@ -54,6 +57,16 @@ class _PklDetailPageState extends State<PklDetailPage> {
     _loadDetail(initial: true);
     _loadRatingSummary();
     _loadBuyerLocation();
+  }
+
+  @override
+  void dispose() {
+    _themeManager.removeListener(_onThemeChanged);
+    super.dispose();
+  }
+
+  void _onThemeChanged() {
+    if (mounted) setState(() {});
   }
 
   LatLng? _extractLatLng(Map<String, dynamic>? data) {
@@ -175,12 +188,14 @@ class _PklDetailPageState extends State<PklDetailPage> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: _themeManager.cardColor,
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: Colors.black.withValues(alpha: 0.08)),
+        border: Border.all(color: _themeManager.borderColor),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.12),
+            color: Colors.black.withValues(
+              alpha: _themeManager.isDarkMode ? 0.35 : 0.12,
+            ),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -188,10 +203,10 @@ class _PklDetailPageState extends State<PklDetailPage> {
       ),
       child: Text(
         text,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 12,
           fontWeight: FontWeight.w700,
-          color: Colors.black87,
+          color: _themeManager.textColor,
         ),
       ),
     );
@@ -203,6 +218,9 @@ class _PklDetailPageState extends State<PklDetailPage> {
     required bool selected,
     required VoidCallback onTap,
   }) {
+    final borderBase = _themeManager.isDarkMode
+        ? _themeManager.textColor
+        : Colors.white;
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
@@ -212,8 +230,8 @@ class _PklDetailPageState extends State<PklDetailPage> {
           color: color,
           borderRadius: BorderRadius.circular(20),
           border: selected
-              ? Border.all(color: Colors.white, width: 2)
-              : Border.all(color: Colors.white.withValues(alpha: 0.2)),
+              ? Border.all(color: borderBase, width: 2)
+              : Border.all(color: borderBase.withValues(alpha: 0.2)),
           boxShadow: [
             BoxShadow(
               color: color.withValues(alpha: 0.35),
@@ -615,9 +633,7 @@ class _PklDetailPageState extends State<PklDetailPage> {
                                   Polyline(
                                     points: [buyer, location],
                                     strokeWidth: 4,
-                                    color: _secondaryGreen.withValues(
-                                      alpha: 0.9,
-                                    ),
+                                    color: _secondary.withValues(alpha: 0.9),
                                   ),
                                 ],
                               ),
@@ -647,7 +663,7 @@ class _PklDetailPageState extends State<PklDetailPage> {
                                     height: 44,
                                     child: _buildMapMarker(
                                       icon: Icons.person_pin_circle_rounded,
-                                      color: _accentPeach,
+                                      color: _ctaAccent,
                                       selected: _isBuyerMarkerSelected,
                                       onTap: toggleBuyerMarker,
                                     ),
@@ -658,7 +674,7 @@ class _PklDetailPageState extends State<PklDetailPage> {
                                   height: 44,
                                   child: _buildMapMarker(
                                     icon: Icons.storefront_rounded,
-                                    color: _primaryGreen,
+                                    color: _primary,
                                     selected: _isPklMarkerSelected,
                                     onTap: togglePklMarker,
                                   ),
@@ -702,8 +718,8 @@ class _PklDetailPageState extends State<PklDetailPage> {
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [_primaryGreen, _secondaryGreen],
+        gradient: LinearGradient(
+          colors: [_primary, _secondary],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -713,7 +729,7 @@ class _PklDetailPageState extends State<PklDetailPage> {
         ),
         boxShadow: [
           BoxShadow(
-            color: _primaryGreen.withValues(alpha: 0.3),
+            color: _primary.withValues(alpha: 0.3),
             blurRadius: 20,
             offset: const Offset(0, 8),
           ),
@@ -790,11 +806,13 @@ class _PklDetailPageState extends State<PklDetailPage> {
                 width: 100,
                 height: 100,
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: _themeManager.cardColor,
                   borderRadius: BorderRadius.circular(24),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.1),
+                      color: Colors.black.withValues(
+                        alpha: _themeManager.isDarkMode ? 0.35 : 0.1,
+                      ),
                       blurRadius: 20,
                       offset: const Offset(0, 8),
                     ),
@@ -804,7 +822,7 @@ class _PklDetailPageState extends State<PklDetailPage> {
                   child: Icon(
                     _getCategoryIcon(jenis),
                     size: 48,
-                    color: _primaryGreen,
+                    color: _primary,
                   ),
                 ),
               ),
@@ -840,9 +858,9 @@ class _PklDetailPageState extends State<PklDetailPage> {
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(
+                            Icon(
                               Icons.star_rounded,
-                              color: Colors.amber,
+                              color: _themeManager.accentGold,
                               size: 18,
                             ),
                             const SizedBox(width: 6),
@@ -873,7 +891,7 @@ class _PklDetailPageState extends State<PklDetailPage> {
                         ),
                         decoration: BoxDecoration(
                           color: isActive
-                              ? Colors.greenAccent.withValues(alpha: 0.3)
+                              ? _primary.withValues(alpha: 0.22)
                               : Colors.white.withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(20),
                         ),
@@ -885,8 +903,8 @@ class _PklDetailPageState extends State<PklDetailPage> {
                               height: 8,
                               decoration: BoxDecoration(
                                 color: isActive
-                                    ? Colors.greenAccent
-                                    : Colors.grey,
+                                    ? _themeManager.accentGold
+                                    : Colors.white.withValues(alpha: 0.7),
                                 borderRadius: BorderRadius.circular(4),
                               ),
                             ),
@@ -938,7 +956,7 @@ class _PklDetailPageState extends State<PklDetailPage> {
             child: _buildActionButton(
               icon: Icons.phone_rounded,
               label: 'Hubungi',
-              color: _primaryGreen,
+              color: _primary,
               filled: true,
               onTap: _detail == null ? null : _openChat,
             ),
@@ -948,8 +966,8 @@ class _PklDetailPageState extends State<PklDetailPage> {
             child: _buildActionButton(
               icon: Icons.map_rounded,
               label: 'Lihat di Peta',
-              color: _accentPeach,
-              textColor: _primaryGreen,
+              color: _ctaAccent,
+              textColor: Colors.black,
               filled: true,
               onTap: _pklLatLng == null ? null : _showMapSheet,
             ),
@@ -1054,7 +1072,7 @@ class _PklDetailPageState extends State<PklDetailPage> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: _themeManager.cardColor,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
@@ -1069,10 +1087,10 @@ class _PklDetailPageState extends State<PklDetailPage> {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: _lightGreen,
+              color: _softSurface,
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(icon, color: _primaryGreen, size: 24),
+            child: Icon(icon, color: _primary, size: 24),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -1081,21 +1099,28 @@ class _PklDetailPageState extends State<PklDetailPage> {
               children: [
                 Text(
                   title,
-                  style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                  style: TextStyle(
+                    color: _themeManager.mutedTextColor,
+                    fontSize: 12,
+                  ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   subtitle,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 15,
+                    color: _themeManager.textColor,
                   ),
                 ),
                 if (detail.isNotEmpty) ...[
                   const SizedBox(height: 2),
                   Text(
                     detail,
-                    style: TextStyle(color: Colors.grey[500], fontSize: 12),
+                    style: TextStyle(
+                      color: _themeManager.mutedTextColor,
+                      fontSize: 12,
+                    ),
                   ),
                 ],
               ],
@@ -1124,16 +1149,16 @@ class _PklDetailPageState extends State<PklDetailPage> {
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
-                  color: Colors.grey[800],
+                  color: _themeManager.textColor,
                 ),
               ),
               if (_isRatingLoading)
-                const SizedBox(
+                SizedBox(
                   width: 20,
                   height: 20,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(_primaryGreen),
+                    valueColor: AlwaysStoppedAnimation<Color>(_primary),
                   ),
                 ),
             ],
@@ -1142,7 +1167,7 @@ class _PklDetailPageState extends State<PklDetailPage> {
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: _themeManager.cardColor,
               borderRadius: BorderRadius.circular(20),
               boxShadow: [
                 BoxShadow(
@@ -1164,19 +1189,20 @@ class _PklDetailPageState extends State<PklDetailPage> {
                           children: [
                             Text(
                               _formatRatingValue(avgRating),
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 40,
                                 fontWeight: FontWeight.bold,
+                                color: _themeManager.textColor,
                               ),
                             ),
                             const SizedBox(width: 4),
-                            const Padding(
-                              padding: EdgeInsets.only(bottom: 8),
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 8),
                               child: Text(
                                 '/5',
                                 style: TextStyle(
                                   fontSize: 16,
-                                  color: Colors.grey,
+                                  color: _themeManager.mutedTextColor,
                                 ),
                               ),
                             ),
@@ -1192,7 +1218,7 @@ class _PklDetailPageState extends State<PklDetailPage> {
                                   : index < rating
                                   ? Icons.star_half_rounded
                                   : Icons.star_outline_rounded,
-                              color: Colors.amber,
+                              color: _themeManager.accentGold,
                               size: 20,
                             );
                           }),
@@ -1203,7 +1229,7 @@ class _PklDetailPageState extends State<PklDetailPage> {
                               ? 'Belum ada ulasan'
                               : '$ratingCount ulasan',
                           style: TextStyle(
-                            color: Colors.grey[600],
+                            color: _themeManager.mutedTextColor,
                             fontSize: 13,
                           ),
                         ),
@@ -1213,12 +1239,12 @@ class _PklDetailPageState extends State<PklDetailPage> {
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: Colors.amber[50],
+                        color: _themeManager.accentGold.withValues(alpha: 0.14),
                         borderRadius: BorderRadius.circular(16),
                       ),
-                      child: const Icon(
+                      child: Icon(
                         Icons.star_rounded,
-                        color: Colors.amber,
+                        color: _themeManager.accentGold,
                         size: 32,
                       ),
                     ),
@@ -1230,14 +1256,14 @@ class _PklDetailPageState extends State<PklDetailPage> {
                     width: double.infinity,
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: _lightGreen,
+                      color: _softSurface,
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Row(
                       children: [
                         Icon(
                           Icons.check_circle_rounded,
-                          color: _primaryGreen,
+                          color: _primary,
                           size: 20,
                         ),
                         const SizedBox(width: 8),
@@ -1264,7 +1290,7 @@ class _PklDetailPageState extends State<PklDetailPage> {
                       userRating == null ? 'Tulis Ulasan' : 'Ubah Ulasan',
                     ),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: _primaryGreen,
+                      backgroundColor: _primary,
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(
@@ -1295,14 +1321,14 @@ class _PklDetailPageState extends State<PklDetailPage> {
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
-              color: Colors.grey[800],
+              color: _themeManager.textColor,
             ),
           ),
           const SizedBox(height: 12),
           Text(
             description,
             style: TextStyle(
-              color: Colors.grey[600],
+              color: _themeManager.mutedTextColor,
               fontSize: 14,
               height: 1.6,
             ),
@@ -1335,7 +1361,7 @@ class _PklDetailPageState extends State<PklDetailPage> {
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
-              color: Colors.grey[800],
+              color: _themeManager.textColor,
             ),
           ),
           const SizedBox(height: 12),
@@ -1354,7 +1380,7 @@ class _PklDetailPageState extends State<PklDetailPage> {
                       right: index < imageUrls.length - 1 ? 12 : 0,
                     ),
                     decoration: BoxDecoration(
-                      color: _lightGreen,
+                      color: _softSurface,
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: ClipRRect(
@@ -1367,7 +1393,7 @@ class _PklDetailPageState extends State<PklDetailPage> {
                             _getCategoryIcon(
                               _detail?['jenis_dagangan'] as String? ?? '',
                             ),
-                            color: _primaryGreen.withValues(alpha: 0.5),
+                            color: _primary.withValues(alpha: 0.5),
                             size: 32,
                           );
                         },
@@ -1380,14 +1406,14 @@ class _PklDetailPageState extends State<PklDetailPage> {
                   height: 90,
                   margin: EdgeInsets.only(right: index < 2 ? 12 : 0),
                   decoration: BoxDecoration(
-                    color: _lightGreen,
+                    color: _softSurface,
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Icon(
                     _getCategoryIcon(
                       _detail?['jenis_dagangan'] as String? ?? '',
                     ),
-                    color: _primaryGreen.withValues(alpha: 0.5),
+                    color: _primary.withValues(alpha: 0.5),
                     size: 32,
                   ),
                 );
@@ -1415,13 +1441,13 @@ class _PklDetailPageState extends State<PklDetailPage> {
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
-              color: Colors.grey[800],
+              color: _themeManager.textColor,
             ),
           ),
           const SizedBox(height: 12),
           Container(
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: _themeManager.cardColor,
               borderRadius: BorderRadius.circular(20),
               boxShadow: [
                 BoxShadow(
@@ -1439,18 +1465,21 @@ class _PklDetailPageState extends State<PklDetailPage> {
                   qrisUrl,
                   fit: BoxFit.cover,
                   errorBuilder: (_, __, ___) => Container(
-                    color: Colors.grey[100],
-                    child: const Center(child: Text('Gagal memuat QRIS')),
+                    color: _themeManager.surfaceColor,
+                    child: Center(
+                      child: Text(
+                        'Gagal memuat QRIS',
+                        style: TextStyle(color: _themeManager.mutedTextColor),
+                      ),
+                    ),
                   ),
                   loadingBuilder: (context, child, progress) {
                     if (progress == null) return child;
                     return Container(
-                      color: Colors.grey[100],
-                      child: const Center(
+                      color: _themeManager.surfaceColor,
+                      child: Center(
                         child: CircularProgressIndicator(
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            _primaryGreen,
-                          ),
+                          valueColor: AlwaysStoppedAnimation<Color>(_primary),
                         ),
                       ),
                     );
@@ -1493,13 +1522,14 @@ class _PklDetailPageState extends State<PklDetailPage> {
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
-              color: Colors.grey[800],
+              color: _themeManager.textColor,
             ),
           ),
           const SizedBox(height: 12),
           Container(
             height: 180,
             decoration: BoxDecoration(
+              color: _themeManager.cardColor,
               borderRadius: BorderRadius.circular(20),
               boxShadow: [
                 BoxShadow(
@@ -1531,7 +1561,7 @@ class _PklDetailPageState extends State<PklDetailPage> {
                             Polyline(
                               points: [buyer, _pklLatLng!],
                               strokeWidth: 4,
-                              color: _secondaryGreen.withValues(alpha: 0.9),
+                              color: _secondary.withValues(alpha: 0.9),
                             ),
                           ],
                         ),
@@ -1559,7 +1589,7 @@ class _PklDetailPageState extends State<PklDetailPage> {
                               height: 44,
                               child: _buildMapMarker(
                                 icon: Icons.person_pin_circle_rounded,
-                                color: _accentPeach,
+                                color: _ctaAccent,
                                 selected: _isBuyerMarkerSelected,
                                 onTap: _toggleBuyerMarker,
                               ),
@@ -1570,7 +1600,7 @@ class _PklDetailPageState extends State<PklDetailPage> {
                             height: 44,
                             child: _buildMapMarker(
                               icon: Icons.storefront_rounded,
-                              color: _primaryGreen,
+                              color: _primary,
                               selected: _isPklMarkerSelected,
                               onTap: _togglePklMarker,
                             ),
@@ -1590,11 +1620,13 @@ class _PklDetailPageState extends State<PklDetailPage> {
                           vertical: 8,
                         ),
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: _themeManager.cardColor,
                           borderRadius: BorderRadius.circular(20),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.1),
+                              color: Colors.black.withValues(
+                                alpha: _themeManager.isDarkMode ? 0.35 : 0.1,
+                              ),
                               blurRadius: 8,
                             ),
                           ],
@@ -1604,14 +1636,14 @@ class _PklDetailPageState extends State<PklDetailPage> {
                           children: [
                             Icon(
                               Icons.directions_rounded,
-                              color: _primaryGreen,
+                              color: _primary,
                               size: 18,
                             ),
                             const SizedBox(width: 6),
                             Text(
                               'Petunjuk Arah',
                               style: TextStyle(
-                                color: _primaryGreen,
+                                color: _primary,
                                 fontWeight: FontWeight.w600,
                                 fontSize: 12,
                               ),
@@ -1633,9 +1665,10 @@ class _PklDetailPageState extends State<PklDetailPage> {
   @override
   Widget build(BuildContext context) {
     final data = _detail;
+    final bgColor = _themeManager.backgroundColor;
 
     return Scaffold(
-      backgroundColor: Colors.grey[50],
+      backgroundColor: bgColor,
       body: _isLoading && data == null
           ? _buildLoadingState()
           : data == null
@@ -1644,7 +1677,7 @@ class _PklDetailPageState extends State<PklDetailPage> {
               children: [
                 RefreshIndicator(
                   onRefresh: () => _loadDetail(initial: false),
-                  color: _primaryGreen,
+                  color: _primary,
                   child: SingleChildScrollView(
                     physics: const AlwaysScrollableScrollPhysics(),
                     child: Column(
@@ -1681,7 +1714,7 @@ class _PklDetailPageState extends State<PklDetailPage> {
                         child: _buildFloatingButton(
                           icon: Icons.chat_bubble_rounded,
                           label: 'Chat',
-                          color: _primaryGreen,
+                          color: _primary,
                           onTap: _openChat,
                         ),
                       ),
@@ -1690,8 +1723,8 @@ class _PklDetailPageState extends State<PklDetailPage> {
                         child: _buildFloatingButton(
                           icon: Icons.receipt_long_rounded,
                           label: 'Pre-order',
-                          color: _accentPeach,
-                          textColor: _primaryGreen,
+                          color: _ctaAccent,
+                          textColor: Colors.black,
                           onTap: _openPreorder,
                         ),
                       ),
@@ -1749,8 +1782,10 @@ class _PklDetailPageState extends State<PklDetailPage> {
   }
 
   Widget _buildLoadingState() {
+    final bgColor = _themeManager.backgroundColor;
+    final textColor = _themeManager.textColor;
     return Container(
-      color: Colors.grey[50],
+      color: bgColor,
       child: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -1758,18 +1793,21 @@ class _PklDetailPageState extends State<PklDetailPage> {
             Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                color: _lightGreen,
+                color: _softSurface,
                 borderRadius: BorderRadius.circular(24),
               ),
-              child: const CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(_primaryGreen),
+              child: CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(_primary),
                 strokeWidth: 3,
               ),
             ),
             const SizedBox(height: 20),
             Text(
               'Memuat detail PKL...',
-              style: TextStyle(color: Colors.grey[600], fontSize: 14),
+              style: TextStyle(
+                color: textColor.withValues(alpha: 0.7),
+                fontSize: 14,
+              ),
             ),
           ],
         ),
@@ -1778,8 +1816,10 @@ class _PklDetailPageState extends State<PklDetailPage> {
   }
 
   Widget _buildErrorStateWidget() {
+    final bgColor = _themeManager.backgroundColor;
+    final isDark = _themeManager.isDarkMode;
     return Container(
-      color: Colors.grey[50],
+      color: bgColor,
       child: Center(
         child: Padding(
           padding: const EdgeInsets.all(32),
@@ -1789,13 +1829,13 @@ class _PklDetailPageState extends State<PklDetailPage> {
               Container(
                 padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
-                  color: Colors.red[50],
+                  color: Colors.red.withValues(alpha: isDark ? 0.18 : 0.08),
                   borderRadius: BorderRadius.circular(24),
                 ),
                 child: Icon(
                   Icons.error_outline_rounded,
                   size: 56,
-                  color: Colors.red[400],
+                  color: isDark ? Colors.red.shade300 : Colors.red.shade400,
                 ),
               ),
               const SizedBox(height: 24),
@@ -1803,7 +1843,7 @@ class _PklDetailPageState extends State<PklDetailPage> {
                 _error ?? 'Gagal memuat detail PKL',
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  color: Colors.grey[700],
+                  color: _themeManager.textColor,
                   fontSize: 14,
                   height: 1.5,
                 ),
@@ -1814,7 +1854,7 @@ class _PklDetailPageState extends State<PklDetailPage> {
                 icon: const Icon(Icons.refresh_rounded),
                 label: const Text('Coba Lagi'),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: _primaryGreen,
+                  backgroundColor: _primary,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(
                     horizontal: 24,
@@ -1887,7 +1927,7 @@ class _InfoTile extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 6),
       child: ListTile(
-        leading: Icon(icon, color: const Color(0xFF1B7B5A)),
+        leading: Icon(icon, color: Theme.of(context).colorScheme.primary),
         title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
         subtitle: textWidget,
       ),

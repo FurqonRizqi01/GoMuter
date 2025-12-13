@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:gomuter_app/api_service.dart';
 import 'package:gomuter_app/utils/chat_badge_manager.dart';
+import 'package:gomuter_app/utils/theme_manager.dart';
 import 'package:gomuter_app/utils/token_manager.dart';
 import 'package:gomuter_app/widgets/pkl_bottom_nav.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -22,6 +23,7 @@ class PklChatRoomPage extends StatefulWidget {
 }
 
 class _PklChatRoomPageState extends State<PklChatRoomPage> {
+  final ThemeManager _themeManager = ThemeManager();
   bool _isLoading = true;
   bool _isSending = false;
   String? _error;
@@ -33,6 +35,7 @@ class _PklChatRoomPageState extends State<PklChatRoomPage> {
   @override
   void initState() {
     super.initState();
+    _themeManager.addListener(_onThemeChanged);
     _setupChat();
   }
 
@@ -40,7 +43,12 @@ class _PklChatRoomPageState extends State<PklChatRoomPage> {
   void dispose() {
     _pollingTimer?.cancel();
     _msgController.dispose();
+    _themeManager.removeListener(_onThemeChanged);
     super.dispose();
+  }
+
+  void _onThemeChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _setupChat() async {
@@ -142,17 +150,30 @@ class _PklChatRoomPageState extends State<PklChatRoomPage> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = _themeManager.isDarkMode;
+    final bgColor = _themeManager.backgroundColor;
+    final textColor = _themeManager.textColor;
+    final mutedText = _themeManager.mutedTextColor;
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F6FB),
+      backgroundColor: bgColor,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: _themeManager.cardColor,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
-        foregroundColor: Colors.black87,
+        foregroundColor: textColor,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_rounded),
           onPressed: () => Navigator.of(context).pop(),
         ),
+        actions: [
+          IconButton(
+            icon: Icon(
+              isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
+            ),
+            onPressed: _themeManager.toggleTheme,
+            tooltip: isDark ? 'Mode terang' : 'Mode gelap',
+          ),
+        ],
         title: Row(
           children: [
             Container(
@@ -195,7 +216,7 @@ class _PklChatRoomPageState extends State<PklChatRoomPage> {
                     'Pembeli',
                     style: TextStyle(
                       fontSize: 12,
-                      color: Colors.black.withValues(alpha: 0.5),
+                      color: mutedText,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -224,7 +245,7 @@ class _PklChatRoomPageState extends State<PklChatRoomPage> {
                       margin: const EdgeInsets.all(16),
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: _themeManager.cardColor,
                         borderRadius: BorderRadius.circular(32),
                         boxShadow: [
                           BoxShadow(
@@ -254,6 +275,8 @@ class _PklChatRoomPageState extends State<PklChatRoomPage> {
 
   Widget _buildMessages() {
     if (_messages.isEmpty) {
+      final textColor = _themeManager.textColor;
+      final mutedText = _themeManager.mutedTextColor;
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -261,28 +284,29 @@ class _PklChatRoomPageState extends State<PklChatRoomPage> {
             Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                color: const Color(0xFFE8F5E9),
+                color: _themeManager.accentSurfaceColor,
                 shape: BoxShape.circle,
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.chat_bubble_outline_rounded,
                 size: 48,
-                color: Color(0xFF0D8A3A),
+                color: _themeManager.primaryGreen,
               ),
             ),
             const SizedBox(height: 20),
-            const Text(
+            Text(
               'Belum ada pesan',
-              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                fontSize: 16,
+                color: textColor,
+              ),
             ),
             const SizedBox(height: 8),
             Text(
               'Mulai percakapan dengan ${widget.pembeliName}',
               textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Colors.black.withValues(alpha: 0.6),
-                fontSize: 14,
-              ),
+              style: TextStyle(color: mutedText, fontSize: 14),
             ),
           ],
         ),
@@ -298,6 +322,8 @@ class _PklChatRoomPageState extends State<PklChatRoomPage> {
         final senderName = (msg['sender_username'] ?? '-') as String;
         final isMe = senderName == _currentUsername;
 
+        final textColor = _themeManager.textColor;
+
         return Align(
           alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
           child: Container(
@@ -312,7 +338,7 @@ class _PklChatRoomPageState extends State<PklChatRoomPage> {
                       end: Alignment.bottomRight,
                     )
                   : null,
-              color: isMe ? null : Colors.white,
+              color: isMe ? null : _themeManager.cardColor,
               borderRadius: BorderRadius.only(
                 topLeft: const Radius.circular(20),
                 topRight: const Radius.circular(20),
@@ -341,14 +367,14 @@ class _PklChatRoomPageState extends State<PklChatRoomPage> {
                     fontWeight: FontWeight.w700,
                     color: isMe
                         ? Colors.white.withValues(alpha: 0.8)
-                        : const Color(0xFF0D8A3A),
+                        : _themeManager.primaryGreen,
                   ),
                 ),
                 const SizedBox(height: 6),
                 Text(
                   content,
                   style: TextStyle(
-                    color: isMe ? Colors.white : Colors.black87,
+                    color: isMe ? Colors.white : textColor,
                     height: 1.4,
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
@@ -363,10 +389,16 @@ class _PklChatRoomPageState extends State<PklChatRoomPage> {
   }
 
   Widget _buildComposer() {
+    final hintText = _themeManager.hintTextColor;
+    final borderColor = _themeManager.borderColor;
+    final cardColor = _themeManager.cardColor;
+    final surfaceColor = _themeManager.surfaceColor;
+    final textColor = _themeManager.textColor;
+
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: cardColor,
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.08),
@@ -382,24 +414,22 @@ class _PklChatRoomPageState extends State<PklChatRoomPage> {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 18),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF8F9FA),
+                  color: surfaceColor,
                   borderRadius: BorderRadius.circular(28),
-                  border: Border.all(
-                    color: Colors.black.withValues(alpha: 0.08),
-                    width: 1.5,
-                  ),
+                  border: Border.all(color: borderColor, width: 1.5),
                 ),
                 child: TextField(
                   controller: _msgController,
                   decoration: InputDecoration(
                     hintText: 'Tulis pesan...',
                     hintStyle: TextStyle(
-                      color: Colors.black.withValues(alpha: 0.4),
+                      color: hintText,
                       fontWeight: FontWeight.w500,
                     ),
                     border: InputBorder.none,
                     contentPadding: const EdgeInsets.symmetric(vertical: 14),
                   ),
+                  style: TextStyle(color: textColor),
                   onSubmitted: (_) => _sendMessage(),
                 ),
               ),

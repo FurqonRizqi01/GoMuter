@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:gomuter_app/api_service.dart';
 import 'package:gomuter_app/pages/pembeli/chat_page.dart';
 import 'package:gomuter_app/utils/chat_badge_manager.dart';
+import 'package:gomuter_app/utils/theme_manager.dart';
 import 'package:gomuter_app/utils/token_manager.dart';
 
 class PembeliChatListPage extends StatefulWidget {
@@ -12,6 +13,8 @@ class PembeliChatListPage extends StatefulWidget {
 }
 
 class _PembeliChatListPageState extends State<PembeliChatListPage> {
+  final ThemeManager _themeManager = ThemeManager();
+
   bool _isLoading = true;
   String? _error;
   List<dynamic> _chats = [];
@@ -19,7 +22,18 @@ class _PembeliChatListPageState extends State<PembeliChatListPage> {
   @override
   void initState() {
     super.initState();
+    _themeManager.addListener(_onThemeChanged);
     _loadChats();
+  }
+
+  @override
+  void dispose() {
+    _themeManager.removeListener(_onThemeChanged);
+    super.dispose();
+  }
+
+  void _onThemeChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _loadChats() async {
@@ -70,13 +84,18 @@ class _PembeliChatListPageState extends State<PembeliChatListPage> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = _themeManager.isDarkMode;
+    final bgColor = _themeManager.backgroundColor;
+    final cardColor = _themeManager.cardColor;
+    final textColor = _themeManager.textColor;
+
     return Scaffold(
-      backgroundColor: const Color(0xFF121212),
+      backgroundColor: bgColor,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
-        foregroundColor: Colors.white,
+        foregroundColor: textColor,
         title: const Text('Pesan Saya'),
         actions: [
           IconButton(
@@ -86,23 +105,27 @@ class _PembeliChatListPageState extends State<PembeliChatListPage> {
         ],
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: Color(0xFF1B7B5A)))
+          ? Center(
+              child: CircularProgressIndicator(
+                color: _themeManager.primaryGreen,
+              ),
+            )
           : SafeArea(
               bottom: false,
               child: RefreshIndicator(
                 onRefresh: _loadChats,
-                color: const Color(0xFF1B7B5A),
-                backgroundColor: const Color(0xFF1E1E1E),
+                color: _themeManager.primaryGreen,
+                backgroundColor: cardColor,
                 child: ListView(
                   physics: const AlwaysScrollableScrollPhysics(),
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
                   children: [
                     const SizedBox(height: 12),
-                    _buildHeroBanner(),
+                    _buildHeroBanner(isDark: isDark, bgColor: bgColor),
                     const SizedBox(height: 18),
                     if (_error != null) _buildErrorBanner(_error!),
                     if (_chats.isEmpty)
-                      _buildEmptyState()
+                      _buildEmptyState(cardColor: cardColor, textColor: textColor)
                     else
                       ..._chats.map<Widget>((chat) {
                         return Padding(
@@ -117,20 +140,25 @@ class _PembeliChatListPageState extends State<PembeliChatListPage> {
     );
   }
 
-  Widget _buildHeroBanner() {
+  Widget _buildHeroBanner({
+    required bool isDark,
+    required Color bgColor,
+  }) {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            const Color(0xFF1B7B5A).withValues(alpha: 0.8),
-            const Color(0xFF121212).withValues(alpha: 0.0),
+            _themeManager.primaryGreen.withValues(alpha: 0.8),
+            bgColor.withValues(alpha: 0.0),
           ],
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
         ),
         borderRadius: BorderRadius.circular(30),
-        border: Border.all(color: const Color(0xFF1B7B5A).withValues(alpha: 0.3)),
+        border: Border.all(
+          color: _themeManager.primaryGreen.withValues(alpha: 0.3),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -177,27 +205,37 @@ class _PembeliChatListPageState extends State<PembeliChatListPage> {
     );
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState({
+    required Color cardColor,
+    required Color textColor,
+  }) {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: const Color(0xFF1E1E1E),
+        color: cardColor,
         borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+        border: Border.all(color: textColor.withValues(alpha: 0.1)),
       ),
       child: Column(
-        children: const [
-          Icon(Icons.chat_bubble_outline, size: 44, color: Color(0xFF1B7B5A)),
+        children: [
+          Icon(
+            Icons.chat_bubble_outline,
+            size: 44,
+            color: _themeManager.primaryGreen,
+          ),
           SizedBox(height: 10),
           Text(
             'Belum ada chat dengan PKL.',
-            style: TextStyle(fontWeight: FontWeight.w600, color: Colors.white),
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              color: textColor,
+            ),
           ),
           SizedBox(height: 4),
           Text(
             'Mulai obrolan dari halaman PKL favoritmu.',
             textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.grey),
+            style: TextStyle(color: textColor.withValues(alpha: 0.6)),
           ),
         ],
       ),
@@ -205,15 +243,17 @@ class _PembeliChatListPageState extends State<PembeliChatListPage> {
   }
 
   Widget _buildChatTile(Map<String, dynamic> chat) {
+    final cardColor = _themeManager.cardColor;
+    final textColor = _themeManager.textColor;
     final pklName = (chat['pkl_nama_usaha'] ?? 'PKL') as String;
     final updatedAt = _formatTimestamp(chat['updated_at'] as String?);
     final pklId = (chat['pkl'] as num?)?.toInt();
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
       decoration: BoxDecoration(
-        color: const Color(0xFF1E1E1E),
+        color: cardColor,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+        border: Border.all(color: textColor.withValues(alpha: 0.1)),
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(24),
@@ -230,8 +270,9 @@ class _PembeliChatListPageState extends State<PembeliChatListPage> {
         child: Row(
           children: [
             CircleAvatar(
-              backgroundColor: const Color(0xFF1B7B5A).withValues(alpha: 0.2),
-              foregroundColor: const Color(0xFF1B7B5A),
+              backgroundColor:
+                  _themeManager.primaryGreen.withValues(alpha: 0.2),
+              foregroundColor: _themeManager.primaryGreen,
               child: Text(pklName.isEmpty ? '?' : pklName[0].toUpperCase()),
             ),
             const SizedBox(width: 14),
@@ -241,21 +282,27 @@ class _PembeliChatListPageState extends State<PembeliChatListPage> {
                 children: [
                   Text(
                     pklName,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontWeight: FontWeight.w700,
                       fontSize: 15,
-                      color: Colors.white,
+                      color: textColor,
                     ),
                   ),
                   const SizedBox(height: 2),
                   Text(
                     'Update terakhir: $updatedAt',
-                    style: const TextStyle(color: Colors.grey, fontSize: 12),
+                    style: TextStyle(
+                      color: textColor.withValues(alpha: 0.6),
+                      fontSize: 12,
+                    ),
                   ),
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right, color: Colors.grey),
+            Icon(
+              Icons.chevron_right,
+              color: textColor.withValues(alpha: 0.6),
+            ),
           ],
         ),
       ),

@@ -2,6 +2,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:gomuter_app/api_service.dart';
+import 'package:gomuter_app/utils/theme_manager.dart';
 import 'package:gomuter_app/utils/token_manager.dart';
 import 'package:intl/intl.dart';
 
@@ -37,6 +38,7 @@ class PklEditInfoPage extends StatefulWidget {
 }
 
 class _PklEditInfoPageState extends State<PklEditInfoPage> {
+  final ThemeManager _themeManager = ThemeManager();
   static const List<String> _allowedImageExtensions = [
     'jpg',
     'jpeg',
@@ -68,6 +70,7 @@ class _PklEditInfoPageState extends State<PklEditInfoPage> {
   @override
   void initState() {
     super.initState();
+    _themeManager.addListener(_onThemeChanged);
     _loadProfile();
   }
 
@@ -79,7 +82,12 @@ class _PklEditInfoPageState extends State<PklEditInfoPage> {
     _alamatController.dispose();
     _tentangController.dispose();
     _namaRekeningController.dispose();
+    _themeManager.removeListener(_onThemeChanged);
     super.dispose();
+  }
+
+  void _onThemeChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<String?> _getToken() async {
@@ -675,9 +683,9 @@ class _PklEditInfoPageState extends State<PklEditInfoPage> {
       width: double.infinity,
       padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: _themeManager.cardColor,
         borderRadius: BorderRadius.circular(26),
-        border: Border.all(color: Colors.black.withValues(alpha: 0.05)),
+        border: Border.all(color: _themeManager.borderColor),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.04),
@@ -708,9 +716,7 @@ class _PklEditInfoPageState extends State<PklEditInfoPage> {
                       _isNewProfile
                           ? 'Lengkapi profil usahamu sebelum menambahkan menu.'
                           : 'Upload foto, harga, dan deskripsi agar pembeli tertarik.',
-                      style: TextStyle(
-                        color: Colors.black.withValues(alpha: 0.6),
-                      ),
+                      style: TextStyle(color: _themeManager.mutedTextColor),
                     ),
                   ],
                 ),
@@ -938,18 +944,28 @@ class _PklEditInfoPageState extends State<PklEditInfoPage> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = _themeManager.isDarkMode;
+    final bgColor = _themeManager.backgroundColor;
+    final textColor = _themeManager.textColor;
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F6FB),
+      backgroundColor: bgColor,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
-        foregroundColor: Colors.black87,
+        foregroundColor: textColor,
         title: const Text(
           'Edit Informasi Dagangan',
           style: TextStyle(fontWeight: FontWeight.w700),
         ),
         actions: [
+          IconButton(
+            icon: Icon(
+              isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
+            ),
+            onPressed: _themeManager.toggleTheme,
+            tooltip: isDark ? 'Mode terang' : 'Mode gelap',
+          ),
           IconButton(
             icon: const Icon(Icons.refresh_rounded),
             onPressed: _isLoading ? null : _loadProfile,
@@ -1099,6 +1115,8 @@ class _PklEditInfoPageState extends State<PklEditInfoPage> {
     required IconData icon,
     int maxLines = 1,
   }) {
+    final borderColor = _themeManager.borderColor;
+    final textColor = _themeManager.textColor;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1118,29 +1136,23 @@ class _PklEditInfoPageState extends State<PklEditInfoPage> {
           maxLines: maxLines,
           decoration: InputDecoration(
             filled: true,
-            fillColor: Colors.white,
+            fillColor: _themeManager.surfaceColor,
             prefixIcon: Container(
               margin: const EdgeInsets.all(12),
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: const Color(0xFFE8F5E9),
+                color: _themeManager.accentSurfaceColor,
                 borderRadius: BorderRadius.circular(14),
               ),
-              child: Icon(icon, color: const Color(0xFF0D8A3A), size: 22),
+              child: Icon(icon, color: _themeManager.primaryGreen, size: 22),
             ),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(22),
-              borderSide: BorderSide(
-                color: Colors.black.withValues(alpha: 0.08),
-                width: 1.5,
-              ),
+              borderSide: BorderSide(color: borderColor, width: 1.5),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(22),
-              borderSide: BorderSide(
-                color: Colors.black.withValues(alpha: 0.08),
-                width: 1.5,
-              ),
+              borderSide: BorderSide(color: borderColor, width: 1.5),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(22),
@@ -1151,6 +1163,8 @@ class _PklEditInfoPageState extends State<PklEditInfoPage> {
               vertical: 18,
             ),
           ),
+          style: TextStyle(color: textColor),
+          cursorColor: _themeManager.primaryGreen,
         ),
       ],
     );

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:gomuter_app/api_service.dart';
+import 'package:gomuter_app/utils/theme_manager.dart';
 import 'package:gomuter_app/utils/token_manager.dart';
 import 'package:gomuter_app/widgets/pkl_bottom_nav.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -12,6 +13,7 @@ class PklPreOrderPage extends StatefulWidget {
 }
 
 class _PklPreOrderPageState extends State<PklPreOrderPage> {
+  final ThemeManager _themeManager = ThemeManager();
   bool _isLoading = true;
   String? _error;
   List<dynamic> _orders = [];
@@ -20,7 +22,18 @@ class _PklPreOrderPageState extends State<PklPreOrderPage> {
   @override
   void initState() {
     super.initState();
+    _themeManager.addListener(_onThemeChanged);
     _loadOrders();
+  }
+
+  @override
+  void dispose() {
+    _themeManager.removeListener(_onThemeChanged);
+    super.dispose();
+  }
+
+  void _onThemeChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<String?> _getToken() async {
@@ -423,10 +436,12 @@ class _PklPreOrderPageState extends State<PklPreOrderPage> {
   }
 
   Widget _buildEmptyState() {
+    final textColor = _themeManager.textColor;
+    final mutedText = _themeManager.mutedTextColor;
     return Container(
       padding: const EdgeInsets.all(32),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: _themeManager.cardColor,
         borderRadius: BorderRadius.circular(32),
         boxShadow: [
           BoxShadow(
@@ -441,29 +456,29 @@ class _PklPreOrderPageState extends State<PklPreOrderPage> {
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: const Color(0xFFE8F5E9),
+              color: _themeManager.accentSurfaceColor,
               shape: BoxShape.circle,
             ),
-            child: const Icon(
+            child: Icon(
               Icons.receipt_long_rounded,
               size: 48,
-              color: Color(0xFF0D8A3A),
+              color: _themeManager.primaryGreen,
             ),
           ),
           const SizedBox(height: 20),
-          const Text(
+          Text(
             'Belum ada permintaan pre-order.',
-            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+            style: TextStyle(
+              fontWeight: FontWeight.w700,
+              fontSize: 16,
+              color: textColor,
+            ),
           ),
           const SizedBox(height: 8),
           Text(
             'Saat pembeli memesan, daftar akan tampil di sini.',
             textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Colors.black.withValues(alpha: 0.6),
-              fontSize: 14,
-              height: 1.4,
-            ),
+            style: TextStyle(color: mutedText, fontSize: 14, height: 1.4),
           ),
         ],
       ),
@@ -506,7 +521,7 @@ class _PklPreOrderPageState extends State<PklPreOrderPage> {
         ],
       ),
       child: Material(
-        color: Colors.white,
+        color: _themeManager.cardColor,
         borderRadius: BorderRadius.circular(32),
         clipBehavior: Clip.antiAlias,
         child: Padding(
@@ -545,7 +560,7 @@ class _PklPreOrderPageState extends State<PklPreOrderPage> {
                         Text(
                           'Dibuat: $createdLabel',
                           style: TextStyle(
-                            color: Colors.black.withValues(alpha: 0.5),
+                            color: _themeManager.mutedTextColor,
                             fontSize: 13,
                             fontWeight: FontWeight.w500,
                           ),
@@ -586,11 +601,9 @@ class _PklPreOrderPageState extends State<PklPreOrderPage> {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF8F9FA),
+                  color: _themeManager.surfaceColor,
                   borderRadius: BorderRadius.circular(18),
-                  border: Border.all(
-                    color: Colors.black.withValues(alpha: 0.06),
-                  ),
+                  border: Border.all(color: _themeManager.borderColor),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -600,7 +613,7 @@ class _PklPreOrderPageState extends State<PklPreOrderPage> {
                         Icon(
                           Icons.description_rounded,
                           size: 18,
-                          color: Colors.black.withValues(alpha: 0.6),
+                          color: _themeManager.mutedTextColor,
                         ),
                         const SizedBox(width: 8),
                         const Text(
@@ -807,16 +820,18 @@ class _PklPreOrderPageState extends State<PklPreOrderPage> {
   }
 
   Widget _buildInfoRow(IconData icon, String label, String value) {
+    final mutedText = _themeManager.mutedTextColor;
+    final textColor = _themeManager.textColor;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         children: [
-          Icon(icon, size: 18, color: Colors.black.withValues(alpha: 0.5)),
+          Icon(icon, size: 18, color: mutedText),
           const SizedBox(width: 10),
           Text(
             '$label: ',
             style: TextStyle(
-              color: Colors.black.withValues(alpha: 0.6),
+              color: mutedText,
               fontSize: 13,
               fontWeight: FontWeight.w600,
             ),
@@ -824,7 +839,11 @@ class _PklPreOrderPageState extends State<PklPreOrderPage> {
           Expanded(
             child: Text(
               value,
-              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: textColor,
+              ),
             ),
           ),
         ],
@@ -834,17 +853,27 @@ class _PklPreOrderPageState extends State<PklPreOrderPage> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = _themeManager.isDarkMode;
+    final bgColor = _themeManager.backgroundColor;
+    final textColor = _themeManager.textColor;
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F6FB),
+      backgroundColor: bgColor,
       appBar: AppBar(
         automaticallyImplyLeading: false,
         backgroundColor: Colors.transparent,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
         scrolledUnderElevation: 0,
-        foregroundColor: Colors.black87,
+        foregroundColor: textColor,
         title: const Text('Permintaan Pre-Order'),
         actions: [
+          IconButton(
+            icon: Icon(
+              isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
+            ),
+            onPressed: _themeManager.toggleTheme,
+            tooltip: isDark ? 'Mode terang' : 'Mode gelap',
+          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _isLoading ? null : _loadOrders,

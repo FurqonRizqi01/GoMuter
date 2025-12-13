@@ -5,6 +5,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:gomuter_app/api_service.dart';
 import 'package:gomuter_app/navigation/pkl_routes.dart';
 import 'package:gomuter_app/utils/chat_badge_manager.dart';
+import 'package:gomuter_app/utils/theme_manager.dart';
 import 'package:gomuter_app/utils/token_manager.dart';
 import 'package:gomuter_app/widgets/pkl_bottom_nav.dart';
 
@@ -16,6 +17,7 @@ class PklHomePage extends StatefulWidget {
 }
 
 class _PklHomePageState extends State<PklHomePage> {
+  final ThemeManager _themeManager = ThemeManager();
   final ScrollController _scrollController = ScrollController();
 
   bool _isLoading = true;
@@ -43,15 +45,21 @@ class _PklHomePageState extends State<PklHomePage> {
   @override
   void initState() {
     super.initState();
+    _themeManager.addListener(_onThemeChanged);
     _loadProfile();
     _loadChatBadge();
   }
 
   @override
   void dispose() {
+    _themeManager.removeListener(_onThemeChanged);
     _scrollController.dispose();
     _locationTimer?.cancel();
     super.dispose();
+  }
+
+  void _onThemeChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<String?> _getToken() async {
@@ -655,9 +663,21 @@ class _PklHomePageState extends State<PklHomePage> {
     required Color iconColor,
     required VoidCallback onTap,
   }) {
+    final isDark = _themeManager.isDarkMode;
+    final textColor = _themeManager.textColor;
+    final mutedText = _themeManager.mutedTextColor;
+
     final isHovered = _hoveredActionCard == title;
     final isPressed = _pressedActionCard == title;
-    final cardColor = isHovered ? _darkenColor(color, 0.05) : color;
+    final baseColor = isDark
+        ? Color.alphaBlend(
+            color.withValues(alpha: 0.12),
+            _themeManager.cardColor,
+          )
+        : color;
+    final cardColor = isHovered && !isDark
+        ? _darkenColor(baseColor, 0.05)
+        : baseColor;
 
     return AnimatedScale(
       duration: const Duration(milliseconds: 150),
@@ -722,7 +742,9 @@ class _PklHomePageState extends State<PklHomePage> {
                   Container(
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: isDark
+                          ? _themeManager.accentSurfaceColor
+                          : Colors.white,
                       borderRadius: BorderRadius.circular(18),
                       boxShadow: [
                         BoxShadow(
@@ -737,10 +759,11 @@ class _PklHomePageState extends State<PklHomePage> {
                   const Spacer(),
                   Text(
                     title,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontWeight: FontWeight.w800,
                       fontSize: 16,
                       letterSpacing: -0.3,
+                      color: textColor,
                     ),
                   ),
                   const SizedBox(height: 6),
@@ -749,7 +772,7 @@ class _PklHomePageState extends State<PklHomePage> {
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      color: Colors.black.withValues(alpha: 0.65),
+                      color: mutedText,
                       fontSize: 13,
                       height: 1.3,
                       fontWeight: FontWeight.w500,
@@ -774,7 +797,7 @@ class _PklHomePageState extends State<PklHomePage> {
     return Card(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
       elevation: 0,
-      color: Colors.white,
+      color: _themeManager.cardColor,
       shadowColor: Colors.black.withValues(alpha: 0.1),
       child: Container(
         decoration: BoxDecoration(
@@ -843,6 +866,8 @@ class _PklHomePageState extends State<PklHomePage> {
   }
 
   Widget _buildInfoRow(String label, String value) {
+    final textColor = _themeManager.textColor;
+    final mutedText = _themeManager.mutedTextColor;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 10),
       child: Row(
@@ -853,7 +878,7 @@ class _PklHomePageState extends State<PklHomePage> {
             child: Text(
               label,
               style: TextStyle(
-                color: Colors.black.withValues(alpha: 0.6),
+                color: mutedText,
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
                 letterSpacing: 0.2,
@@ -863,10 +888,11 @@ class _PklHomePageState extends State<PklHomePage> {
           Expanded(
             child: Text(
               value,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
                 height: 1.4,
+                color: textColor,
               ),
             ),
           ),
@@ -879,7 +905,7 @@ class _PklHomePageState extends State<PklHomePage> {
     return Card(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
       elevation: 0,
-      color: Colors.white,
+      color: _themeManager.cardColor,
       child: Container(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(28),
@@ -978,6 +1004,8 @@ class _PklHomePageState extends State<PklHomePage> {
     required Color color,
     String? footnote,
   }) {
+    final isDark = _themeManager.isDarkMode;
+    final mutedText = _themeManager.mutedTextColor;
     return Container(
       padding: const EdgeInsets.all(20),
       constraints: const BoxConstraints(minHeight: 160),
@@ -1026,7 +1054,7 @@ class _PklHomePageState extends State<PklHomePage> {
             subtitle,
             style: TextStyle(
               fontSize: 12,
-              color: Colors.black.withValues(alpha: 0.6),
+              color: isDark ? mutedText : Colors.black.withValues(alpha: 0.6),
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -1036,7 +1064,9 @@ class _PklHomePageState extends State<PklHomePage> {
               footnote,
               style: TextStyle(
                 fontSize: 11,
-                color: Colors.black.withValues(alpha: 0.5),
+                color: isDark
+                    ? mutedText.withValues(alpha: 0.85)
+                    : Colors.black.withValues(alpha: 0.5),
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -1048,6 +1078,9 @@ class _PklHomePageState extends State<PklHomePage> {
   }
 
   Widget _buildLocationPanel() {
+    final isDark = _themeManager.isDarkMode;
+    final textColor = _themeManager.textColor;
+    final mutedText = _themeManager.mutedTextColor;
     final autoActive = _locationTimer != null;
     final lastUpdateLabel = _lastAutoUpdate != null
         ? 'Terakhir ${_formatTime(_lastAutoUpdate!)}'
@@ -1063,7 +1096,7 @@ class _PklHomePageState extends State<PklHomePage> {
       child: Container(
         padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: _themeManager.cardColor,
           borderRadius: BorderRadius.circular(32),
           boxShadow: [
             BoxShadow(
@@ -1100,18 +1133,19 @@ class _PklHomePageState extends State<PklHomePage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         'Kontrol Lokasi',
                         style: TextStyle(
                           fontWeight: FontWeight.w700,
                           fontSize: 16,
+                          color: textColor,
                         ),
                       ),
                       Text(
                         lastUpdateLabel,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
-                          color: Colors.black54,
+                          color: isDark ? mutedText : Colors.black54,
                         ),
                       ),
                     ],
@@ -1123,7 +1157,7 @@ class _PklHomePageState extends State<PklHomePage> {
             const SizedBox(height: 12),
             Text(
               statusMessage,
-              style: const TextStyle(color: Colors.black87, height: 1.4),
+              style: TextStyle(color: textColor, height: 1.4),
             ),
             const SizedBox(height: 18),
             Row(
@@ -1213,6 +1247,10 @@ class _PklHomePageState extends State<PklHomePage> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = _themeManager.isDarkMode;
+    final bgColor = _themeManager.backgroundColor;
+    final textColor = _themeManager.textColor;
+
     final bodyContent = SingleChildScrollView(
       controller: _scrollController,
       physics: const AlwaysScrollableScrollPhysics(),
@@ -1267,16 +1305,29 @@ class _PklHomePageState extends State<PklHomePage> {
     );
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F6FB),
+      backgroundColor: bgColor,
       appBar: AppBar(
+        automaticallyImplyLeading: false,
         backgroundColor: Colors.transparent,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
-        title: const Text(
+        title: Text(
           'Beranda PKL',
-          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 20),
+          style: TextStyle(
+            fontWeight: FontWeight.w800,
+            fontSize: 20,
+            color: textColor,
+          ),
         ),
         actions: [
+          IconButton(
+            icon: Icon(
+              isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
+              color: textColor,
+            ),
+            onPressed: _themeManager.toggleTheme,
+            tooltip: isDark ? 'Mode terang' : 'Mode gelap',
+          ),
           IconButton(
             icon: const Icon(Icons.logout_rounded, color: Color(0xFFD32F2F)),
             onPressed: _logout,

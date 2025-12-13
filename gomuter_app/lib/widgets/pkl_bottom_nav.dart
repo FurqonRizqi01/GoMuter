@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../navigation/pkl_routes.dart';
+import 'package:gomuter_app/utils/theme_manager.dart';
 
 enum PklNavItem { home, payment, preorder, chat }
 
@@ -44,7 +45,7 @@ extension PklNavItemDetails on PklNavItem {
   }
 }
 
-class PklBottomNavBar extends StatelessWidget {
+class PklBottomNavBar extends StatefulWidget {
   const PklBottomNavBar({
     super.key,
     required this.current,
@@ -56,9 +57,32 @@ class PklBottomNavBar extends StatelessWidget {
   final ValueChanged<PklNavItem>? onCurrentTap;
   final int chatBadgeCount;
 
+  @override
+  State<PklBottomNavBar> createState() => _PklBottomNavBarState();
+}
+
+class _PklBottomNavBarState extends State<PklBottomNavBar> {
+  final ThemeManager _themeManager = ThemeManager();
+
+  @override
+  void initState() {
+    super.initState();
+    _themeManager.addListener(_onThemeChanged);
+  }
+
+  @override
+  void dispose() {
+    _themeManager.removeListener(_onThemeChanged);
+    super.dispose();
+  }
+
+  void _onThemeChanged() {
+    if (mounted) setState(() {});
+  }
+
   void _handleTap(BuildContext context, PklNavItem destination) {
-    if (destination == current) {
-      onCurrentTap?.call(destination);
+    if (destination == widget.current) {
+      widget.onCurrentTap?.call(destination);
       return;
     }
     Navigator.of(context).pushReplacementNamed(destination.routeName);
@@ -66,12 +90,18 @@ class PklBottomNavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final bgColor = _themeManager.cardColor;
+    final activeBgColor = _themeManager.accentSurfaceColor;
+    final activeColor = _themeManager.primaryGreen;
+    final inactiveLabelColor = _themeManager.mutedTextColor;
+    final inactiveIconColor = _themeManager.hintTextColor;
+
     return SafeArea(
       top: false,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: bgColor,
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.08),
@@ -89,7 +119,7 @@ class PklBottomNavBar extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: PklNavItem.values.map((item) {
-              final isActive = item == current;
+              final isActive = item == widget.current;
               return Expanded(
                 child: InkWell(
                   borderRadius: BorderRadius.circular(16),
@@ -102,14 +132,19 @@ class PklBottomNavBar extends StatelessWidget {
                     ),
                     decoration: BoxDecoration(
                       color: isActive
-                          ? const Color(0xFFE8F9EF)
+                            ? activeBgColor
                           : Colors.transparent,
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        _buildIcon(item, isActive),
+                          _buildIcon(
+                            item,
+                            isActive,
+                            activeColor: activeColor,
+                            inactiveColor: inactiveIconColor,
+                          ),
                         const SizedBox(height: 6),
                         Text(
                           item.label,
@@ -120,8 +155,8 @@ class PklBottomNavBar extends StatelessWidget {
                                 ? FontWeight.w600
                                 : FontWeight.w500,
                             color: isActive
-                                ? const Color(0xFF0D8A3A)
-                                : Colors.black87,
+                                  ? activeColor
+                                  : inactiveLabelColor,
                           ),
                         ),
                       ],
@@ -136,12 +171,17 @@ class PklBottomNavBar extends StatelessWidget {
     );
   }
 
-  Widget _buildIcon(PklNavItem item, bool isActive) {
+    Widget _buildIcon(
+      PklNavItem item,
+      bool isActive, {
+      required Color activeColor,
+      required Color inactiveColor,
+    }) {
     final icon = Icon(
       item.icon,
-      color: isActive ? const Color(0xFF0D8A3A) : Colors.black54,
+        color: isActive ? activeColor : inactiveColor,
     );
-    if (item != PklNavItem.chat || chatBadgeCount <= 0) {
+    if (item != PklNavItem.chat || widget.chatBadgeCount <= 0) {
       return icon;
     }
     return Stack(
@@ -159,7 +199,7 @@ class PklBottomNavBar extends StatelessWidget {
             ),
             constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
             child: Text(
-              chatBadgeCount > 9 ? '9+' : '$chatBadgeCount',
+              widget.chatBadgeCount > 9 ? '9+' : '${widget.chatBadgeCount}',
               style: const TextStyle(
                 color: Colors.white,
                 fontSize: 10,
