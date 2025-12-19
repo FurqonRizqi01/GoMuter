@@ -101,8 +101,9 @@ class _PklProfilePageState extends State<PklProfilePage> {
         }
 
         try {
-          final stats = await ApiService.getPKLDailyStats(token: token);
-          _totalOrders = (stats['total_orders'] as num?)?.toInt() ?? 0;
+          // Count all pre-orders for this PKL (from pembeli submissions).
+          final preorders = await ApiService.getPKLPreOrders(token: token);
+          _totalOrders = preorders.length;
         } catch (_) {
           // Optional.
         }
@@ -536,9 +537,7 @@ class _PklProfilePageState extends State<PklProfilePage> {
                         child: _StatChip(
                           icon: Icons.shopping_bag_rounded,
                           label: 'Total Order',
-                          value: _totalOrders == 0
-                              ? '-'
-                              : _totalOrders.toString(),
+                          value: '$_totalOrders pesanan',
                           themeManager: _themeManager,
                         ),
                       ),
@@ -763,16 +762,20 @@ class _StatChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      // Slightly taller to avoid overflow in cases like Rating + subValue
+      height: 96,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: themeManager.cardColor,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: themeManager.borderColor),
       ),
       child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Icon(icon, size: 18, color: themeManager.accentGold),
               const SizedBox(width: 6),
@@ -789,17 +792,21 @@ class _StatChip extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: TextStyle(
               color: themeManager.textColor,
               fontWeight: FontWeight.w900,
-              fontSize: 18,
+              fontSize: 17,
             ),
           ),
           if (subValue != null) ...[
             const SizedBox(height: 4),
             Text(
               subValue!,
-              style: TextStyle(color: themeManager.hintTextColor, fontSize: 12),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: themeManager.hintTextColor, fontSize: 12, height: 1.05),
             ),
           ],
         ],

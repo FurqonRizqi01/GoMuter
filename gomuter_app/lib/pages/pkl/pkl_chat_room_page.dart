@@ -153,7 +153,7 @@ class _PklChatRoomPageState extends State<PklChatRoomPage> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = _themeManager.isDarkMode;
+
     final bgColor = _themeManager.backgroundColor;
     final textColor = _themeManager.textColor;
     final mutedText = _themeManager.mutedTextColor;
@@ -169,15 +169,7 @@ class _PklChatRoomPageState extends State<PklChatRoomPage> {
           icon: const Icon(Icons.arrow_back_rounded),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        actions: [
-          IconButton(
-            icon: Icon(
-              isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
-            ),
-            onPressed: _themeManager.toggleTheme,
-            tooltip: isDark ? 'Mode terang' : 'Mode gelap',
-          ),
-        ],
+        actions: [],
         title: Row(
           children: [
             Container(

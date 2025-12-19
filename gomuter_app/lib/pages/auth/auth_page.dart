@@ -559,12 +559,17 @@ class _AuthPageState extends State<AuthPage> {
                                 ? null
                                 : _openForgotPasswordSheet,
                             style: TextButton.styleFrom(
-                              foregroundColor: Colors.white,
+                              foregroundColor:
+                                  Theme.of(context).textTheme.bodyMedium?.color,
                             ),
                             child: Text(
                               'Lupa password?',
                               style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.8),
+                                color: Theme.of(context)
+                                    .textTheme
+                                    .bodyMedium
+                                    ?.color
+                                    ?.withValues(alpha: 0.8),
                                 fontWeight: FontWeight.w700,
                               ),
                             ),

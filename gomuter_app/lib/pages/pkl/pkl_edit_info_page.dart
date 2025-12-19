@@ -944,7 +944,6 @@ class _PklEditInfoPageState extends State<PklEditInfoPage> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = _themeManager.isDarkMode;
     final bgColor = _themeManager.backgroundColor;
     final textColor = _themeManager.textColor;
     final borderColor = _themeManager.borderColor;
@@ -964,13 +963,6 @@ class _PklEditInfoPageState extends State<PklEditInfoPage> {
           child: Divider(height: 1, thickness: 1, color: borderColor),
         ),
         actions: [
-          IconButton(
-            icon: Icon(
-              isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
-            ),
-            onPressed: _themeManager.toggleTheme,
-            tooltip: isDark ? 'Mode terang' : 'Mode gelap',
-          ),
           IconButton(
             icon: const Icon(Icons.refresh_rounded),
             onPressed: _isLoading ? null : _loadProfile,

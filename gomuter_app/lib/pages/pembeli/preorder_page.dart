@@ -766,11 +766,16 @@ class _PreOrderPageState extends State<PreOrderPage>
             children: [
               Container(
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.2),
+                  color: _themeManager.isDarkMode
+                      ? Colors.white.withValues(alpha: 0.2)
+                      : Colors.black.withValues(alpha: 0.06),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: IconButton(
-                  icon: const Icon(Icons.arrow_back, color: Colors.white),
+                  icon: Icon(Icons.arrow_back,
+                      color: _themeManager.isDarkMode
+                          ? Colors.white
+                          : _themeManager.textColor),
                   onPressed: () => Navigator.pop(context),
                 ),
               ),
@@ -779,10 +784,12 @@ class _PreOrderPageState extends State<PreOrderPage>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       'Pre-Order',
                       style: TextStyle(
-                        color: Colors.white,
+                        color: _themeManager.isDarkMode
+                            ? Colors.white
+                            : _themeManager.textColor,
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
                       ),
@@ -791,7 +798,9 @@ class _PreOrderPageState extends State<PreOrderPage>
                     Text(
                       widget.pklName,
                       style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.9),
+                        color: _themeManager.isDarkMode
+                            ? Colors.white.withValues(alpha: 0.9)
+                            : _themeManager.mutedTextColor,
                         fontSize: 14,
                       ),
                       maxLines: 1,
@@ -802,11 +811,16 @@ class _PreOrderPageState extends State<PreOrderPage>
               ),
               Container(
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.2),
+                  color: _themeManager.isDarkMode
+                      ? Colors.white.withValues(alpha: 0.2)
+                      : Colors.black.withValues(alpha: 0.06),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: IconButton(
-                  icon: const Icon(Icons.refresh, color: Colors.white),
+                  icon: Icon(Icons.refresh,
+                      color: _themeManager.isDarkMode
+                          ? Colors.white
+                          : _themeManager.textColor),
                   onPressed: _isLoadingOrders
                       ? null
                       : () {
@@ -859,7 +873,6 @@ class _PreOrderPageState extends State<PreOrderPage>
   }
 
   Widget _buildTabBar() {
-    final isDark = _themeManager.isDarkMode;
     final cardBg = _themeManager.cardColor;
     return Container(
       margin: const EdgeInsets.fromLTRB(20, 20, 20, 0),
@@ -884,7 +897,7 @@ class _PreOrderPageState extends State<PreOrderPage>
         indicatorSize: TabBarIndicatorSize.tab,
         dividerColor: Colors.transparent,
         labelColor: Colors.white,
-        unselectedLabelColor: isDark ? _mutedTextColor : Colors.grey.shade600,
+        unselectedLabelColor: Theme.of(context).textTheme.bodyMedium?.color?.withValues(alpha: 0.70),
         labelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
         padding: const EdgeInsets.all(6),
         tabs: [

@@ -20,6 +20,7 @@ class PKLSerializer(serializers.ModelSerializer):
     latest_latitude = serializers.SerializerMethodField()
     latest_longitude = serializers.SerializerMethodField()
     latest_timestamp = serializers.SerializerMethodField()
+    created_at = serializers.SerializerMethodField()
 
     class Meta:
         model = PKL
@@ -40,6 +41,7 @@ class PKLSerializer(serializers.ModelSerializer):
             'latest_latitude',
             'latest_longitude',
             'latest_timestamp',
+            'created_at',
         ]
 
     def get_latest_latitude(self, obj):
@@ -53,6 +55,14 @@ class PKLSerializer(serializers.ModelSerializer):
     def get_latest_timestamp(self, obj):
         lokasi = obj.lokasi.order_by('-timestamp').first()
         return lokasi.timestamp if lokasi else None
+
+    def get_created_at(self, obj):
+        # Return the owner's account creation datetime in ISO format (used as "gabung" year in client)
+        try:
+            dj = obj.user.date_joined
+            return dj.isoformat() if dj is not None else None
+        except Exception:
+            return None
 
 
 class LokasiPKLSerializer(serializers.ModelSerializer):

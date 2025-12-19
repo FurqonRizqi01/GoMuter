@@ -240,7 +240,7 @@ class _PklHomePageState extends State<PklHomePage> {
   }
 
   Future<void> _openEditInfoPage() async {
-    final updated = await Navigator.of(context).pushNamed(PklRoutes.profile);
+    final updated = await Navigator.of(context).pushNamed(PklRoutes.manage);
     if (updated == true) {
       _loadProfile();
     }
@@ -897,9 +897,10 @@ class _PklHomePageState extends State<PklHomePage> {
                     ),
                   ),
                   const SizedBox(width: 14),
-                  const Text(
+                  Text(
                     'Informasi Dagangan',
                     style: TextStyle(
+                      color: _themeManager.textColor,
                       fontSize: 18,
                       fontWeight: FontWeight.w800,
                       letterSpacing: -0.3,
@@ -1007,9 +1008,10 @@ class _PklHomePageState extends State<PklHomePage> {
                     ),
                   ),
                   const SizedBox(width: 14),
-                  const Text(
+                  Text(
                     'Statistik Hari Ini',
                     style: TextStyle(
+                      color: _themeManager.textColor,
                       fontSize: 18,
                       fontWeight: FontWeight.w800,
                       letterSpacing: -0.3,
