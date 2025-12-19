@@ -112,10 +112,13 @@ class PKLProfileView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
+        was_active = pkl.status_aktif
         serializer = PKLSerializer(pkl, data=request.data, partial=True)
         if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
+            updated_pkl = serializer.save()
+            if not was_active and updated_pkl.status_aktif:
+                notify_favorite_pkl_active(updated_pkl)
+            return Response(PKLSerializer(updated_pkl).data)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -134,13 +137,7 @@ class PKLUpdateLocationView(APIView):
 
         serializer = LokasiPKLSerializer(data=request.data)
         if serializer.is_valid():
-            was_active = pkl.status_aktif
             lokasi = serializer.save(pkl=pkl, status='AKTIF')
-            # tandai PKL aktif setelah update lokasi
-            pkl.status_aktif = True
-            pkl.save(update_fields=['status_aktif'])
-            if not was_active and pkl.status_aktif:
-                notify_favorite_pkl_active(pkl)
             _increment_daily_stat(pkl, 'auto_updates')
             return Response(LokasiPKLSerializer(lokasi).data, status=status.HTTP_201_CREATED)
 
@@ -836,6 +833,13 @@ class UpdatePreOrderStatusView(APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
+        # Final states cannot be changed again.
+        if preorder.status in ['SELESAI', 'DITOLAK']:
+            return Response(
+                {"detail": "Pesanan sudah selesai dan tidak bisa diubah lagi."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         new_status = request.data.get('status')
         if new_status not in ['DITERIMA', 'DITOLAK', 'SELESAI']:
             return Response(
@@ -933,6 +937,37 @@ class DPProofUploadView(APIView):
         return Response({'url': file_url}, status=status.HTTP_201_CREATED)
 
 
+class PKLProfilePhotoUploadView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsPKL]
+    parser_classes = [MultiPartParser, FormParser]
+
+    def post(self, request):
+        file_obj = request.FILES.get('file')
+        if not file_obj:
+            return Response(
+                {"detail": "File tidak ditemukan."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            pkl = PKL.objects.get(user=request.user)
+        except PKL.DoesNotExist:
+            return Response(
+                {"detail": "Profil PKL belum dibuat."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        extension = file_obj.name.split('.')[-1].lower()
+        filename = f"pkl_profile_photos/{uuid.uuid4().hex}.{extension}"
+        saved_path = default_storage.save(filename, file_obj)
+        file_url = request.build_absolute_uri(default_storage.url(saved_path))
+
+        pkl.profile_image_url = file_url
+        pkl.save(update_fields=['profile_image_url'])
+
+        return Response(PKLSerializer(pkl).data, status=status.HTTP_200_OK)
+
+
 class NotificationListView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsPembeli]
 
@@ -951,6 +986,16 @@ class NotificationListView(APIView):
         notifications = queryset.order_by('-created_at')[:max(1, min(limit, 100))]
         serializer = NotificationSerializer(notifications, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class AdminPKLDeleteView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def delete(self, request, pkl_id: int):
+        pkl = get_object_or_404(PKL.objects.select_related('user'), id=pkl_id)
+        # Delete the owning user so the PKL profile + related data cascade cleanly.
+        pkl.user.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class NotificationMarkReadView(APIView):

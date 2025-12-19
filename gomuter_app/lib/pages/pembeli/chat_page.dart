@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:gomuter_app/api_service.dart';
 import 'package:gomuter_app/utils/chat_badge_manager.dart';
+import 'package:gomuter_app/utils/chat_read_tracker.dart';
 import 'package:gomuter_app/utils/theme_manager.dart';
 import 'package:gomuter_app/utils/token_manager.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -77,6 +78,8 @@ class _ChatPageState extends State<ChatPage> {
       setState(() {
         _chatId = chatId;
       });
+
+      await ChatReadTracker.markOpened(ChatRole.pembeli, chatId);
 
       await _loadMessages();
 
@@ -246,10 +249,7 @@ class _ChatPageState extends State<ChatPage> {
             height: 44,
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: [
-                  primary.withValues(alpha: 0.85),
-                  primary,
-                ],
+                colors: [primary.withValues(alpha: 0.85), primary],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
@@ -347,10 +347,7 @@ class _ChatPageState extends State<ChatPage> {
           const SizedBox(height: 20),
           Text(
             'Memuat percakapan...',
-            style: TextStyle(
-              color: _themeManager.mutedTextColor,
-              fontSize: 14,
-            ),
+            style: TextStyle(color: _themeManager.mutedTextColor, fontSize: 14),
           ),
         ],
       ),
@@ -525,7 +522,9 @@ class _ChatPageState extends State<ChatPage> {
     final surfaceColor = _themeManager.surfaceColor;
     final textColor = _themeManager.textColor;
     final otherBubbleColor = isDark ? surfaceColor : Colors.white;
-    final otherTextColor = isDark ? textColor : (Colors.grey[800] ?? Colors.black87);
+    final otherTextColor = isDark
+        ? textColor
+        : (Colors.grey[800] ?? Colors.black87);
     final primary = _themeManager.primaryGreen;
 
     return Padding(
@@ -542,10 +541,7 @@ class _ChatPageState extends State<ChatPage> {
               height: 32,
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [
-                    primary.withValues(alpha: 0.85),
-                    primary,
-                  ],
+                  colors: [primary.withValues(alpha: 0.85), primary],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
@@ -645,11 +641,7 @@ class _ChatPageState extends State<ChatPage> {
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Center(
-                child: Icon(
-                  Icons.person,
-                  color: primary,
-                  size: 16,
-                ),
+                child: Icon(Icons.person, color: primary, size: 16),
               ),
             ),
           ],
@@ -723,10 +715,7 @@ class _ChatPageState extends State<ChatPage> {
           Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: [
-                  primary.withValues(alpha: 0.85),
-                  primary,
-                ],
+                colors: [primary.withValues(alpha: 0.85), primary],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),

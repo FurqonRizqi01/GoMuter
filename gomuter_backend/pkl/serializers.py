@@ -17,11 +17,16 @@ from .models import (
 
 
 class PKLSerializer(serializers.ModelSerializer):
+    latest_latitude = serializers.SerializerMethodField()
+    latest_longitude = serializers.SerializerMethodField()
+    latest_timestamp = serializers.SerializerMethodField()
+
     class Meta:
         model = PKL
         fields = [
             'id',
             'nama_usaha',
+            'profile_image_url',
             'jenis_dagangan',
             'jam_operasional',
             'status_aktif',
@@ -32,7 +37,22 @@ class PKLSerializer(serializers.ModelSerializer):
             'qris_link',
             'status_verifikasi',
             'catatan_verifikasi',
+            'latest_latitude',
+            'latest_longitude',
+            'latest_timestamp',
         ]
+
+    def get_latest_latitude(self, obj):
+        lokasi = obj.lokasi.order_by('-timestamp').first()
+        return lokasi.latitude if lokasi else None
+
+    def get_latest_longitude(self, obj):
+        lokasi = obj.lokasi.order_by('-timestamp').first()
+        return lokasi.longitude if lokasi else None
+
+    def get_latest_timestamp(self, obj):
+        lokasi = obj.lokasi.order_by('-timestamp').first()
+        return lokasi.timestamp if lokasi else None
 
 
 class LokasiPKLSerializer(serializers.ModelSerializer):
@@ -55,6 +75,7 @@ class PKLListSerializer(serializers.ModelSerializer):
         fields = [
             'id',
             'nama_usaha',
+            'profile_image_url',
             'jenis_dagangan',
             'jam_operasional',
             'status_aktif',

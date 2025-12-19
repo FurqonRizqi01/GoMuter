@@ -19,6 +19,7 @@ class AdminReportsTab extends StatelessWidget {
   final void Function(Map<String, dynamic> pkl, bool shouldBeActive)
   onToggleActive;
   final void Function(Map<String, dynamic> pkl) onShowDetail;
+  final void Function(Map<String, dynamic> pkl) onDelete;
   final int? processingId;
 
   const AdminReportsTab({
@@ -32,6 +33,7 @@ class AdminReportsTab extends StatelessWidget {
     required this.onVerify,
     required this.onToggleActive,
     required this.onShowDetail,
+    required this.onDelete,
     required this.processingId,
   });
 
@@ -297,6 +299,7 @@ class AdminReportsTab extends StatelessWidget {
                           onVerify: onVerify,
                           onToggleActive: onToggleActive,
                           onShowDetail: onShowDetail,
+                          onDelete: onDelete,
                         ),
                       ),
               ],

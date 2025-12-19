@@ -947,6 +947,7 @@ class _PklEditInfoPageState extends State<PklEditInfoPage> {
     final isDark = _themeManager.isDarkMode;
     final bgColor = _themeManager.backgroundColor;
     final textColor = _themeManager.textColor;
+    final borderColor = _themeManager.borderColor;
     return Scaffold(
       backgroundColor: bgColor,
       appBar: AppBar(
@@ -957,6 +958,10 @@ class _PklEditInfoPageState extends State<PklEditInfoPage> {
         title: const Text(
           'Edit Informasi Dagangan',
           style: TextStyle(fontWeight: FontWeight.w700),
+        ),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Divider(height: 1, thickness: 1, color: borderColor),
         ),
         actions: [
           IconButton(

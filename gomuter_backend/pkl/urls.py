@@ -2,6 +2,7 @@ from django.urls import path
 
 from .views import (
     PKLProfileView,
+    PKLProfilePhotoUploadView,
     PKLUpdateLocationView,
     PKLTodayStatsView,
     BuyerLocationView,
@@ -14,6 +15,7 @@ from .views import (
     AdminPKLPendingListView,
     AdminPKLVerifyView,
     AdminMonitoringPKLView,
+    AdminPKLDeleteView,
     AdminDashboardView,
     CreatePreOrderView,
     MyPreOrderListView,
@@ -32,6 +34,7 @@ from .views_chat import ChatListView, StartChatView, ChatMessagesView
 urlpatterns = [
     # PKL owner endpoints
     path('profile/', PKLProfileView.as_view(), name='pkl-profile'),
+    path('upload/profile-photo/', PKLProfilePhotoUploadView.as_view(), name='pkl-upload-profile-photo'),
     path('update-location/', PKLUpdateLocationView.as_view(), name='pkl-update-location'),
     path('stats/today/', PKLTodayStatsView.as_view(), name='pkl-stats-today'),
     path('buyer/location/', BuyerLocationView.as_view(), name='buyer-location'),
@@ -52,6 +55,7 @@ urlpatterns = [
     # admin endpoints
     path('admin/dashboard/', AdminDashboardView.as_view(), name='admin-dashboard'),
     path('admin/pkls/', AdminPKLListView.as_view(), name='admin-pkl-list'),
+    path('admin/pkls/<int:pkl_id>/', AdminPKLDeleteView.as_view(), name='admin-pkl-delete'),
     path('admin/pending/', AdminPKLPendingListView.as_view(), name='admin-pkl-pending'),
     path('admin/<int:pk>/verify/', AdminPKLVerifyView.as_view(), name='admin-pkl-verify'),
     path('admin/monitor/', AdminMonitoringPKLView.as_view(), name='admin-pkl-monitor'),

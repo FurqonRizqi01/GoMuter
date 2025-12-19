@@ -2,19 +2,19 @@ import 'package:flutter/material.dart';
 import '../navigation/pkl_routes.dart';
 import 'package:gomuter_app/utils/theme_manager.dart';
 
-enum PklNavItem { home, payment, preorder, chat }
+enum PklNavItem { home, orders, chat, profile }
 
 extension PklNavItemDetails on PklNavItem {
   String get label {
     switch (this) {
       case PklNavItem.home:
         return 'Beranda';
-      case PklNavItem.payment:
-        return 'Pembayaran';
-      case PklNavItem.preorder:
-        return 'Pre-Order';
       case PklNavItem.chat:
         return 'Pesan';
+      case PklNavItem.orders:
+        return 'Pesanan';
+      case PklNavItem.profile:
+        return 'Profil';
     }
   }
 
@@ -22,12 +22,12 @@ extension PklNavItemDetails on PklNavItem {
     switch (this) {
       case PklNavItem.home:
         return Icons.home_outlined;
-      case PklNavItem.payment:
-        return Icons.qr_code_2;
-      case PklNavItem.preorder:
-        return Icons.receipt_long_outlined;
       case PklNavItem.chat:
         return Icons.chat_bubble_outline;
+      case PklNavItem.orders:
+        return Icons.receipt_long_outlined;
+      case PklNavItem.profile:
+        return Icons.person_outline_rounded;
     }
   }
 
@@ -35,12 +35,12 @@ extension PklNavItemDetails on PklNavItem {
     switch (this) {
       case PklNavItem.home:
         return PklRoutes.home;
-      case PklNavItem.payment:
-        return PklRoutes.payment;
-      case PklNavItem.preorder:
-        return PklRoutes.preorder;
       case PklNavItem.chat:
         return PklRoutes.chat;
+      case PklNavItem.orders:
+        return PklRoutes.orders;
+      case PklNavItem.profile:
+        return PklRoutes.profile;
     }
   }
 }
@@ -88,128 +88,212 @@ class _PklBottomNavBarState extends State<PklBottomNavBar> {
     Navigator.of(context).pushReplacementNamed(destination.routeName);
   }
 
+  void _handlePlus(BuildContext context) {
+    Navigator.of(context).pushNamed(PklRoutes.manage);
+  }
+
   @override
   Widget build(BuildContext context) {
     final bgColor = _themeManager.cardColor;
-    final activeBgColor = _themeManager.accentSurfaceColor;
-    final activeColor = _themeManager.primaryGreen;
+    final activeBgColor = _themeManager.accentGold.withValues(alpha: 0.14);
+    final activeColor = _themeManager.accentGold;
     final inactiveLabelColor = _themeManager.mutedTextColor;
     final inactiveIconColor = _themeManager.hintTextColor;
 
     return SafeArea(
       top: false,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        decoration: BoxDecoration(
-          color: bgColor,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.08),
-              blurRadius: 20,
-              offset: const Offset(0, -4),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 82, maxHeight: 100),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
+          decoration: BoxDecoration(
+            color: bgColor,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.08),
+                blurRadius: 20,
+                offset: const Offset(0, -4),
+              ),
+            ],
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(24),
+              topRight: Radius.circular(24),
             ),
-          ],
-          borderRadius: const BorderRadius.only(
-            topLeft: Radius.circular(24),
-            topRight: Radius.circular(24),
           ),
-        ),
-        child: Material(
-          color: Colors.transparent,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: PklNavItem.values.map((item) {
-              final isActive = item == widget.current;
-              return Expanded(
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(16),
-                  onTap: () => _handleTap(context, item),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.symmetric(
-                      vertical: 8,
-                      horizontal: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: isActive
-                            ? activeBgColor
-                          : Colors.transparent,
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                          _buildIcon(
-                            item,
-                            isActive,
-                            activeColor: activeColor,
-                            inactiveColor: inactiveIconColor,
-                          ),
-                        const SizedBox(height: 6),
-                        Text(
-                          item.label,
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: isActive
-                                ? FontWeight.w600
-                                : FontWeight.w500,
-                            color: isActive
-                                  ? activeColor
-                                  : inactiveLabelColor,
-                          ),
+          child: Material(
+            color: Colors.transparent,
+            child: Row(
+              children: [
+                Expanded(
+                  child: _NavItem(
+                    item: PklNavItem.home,
+                    isActive: widget.current == PklNavItem.home,
+                    activeBgColor: activeBgColor,
+                    activeColor: activeColor,
+                    inactiveIconColor: inactiveIconColor,
+                    inactiveLabelColor: inactiveLabelColor,
+                    onTap: () => _handleTap(context, PklNavItem.home),
+                    chatBadgeCount: widget.chatBadgeCount,
+                  ),
+                ),
+                Expanded(
+                  child: _NavItem(
+                    item: PklNavItem.orders,
+                    isActive: widget.current == PklNavItem.orders,
+                    activeBgColor: activeBgColor,
+                    activeColor: activeColor,
+                    inactiveIconColor: inactiveIconColor,
+                    inactiveLabelColor: inactiveLabelColor,
+                    onTap: () => _handleTap(context, PklNavItem.orders),
+                    chatBadgeCount: widget.chatBadgeCount,
+                  ),
+                ),
+                SizedBox(
+                  width: 72,
+                  child: Center(
+                    child: GestureDetector(
+                      onTap: () => _handlePlus(context),
+                      child: Container(
+                        width: 56,
+                        height: 56,
+                        decoration: BoxDecoration(
+                          color: activeColor,
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.14),
+                              blurRadius: 16,
+                              offset: const Offset(0, 8),
+                            ),
+                          ],
                         ),
-                      ],
+                        child: const Icon(
+                          Icons.add,
+                          color: Colors.white,
+                          size: 30,
+                        ),
+                      ),
                     ),
                   ),
                 ),
-              );
-            }).toList(),
+                Expanded(
+                  child: _NavItem(
+                    item: PklNavItem.chat,
+                    isActive: widget.current == PklNavItem.chat,
+                    activeBgColor: activeBgColor,
+                    activeColor: activeColor,
+                    inactiveIconColor: inactiveIconColor,
+                    inactiveLabelColor: inactiveLabelColor,
+                    onTap: () => _handleTap(context, PklNavItem.chat),
+                    chatBadgeCount: widget.chatBadgeCount,
+                  ),
+                ),
+                Expanded(
+                  child: _NavItem(
+                    item: PklNavItem.profile,
+                    isActive: widget.current == PklNavItem.profile,
+                    activeBgColor: activeBgColor,
+                    activeColor: activeColor,
+                    inactiveIconColor: inactiveIconColor,
+                    inactiveLabelColor: inactiveLabelColor,
+                    onTap: () => _handleTap(context, PklNavItem.profile),
+                    chatBadgeCount: widget.chatBadgeCount,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
+}
 
-    Widget _buildIcon(
-      PklNavItem item,
-      bool isActive, {
-      required Color activeColor,
-      required Color inactiveColor,
-    }) {
+class _NavItem extends StatelessWidget {
+  const _NavItem({
+    required this.item,
+    required this.isActive,
+    required this.activeBgColor,
+    required this.activeColor,
+    required this.inactiveIconColor,
+    required this.inactiveLabelColor,
+    required this.onTap,
+    required this.chatBadgeCount,
+  });
+
+  final PklNavItem item;
+  final bool isActive;
+  final Color activeBgColor;
+  final Color activeColor;
+  final Color inactiveIconColor;
+  final Color inactiveLabelColor;
+  final VoidCallback onTap;
+  final int chatBadgeCount;
+
+  @override
+  Widget build(BuildContext context) {
     final icon = Icon(
       item.icon,
-        color: isActive ? activeColor : inactiveColor,
+      color: isActive ? activeColor : inactiveIconColor,
+      size: 22,
     );
-    if (item != PklNavItem.chat || widget.chatBadgeCount <= 0) {
-      return icon;
-    }
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        icon,
-        Positioned(
-          right: -6,
-          top: -4,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-            decoration: BoxDecoration(
-              color: Colors.redAccent,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
-            child: Text(
-              widget.chatBadgeCount > 9 ? '9+' : '${widget.chatBadgeCount}',
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 10,
-                fontWeight: FontWeight.bold,
+
+    Widget iconWidget = icon;
+    if (item == PklNavItem.chat && chatBadgeCount > 0) {
+      iconWidget = Stack(
+        clipBehavior: Clip.none,
+        children: [
+          icon,
+          Positioned(
+            right: -8,
+            top: -8,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: Colors.redAccent,
+                borderRadius: BorderRadius.circular(999),
               ),
-              textAlign: TextAlign.center,
+              child: Text(
+                chatBadgeCount > 9 ? '9+' : '$chatBadgeCount',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
             ),
           ),
+        ],
+      );
+    }
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
+        decoration: BoxDecoration(
+          color: isActive ? activeBgColor : Colors.transparent,
+          borderRadius: BorderRadius.circular(16),
         ),
-      ],
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            iconWidget,
+            const SizedBox(height: 6),
+            Text(
+              item.label,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: isActive ? FontWeight.w700 : FontWeight.w600,
+                color: isActive ? activeColor : inactiveLabelColor,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

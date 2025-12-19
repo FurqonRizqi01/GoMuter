@@ -6,8 +6,10 @@ import 'pages/admin/admin_home_page.dart';
 import 'pages/pkl/pkl_chat_list_page.dart';
 import 'pages/pkl/pkl_edit_info_page.dart';
 import 'pages/pkl/pkl_home_page.dart';
+import 'pages/pkl/pkl_location_page.dart';
 import 'pages/pkl/pkl_payment_settings_page.dart';
 import 'pages/pkl/pkl_preorder_page.dart';
+import 'pages/pkl/pkl_profile_page.dart';
 import 'web/file_picker_web_registrar.dart';
 import 'pages/auth/auth_page.dart';
 import 'utils/theme_manager.dart';
@@ -167,14 +169,21 @@ class GoMuterApp extends StatelessWidget {
     switch (settings.name) {
       case PklRoutes.home:
         return noTransitionRoute((_) => const PklHomePage());
-      case PklRoutes.profile:
-        return noTransitionRoute((_) => const PklEditInfoPage());
-      case PklRoutes.payment:
-        return noTransitionRoute((_) => const PklPaymentSettingsPage());
-      case PklRoutes.preorder:
+      case PklRoutes.orders:
         return noTransitionRoute((_) => const PklPreOrderPage());
       case PklRoutes.chat:
         return noTransitionRoute((_) => const PklChatListPage());
+      case PklRoutes.profile:
+        return noTransitionRoute((_) => const PklProfilePage());
+      case PklRoutes.manage:
+        return noTransitionRoute((_) => const PklEditInfoPage());
+      case PklRoutes.payment:
+        return noTransitionRoute((_) => const PklPaymentSettingsPage());
+      case PklRoutes.location:
+        return MaterialPageRoute(
+          builder: (_) => const PklLocationPage(),
+          settings: settings,
+        );
       case AdminRoutes.dashboard:
       case AdminRoutes.dataPKL:
       case AdminRoutes.reports:

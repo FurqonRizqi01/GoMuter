@@ -6,6 +6,7 @@ import '../api_service.dart';
 class TokenManager {
   static const _accessKey = 'access_token';
   static const _refreshKey = 'refresh_token';
+  static const Duration _refreshSkew = Duration(minutes: 2);
 
   static Future<void> saveTokens({
     required String access,
@@ -27,12 +28,11 @@ class TokenManager {
     final access = prefs.getString(_accessKey);
     if (access == null) return null;
 
-    final isExpired = _isExpired(access);
-    if (!isExpired) {
-      return access;
-    }
+    // Refresh proactively if token is expired OR will expire soon.
+    final needsRefresh = _isExpired(access) || _expiresSoon(access);
+    if (!needsRefresh) return access;
 
-    return _refreshAccessToken(prefs);
+    return await _refreshAccessToken(prefs) ?? access;
   }
 
   static Future<String?> forceRefreshAccessToken() async {
@@ -73,6 +73,16 @@ class TokenManager {
       return JwtDecoder.isExpired(token);
     } catch (_) {
       // Jika token rusak, paksa refresh.
+      return true;
+    }
+  }
+
+  static bool _expiresSoon(String token) {
+    try {
+      final expiry = JwtDecoder.getExpirationDate(token);
+      final remaining = expiry.difference(DateTime.now());
+      return remaining <= _refreshSkew;
+    } catch (_) {
       return true;
     }
   }

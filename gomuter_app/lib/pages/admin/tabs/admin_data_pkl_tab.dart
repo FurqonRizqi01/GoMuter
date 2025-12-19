@@ -17,6 +17,7 @@ class AdminDataPKLTab extends StatefulWidget {
   final void Function(Map<String, dynamic> pkl, bool shouldBeActive)
   onToggleActive;
   final void Function(Map<String, dynamic> pkl) onShowDetail;
+  final void Function(Map<String, dynamic> pkl) onDelete;
   final int? processingId;
 
   const AdminDataPKLTab({
@@ -29,6 +30,7 @@ class AdminDataPKLTab extends StatefulWidget {
     required this.onVerify,
     required this.onToggleActive,
     required this.onShowDetail,
+    required this.onDelete,
     required this.processingId,
   });
 
@@ -458,7 +460,8 @@ class _AdminDataPKLTabState extends State<AdminDataPKLTab> {
                 onVerify: widget.onVerify,
                 onToggleActive: widget.onToggleActive,
                 onShowDetail: widget.onShowDetail,
-              ),
+                  onDelete: widget.onDelete,
+                ),
             ),
         ],
       ),

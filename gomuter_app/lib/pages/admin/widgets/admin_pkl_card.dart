@@ -13,6 +13,7 @@ class AdminPKLCard extends StatelessWidget {
   final void Function(Map<String, dynamic> pkl, bool shouldBeActive)?
   onToggleActive;
   final void Function(Map<String, dynamic> pkl)? onShowDetail;
+  final void Function(Map<String, dynamic> pkl)? onDelete;
 
   AdminPKLCard({
     super.key,
@@ -21,6 +22,7 @@ class AdminPKLCard extends StatelessWidget {
     this.onVerify,
     this.onToggleActive,
     this.onShowDetail,
+    this.onDelete,
   });
 
   final DateFormat _summaryFormatter = DateFormat('d MMM', 'id');
@@ -173,28 +175,59 @@ class AdminPKLCard extends StatelessWidget {
                   ),
                 ),
                 // Detail Button
-                Container(
-                  decoration: BoxDecoration(
-                    color: _primaryColor.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      onTap: onShowDetail == null
-                          ? null
-                          : () => onShowDetail!(pkl),
-                      borderRadius: BorderRadius.circular(12),
-                      child: const Padding(
-                        padding: EdgeInsets.all(10),
-                        child: Icon(
-                          Icons.info_outline,
-                          color: _primaryColor,
-                          size: 20,
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (onDelete != null) ...[
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.red.withValues(alpha: 0.10),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: isProcessing
+                                ? null
+                                : () => onDelete!(pkl),
+                            borderRadius: BorderRadius.circular(12),
+                            child: const Padding(
+                              padding: EdgeInsets.all(10),
+                              child: Icon(
+                                Icons.delete_outline,
+                                color: Colors.red,
+                                size: 20,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                    ],
+                    Container(
+                      decoration: BoxDecoration(
+                        color: _primaryColor.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: onShowDetail == null
+                              ? null
+                              : () => onShowDetail!(pkl),
+                          borderRadius: BorderRadius.circular(12),
+                          child: const Padding(
+                            padding: EdgeInsets.all(10),
+                            child: Icon(
+                              Icons.info_outline,
+                              color: _primaryColor,
+                              size: 20,
+                            ),
+                          ),
                         ),
                       ),
                     ),
-                  ),
+                  ],
                 ),
               ],
             ),

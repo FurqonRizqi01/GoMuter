@@ -8,6 +8,7 @@ import '../../navigation/admin_routes.dart';
 import '../../navigation/pkl_routes.dart';
 import '../pembeli/pembeli_home_page.dart';
 import '../../utils/token_manager.dart';
+import '../../utils/theme_manager.dart';
 import 'login_form.dart';
 import 'register_form.dart';
 
@@ -182,11 +183,11 @@ class _AuthPageState extends State<AuthPage> {
                   children: [
                     Row(
                       children: [
-                        const Expanded(
+                        Expanded(
                           child: Text(
                             'Lupa Password',
                             style: TextStyle(
-                              color: Colors.white,
+                              color: Theme.of(ctx).textTheme.titleLarge?.color,
                               fontSize: 18,
                               fontWeight: FontWeight.w800,
                             ),
@@ -196,7 +197,9 @@ class _AuthPageState extends State<AuthPage> {
                           onPressed: () => Navigator.of(ctx).pop(),
                           icon: Icon(
                             Icons.close,
-                            color: Colors.white.withValues(alpha: 0.85),
+                            color: Theme.of(ctx).iconTheme.color?.withValues(
+                              alpha: 0.85,
+                            ),
                           ),
                         ),
                       ],
@@ -206,7 +209,11 @@ class _AuthPageState extends State<AuthPage> {
                           ? 'Masukkan UID dan TOKEN dari email, lalu buat password baru.'
                           : 'Masukkan email atau username. Kami akan mengirim UID & TOKEN ke email akun (cek spam).',
                       style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.70),
+                        color: Theme.of(ctx)
+                            .textTheme
+                            .bodyMedium
+                            ?.color
+                            ?.withValues(alpha: 0.70),
                         height: 1.4,
                       ),
                     ),
@@ -257,7 +264,11 @@ class _AuthPageState extends State<AuthPage> {
                         child: Text(
                           'Saya sudah punya UID/TOKEN',
                           style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.75),
+                            color: Theme.of(ctx)
+                                .textTheme
+                                .bodyMedium
+                                ?.color
+                                ?.withValues(alpha: 0.78),
                             fontWeight: FontWeight.w700,
                           ),
                         ),
@@ -331,7 +342,11 @@ class _AuthPageState extends State<AuthPage> {
                         child: Text(
                           'Kembali',
                           style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.75),
+                            color: Theme.of(ctx)
+                                .textTheme
+                                .bodyMedium
+                                ?.color
+                                ?.withValues(alpha: 0.78),
                             fontWeight: FontWeight.w700,
                           ),
                         ),
@@ -383,6 +398,8 @@ class _AuthPageState extends State<AuthPage> {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('user_role', role);
       await prefs.setString('username', username);
+
+      await ThemeManager().useUserTheme(role: role, username: username);
 
       if (!mounted) return;
       _navigateToRoleHome(role, accessToken);
@@ -615,7 +632,11 @@ class _AuthPageState extends State<AuthPage> {
                           child: Text(
                             'Dengan mendaftar, Anda menyetujui Syarat & Ketentuan kami.',
                             style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.65),
+                              color: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.color
+                                  ?.withValues(alpha: 0.70),
                               fontSize: 12,
                               height: 1.4,
                             ),
@@ -640,14 +661,25 @@ class _AuthBackground extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final primary = Theme.of(context).colorScheme.primary;
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = scheme.brightness == Brightness.dark;
+    final primary = scheme.primary;
+    final background = Theme.of(context).scaffoldBackgroundColor;
+
+    final top = isDark
+      ? const Color(0xFF04150B)
+      : Color.alphaBlend(primary.withValues(alpha: 0.10), background);
+    final mid = isDark
+      ? const Color(0xFF071B10)
+      : Color.alphaBlend(scheme.secondary.withValues(alpha: 0.06), background);
+    final bottom = isDark ? const Color(0xFF050607) : background;
 
     return Container(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [Color(0xFF04150B), Color(0xFF071B10), Color(0xFF050607)],
+          colors: [top, mid, bottom],
         ),
       ),
       child: Stack(
@@ -715,25 +747,42 @@ class _SheetTextField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = scheme.brightness == Brightness.dark;
+    final text = Theme.of(context).textTheme.bodyMedium?.color;
+    final border = isDark
+        ? Colors.white.withValues(alpha: 0.10)
+        : Colors.black.withValues(alpha: 0.10);
+    final fill = isDark
+        ? Colors.white.withValues(alpha: 0.05)
+        : Colors.white.withValues(alpha: 0.78);
+
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.05),
+        color: fill,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
+        border: Border.all(color: border),
       ),
       child: TextField(
         controller: controller,
         obscureText: obscureText,
         textInputAction: textInputAction,
-        style: const TextStyle(color: Colors.white),
+        style: TextStyle(color: text),
         decoration: InputDecoration(
           filled: false,
           border: InputBorder.none,
           enabledBorder: InputBorder.none,
           focusedBorder: InputBorder.none,
           hintText: hintText,
-          hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.65)),
-          prefixIcon: Icon(icon, color: Colors.white.withValues(alpha: 0.70)),
+          hintStyle: TextStyle(
+            color: text?.withValues(alpha: isDark ? 0.65 : 0.55),
+          ),
+          prefixIcon: Icon(
+            icon,
+            color: (Theme.of(context).iconTheme.color ?? text)?.withValues(
+              alpha: 0.70,
+            ),
+          ),
           contentPadding: const EdgeInsets.symmetric(
             horizontal: 16,
             vertical: 16,
@@ -751,28 +800,40 @@ class _Header extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = scheme.brightness == Brightness.dark;
+    final titleColor = Theme.of(context).textTheme.headlineMedium?.color;
+    final subtitleColor = Theme.of(context).textTheme.bodyMedium?.color;
+
+    final border = isDark
+        ? Colors.white.withValues(alpha: 0.10)
+        : Colors.black.withValues(alpha: 0.08);
+    final fill = isDark
+        ? Colors.white.withValues(alpha: 0.06)
+        : Colors.white.withValues(alpha: 0.75);
+
     return Column(
       children: [
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: Colors.white.withValues(alpha: 0.06),
+            color: fill,
             border: Border.all(
-              color: Colors.white.withValues(alpha: 0.10),
+              color: border,
               width: 1,
             ),
           ),
           child: Icon(Icons.store_rounded, size: 46, color: primary),
         ),
         const SizedBox(height: 16),
-        const Text(
+        Text(
           'Selamat Datang',
           textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 30,
             fontWeight: FontWeight.w900,
-            color: Colors.white,
+            color: titleColor,
             height: 1.1,
           ),
         ),
@@ -781,7 +842,7 @@ class _Header extends StatelessWidget {
           'Temukan jajanan kaki lima terbaik di sekitarmu',
           textAlign: TextAlign.center,
           style: TextStyle(
-            color: Colors.white.withValues(alpha: 0.70),
+            color: subtitleColor?.withValues(alpha: 0.72),
             fontWeight: FontWeight.w500,
             height: 1.4,
           ),
@@ -799,14 +860,22 @@ class _SegmentedToggle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final primary = Theme.of(context).colorScheme.primary;
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = scheme.brightness == Brightness.dark;
+    final primary = scheme.primary;
+    final border = isDark
+      ? Colors.white.withValues(alpha: 0.10)
+      : Colors.black.withValues(alpha: 0.10);
+    final fill = isDark
+      ? Colors.white.withValues(alpha: 0.06)
+      : Colors.white.withValues(alpha: 0.78);
 
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.06),
+        color: fill,
         borderRadius: BorderRadius.circular(26),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
+        border: Border.all(color: border),
       ),
       child: Row(
         children: [
@@ -847,6 +916,9 @@ class _SegmentButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = scheme.brightness == Brightness.dark;
+    final text = Theme.of(context).textTheme.bodyMedium?.color;
     return InkWell(
       borderRadius: BorderRadius.circular(22),
       onTap: onTap,
@@ -856,7 +928,9 @@ class _SegmentButton extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
           color: selected
-              ? Colors.white.withValues(alpha: 0.10)
+              ? (isDark
+                    ? Colors.white.withValues(alpha: 0.10)
+                    : accent.withValues(alpha: 0.10))
               : Colors.transparent,
           borderRadius: BorderRadius.circular(22),
           border: selected
@@ -867,9 +941,7 @@ class _SegmentButton extends StatelessWidget {
           label,
           textAlign: TextAlign.center,
           style: TextStyle(
-            color: selected
-                ? Colors.white
-                : Colors.white.withValues(alpha: 0.65),
+            color: selected ? text : text?.withValues(alpha: 0.65),
             fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
           ),
         ),
@@ -885,6 +957,15 @@ class _GlassCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = scheme.brightness == Brightness.dark;
+    final border = isDark
+        ? Colors.white.withValues(alpha: 0.10)
+        : Colors.black.withValues(alpha: 0.08);
+    final fill = isDark
+        ? Colors.white.withValues(alpha: 0.06)
+        : Colors.white.withValues(alpha: 0.78);
+
     return ClipRRect(
       borderRadius: BorderRadius.circular(22),
       child: BackdropFilter(
@@ -892,9 +973,9 @@ class _GlassCard extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.06),
+            color: fill,
             borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
+            border: Border.all(color: border),
           ),
           child: child,
         ),

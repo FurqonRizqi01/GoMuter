@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:gomuter_app/api_service.dart';
 import 'package:gomuter_app/utils/chat_badge_manager.dart';
+import 'package:gomuter_app/utils/chat_read_tracker.dart';
 import 'package:gomuter_app/utils/theme_manager.dart';
 import 'package:gomuter_app/utils/token_manager.dart';
 import 'package:gomuter_app/widgets/pkl_bottom_nav.dart';
@@ -68,6 +69,8 @@ class _PklChatRoomPageState extends State<PklChatRoomPage> {
       setState(() {
         _currentUsername = username;
       });
+
+      await ChatReadTracker.markOpened(ChatRole.pkl, widget.chatId);
 
       await _loadMessages();
 
@@ -154,6 +157,7 @@ class _PklChatRoomPageState extends State<PklChatRoomPage> {
     final bgColor = _themeManager.backgroundColor;
     final textColor = _themeManager.textColor;
     final mutedText = _themeManager.mutedTextColor;
+    final borderColor = _themeManager.borderColor;
     return Scaffold(
       backgroundColor: bgColor,
       appBar: AppBar(
@@ -224,6 +228,10 @@ class _PklChatRoomPageState extends State<PklChatRoomPage> {
               ),
             ),
           ],
+        ),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Divider(height: 1, thickness: 1, color: borderColor),
         ),
       ),
       body: _isLoading

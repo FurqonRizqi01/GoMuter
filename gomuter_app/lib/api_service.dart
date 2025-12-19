@@ -62,11 +62,13 @@ class ApiService {
     required String refreshToken,
   }) async {
     final url = Uri.parse('$baseUrl/api/auth/token/refresh/');
-    final response = await http.post(
-      url,
-      headers: _jsonHeaders(),
-      body: jsonEncode({'refresh': refreshToken}),
-    );
+    final response = await http
+        .post(
+          url,
+          headers: _jsonHeaders(),
+          body: jsonEncode({'refresh': refreshToken}),
+        )
+        .timeout(const Duration(seconds: 12));
 
     if (response.statusCode == 200) {
       return jsonDecode(response.body) as Map<String, dynamic>;
@@ -280,16 +282,26 @@ class ApiService {
     required double longitude,
   }) async {
     final url = Uri.parse('$baseUrl/api/pkl/update-location/');
-    final response = await http.post(
-      url,
-      headers: _jsonHeaders(token: token),
-      body: jsonEncode({'latitude': latitude, 'longitude': longitude}),
-    );
+    final response = await http
+        .post(
+          url,
+          headers: _jsonHeaders(token: token),
+          body: jsonEncode({'latitude': latitude, 'longitude': longitude}),
+        )
+        .timeout(const Duration(seconds: 12));
 
-    if (response.statusCode == 201) {
+    // Backend may return either 200 (OK) or 201 (Created) depending on implementation.
+    if (response.statusCode == 200 || response.statusCode == 201) {
       return jsonDecode(response.body) as Map<String, dynamic>;
     }
-    throw Exception('Gagal mengupdate lokasi PKL: ${response.body}');
+
+    if (response.statusCode == 401) {
+      throw Exception('Unauthorized (401): ${response.body}');
+    }
+
+    throw Exception(
+      'Gagal mengupdate lokasi PKL (${response.statusCode}): ${response.body}',
+    );
   }
 
   static Future<Map<String, dynamic>> getPKLDailyStats({
@@ -480,6 +492,19 @@ class ApiService {
       return jsonDecode(response.body) as List<dynamic>;
     }
     throw Exception('Gagal mengambil data monitoring PKL: ${response.body}');
+  }
+
+  static Future<void> deleteAdminPKL({
+    required String token,
+    required int pklId,
+  }) async {
+    final url = Uri.parse('$baseUrl/api/pkl/admin/pkls/$pklId/');
+    final response = await http.delete(url, headers: _jsonHeaders(token: token));
+
+    if (response.statusCode == 204) {
+      return;
+    }
+    throw Exception('Gagal menghapus PKL: ${response.body}');
   }
 
   static Future<Map<String, dynamic>> getCurrentUser(String accessToken) async {
@@ -693,6 +718,27 @@ class ApiService {
       return jsonDecode(response.body) as Map<String, dynamic>;
     }
     throw Exception('Gagal memperbarui status DP: ${response.body}');
+  }
+
+  static Future<Map<String, dynamic>> uploadPKLProfilePhoto({
+    required String token,
+    required List<int> bytes,
+    required String filename,
+  }) async {
+    final url = Uri.parse('$baseUrl/api/pkl/upload/profile-photo/');
+    final request = http.MultipartRequest('POST', url)
+      ..headers.addAll(_jsonHeaders(token: token))
+      ..files.add(
+        http.MultipartFile.fromBytes('file', bytes, filename: filename),
+      );
+
+    final streamed = await request.send();
+    final response = await http.Response.fromStream(streamed);
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    }
+    throw Exception('Gagal upload foto profil: ${response.body}');
   }
 
   static Future<String> uploadDPFile({

@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 from pathlib import Path
+from datetime import timedelta
 import os
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -48,6 +49,21 @@ REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
+}
+
+
+# JWT settings
+# Goal: keep sessions stable on mobile (login once, then auto-refresh).
+# Access tokens are short-lived; refresh tokens are longer-lived.
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(hours=4),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=30),
+    # Keep refresh rotation on so clients can keep a fresh token.
+    # NOTE: If you add `rest_framework_simplejwt.token_blacklist` to INSTALLED_APPS,
+    # you can set BLACKLIST_AFTER_ROTATION=True for stronger security.
+    'ROTATE_REFRESH_TOKENS': True,
+    'BLACKLIST_AFTER_ROTATION': False,
+    'UPDATE_LAST_LOGIN': True,
 }
 
 

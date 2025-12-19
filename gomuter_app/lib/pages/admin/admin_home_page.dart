@@ -152,6 +152,60 @@ class _AdminHomePageState extends State<AdminHomePage>
     }
   }
 
+  Future<void> _deletePKL(Map<String, dynamic> pkl) async {
+    final id = (pkl['id'] as num?)?.toInt();
+    if (id == null) return;
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Hapus PKL?'),
+        content: Text(
+          'Data PKL ini akan dihapus (termasuk data terkait).\n\nID: $id',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Batal'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Hapus'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    setState(() {
+      _processingId = id;
+    });
+
+    try {
+      final token = await _requireAdminToken();
+      if (token == null) return;
+      await ApiService.deleteAdminPKL(token: token, pklId: id);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('PKL berhasil dihapus.')),
+      );
+      await _loadPKLs();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal menghapus PKL: $e')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _processingId = null;
+        });
+      }
+    }
+  }
+
   Future<void> _refreshAll() async {
     await Future.wait<void>([_loadDashboard(), _loadPKLs()]);
   }
@@ -875,6 +929,7 @@ class _AdminHomePageState extends State<AdminHomePage>
                       _handleVerification(pkl: pkl, approve: approve),
                   onToggleActive: _updateActiveStatus,
                   onShowDetail: _showPKLDetail,
+                  onDelete: _deletePKL,
                   processingId: _processingId,
                 ),
                 AdminReportsTab(
@@ -888,6 +943,7 @@ class _AdminHomePageState extends State<AdminHomePage>
                       _handleVerification(pkl: pkl, approve: approve),
                   onToggleActive: _updateActiveStatus,
                   onShowDetail: _showPKLDetail,
+                  onDelete: _deletePKL,
                   processingId: _processingId,
                 ),
               ],

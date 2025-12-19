@@ -18,6 +18,7 @@ class _PklPreOrderPageState extends State<PklPreOrderPage> {
   String? _error;
   List<dynamic> _orders = [];
   final Set<int> _updatingOrderIds = <int>{};
+  int _tabIndex = 0; // 0: berlangsung, 1: selesai
 
   @override
   void initState() {
@@ -315,83 +316,15 @@ class _PklPreOrderPageState extends State<PklPreOrderPage> {
   }
 
   List<String> _availableStatuses(String current) {
-    const all = ['DITERIMA', 'DITOLAK', 'SELESAI'];
-    return all.where((item) => item != current).toList();
-  }
-
-  Widget _buildHeroBanner() {
-    return Container(
-      padding: const EdgeInsets.all(28),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF0B7332), Color(0xFF10A14D), Color(0xFF25D366)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(32),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF0D8A3A).withValues(alpha: 0.3),
-            blurRadius: 28,
-            offset: const Offset(0, 14),
-            spreadRadius: 0,
-          ),
-          BoxShadow(
-            color: const Color(0xFF0D8A3A).withValues(alpha: 0.1),
-            blurRadius: 48,
-            offset: const Offset(0, 24),
-            spreadRadius: 0,
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.3),
-                    width: 1.5,
-                  ),
-                ),
-                child: const Icon(
-                  Icons.shopping_bag_rounded,
-                  color: Colors.white,
-                  size: 28,
-                ),
-              ),
-              const SizedBox(width: 16),
-              const Expanded(
-                child: Text(
-                  'Kelola Pre-Order',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 24,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -0.5,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Text(
-            'Respon cepat permintaan pembeli untuk menjaga kepercayaan.',
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.85),
-              fontSize: 15,
-              fontWeight: FontWeight.w500,
-              height: 1.4,
-            ),
-          ),
-        ],
-      ),
-    );
+    final normalized = current.toUpperCase();
+    if (normalized == 'PENDING') {
+      return const ['DITERIMA', 'DITOLAK'];
+    }
+    if (normalized == 'DITERIMA') {
+      return const ['SELESAI'];
+    }
+    // Final states: don't allow reopening.
+    return const [];
   }
 
   Widget _buildErrorBanner(String message) {
@@ -496,6 +429,8 @@ class _PklPreOrderPageState extends State<PklPreOrderPage> {
     final dpStatus = order['dp_status'] as String? ?? 'BELUM_BAYAR';
     final dpAmount = order['dp_amount'] as int? ?? 0;
     final buktiDp = order['bukti_dp_url'] as String?;
+    final orderId = (order['id'] as num?)?.toInt() ?? -1;
+    final isUpdating = orderId != -1 && _updatingOrderIds.contains(orderId);
     final createdAt = DateTime.tryParse(order['created_at'] as String? ?? '');
     final createdLabel = createdAt == null
         ? '-'
@@ -700,69 +635,117 @@ class _PklPreOrderPageState extends State<PklPreOrderPage> {
                 ..._buildDpSection(buktiDp),
               const SizedBox(height: 18),
               Row(
-                mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  PopupMenuButton<String>(
-                    enabled: !_updatingOrderIds.contains(order['id'] as int),
-                    onSelected: (value) =>
-                        _changeStatus(order['id'] as int, value),
-                    itemBuilder: (context) {
-                      return _availableStatuses(status)
-                          .map(
-                            (statusOption) => PopupMenuItem(
-                              value: statusOption,
-                              child: Text(statusOption),
-                            ),
-                          )
-                          .toList();
-                    },
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: _updatingOrderIds.contains(order['id'] as int)
-                        ? const SizedBox(
-                            width: 28,
-                            height: 28,
-                            child: CircularProgressIndicator(strokeWidth: 2.5),
-                          )
-                        : Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 18,
-                              vertical: 12,
-                            ),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF0D8A3A),
-                              borderRadius: BorderRadius.circular(16),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: const Color(
-                                    0xFF0D8A3A,
-                                  ).withValues(alpha: 0.3),
-                                  blurRadius: 12,
-                                  offset: const Offset(0, 6),
-                                ),
-                              ],
-                            ),
-                            child: const Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.edit_rounded,
-                                  color: Colors.white,
-                                  size: 18,
-                                ),
-                                SizedBox(width: 8),
-                                Text(
-                                  'Ubah Status',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                              ],
-                            ),
+                  if (status == 'PENDING') ...[
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: (isUpdating || orderId == -1)
+                            ? null
+                            : () => _changeStatus(orderId, 'DITOLAK'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.redAccent,
+                          side: BorderSide(
+                            color: Colors.redAccent.withValues(alpha: 0.55),
                           ),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
+                        child: const Text(
+                          'Tolak',
+                          style: TextStyle(fontWeight: FontWeight.w900),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: (isUpdating || orderId == -1)
+                            ? null
+                            : () => _changeStatus(orderId, 'DITERIMA'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _themeManager.accentGold,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
+                        child: const Text(
+                          'Terima Pesanan',
+                          style: TextStyle(fontWeight: FontWeight.w900),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                  ] else if (status == 'DITERIMA') ...[
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: (isUpdating || orderId == -1)
+                            ? null
+                            : () => _changeStatus(orderId, 'SELESAI'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _themeManager.primaryGreen,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
+                        child: const Text(
+                          'Selesaikan Pesanan',
+                          style: TextStyle(fontWeight: FontWeight.w900),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                  ],
+                  Builder(
+                    builder: (context) {
+                      final options = _availableStatuses(status);
+                      if (options.isEmpty) return const SizedBox.shrink();
+                      return SizedBox(
+                        width: 44,
+                        height: 44,
+                        child: PopupMenuButton<String>(
+                          enabled: !isUpdating && orderId != -1,
+                          onSelected: (value) => _changeStatus(orderId, value),
+                          itemBuilder: (context) {
+                            return options
+                                .map(
+                                  (statusOption) => PopupMenuItem(
+                                    value: statusOption,
+                                    child: Text(statusOption),
+                                  ),
+                                )
+                                .toList();
+                          },
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: _themeManager.surfaceColor,
+                              borderRadius: BorderRadius.circular(14),
+                              border:
+                                  Border.all(color: _themeManager.borderColor),
+                            ),
+                            child: isUpdating
+                                ? const Padding(
+                                    padding: EdgeInsets.all(12),
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2.5,
+                                    ),
+                                  )
+                                : Icon(
+                                    Icons.more_horiz_rounded,
+                                    color: _themeManager.mutedTextColor,
+                                  ),
+                          ),
+                        ),
+                      );
+                    },
                   ),
                 ],
               ),
@@ -774,9 +757,9 @@ class _PklPreOrderPageState extends State<PklPreOrderPage> {
                     children: [
                       TextButton.icon(
                         onPressed:
-                            _updatingOrderIds.contains(order['id'] as int)
+                            isUpdating
                             ? null
-                            : () => _handleDPAction(order['id'] as int, true),
+                            : () => _handleDPAction(orderId, true),
                         style: TextButton.styleFrom(
                           foregroundColor: const Color(0xFF0D8A3A),
                           padding: const EdgeInsets.symmetric(
@@ -793,9 +776,9 @@ class _PklPreOrderPageState extends State<PklPreOrderPage> {
                       const SizedBox(width: 8),
                       TextButton.icon(
                         onPressed:
-                            _updatingOrderIds.contains(order['id'] as int)
+                            isUpdating
                             ? null
-                            : () => _handleDPAction(order['id'] as int, false),
+                            : () => _handleDPAction(orderId, false),
                         style: TextButton.styleFrom(
                           foregroundColor: const Color(0xFFD32F2F),
                           padding: const EdgeInsets.symmetric(
@@ -853,9 +836,20 @@ class _PklPreOrderPageState extends State<PklPreOrderPage> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = _themeManager.isDarkMode;
     final bgColor = _themeManager.backgroundColor;
     final textColor = _themeManager.textColor;
+    final borderColor = _themeManager.borderColor;
+
+    final orders = _orders.whereType<Map<String, dynamic>>().toList();
+    bool isDone(Map<String, dynamic> order) {
+      final status = (order['status'] as String?)?.toUpperCase() ?? 'PENDING';
+      return status == 'SELESAI' || status == 'DITOLAK';
+    }
+
+    final berlangsung = orders.where((o) => !isDone(o)).toList();
+    final selesai = orders.where(isDone).toList();
+    final filtered = _tabIndex == 0 ? berlangsung : selesai;
+
     return Scaffold(
       backgroundColor: bgColor,
       appBar: AppBar(
@@ -865,15 +859,12 @@ class _PklPreOrderPageState extends State<PklPreOrderPage> {
         surfaceTintColor: Colors.transparent,
         scrolledUnderElevation: 0,
         foregroundColor: textColor,
-        title: const Text('Permintaan Pre-Order'),
+        title: const Text('Daftar Pre-Order'),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Divider(height: 1, thickness: 1, color: borderColor),
+        ),
         actions: [
-          IconButton(
-            icon: Icon(
-              isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
-            ),
-            onPressed: _themeManager.toggleTheme,
-            tooltip: isDark ? 'Mode terang' : 'Mode gelap',
-          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _isLoading ? null : _loadOrders,
@@ -891,23 +882,71 @@ class _PklPreOrderPageState extends State<PklPreOrderPage> {
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 120),
                   children: [
                     const SizedBox(height: 12),
-                    _buildHeroBanner(),
-                    const SizedBox(height: 18),
+                    _buildSegmentedTabs(
+                      berlangsungCount: berlangsung.length,
+                      selesaiCount: selesai.length,
+                    ),
+                    const SizedBox(height: 14),
                     if (_error != null) _buildErrorBanner(_error!),
-                    if (_orders.isEmpty)
+                    if (filtered.isEmpty)
                       _buildEmptyState()
                     else
-                      ..._orders.map<Widget>(
-                        (order) => Padding(
+                      ...filtered.map<Widget>((order) {
+                        return Padding(
                           padding: const EdgeInsets.only(bottom: 16),
-                          child: _buildOrderCard(order as Map<String, dynamic>),
-                        ),
-                      ),
+                          child: _buildOrderCard(order),
+                        );
+                      }),
                   ],
                 ),
               ),
             ),
-      bottomNavigationBar: const PklBottomNavBar(current: PklNavItem.preorder),
+      bottomNavigationBar: const PklBottomNavBar(current: PklNavItem.orders),
+    );
+  }
+
+  Widget _buildSegmentedTabs({
+    required int berlangsungCount,
+    required int selesaiCount,
+  }) {
+    final border = _themeManager.borderColor;
+    final card = _themeManager.cardColor;
+    final activeText = _themeManager.textColor;
+    final inactiveText = _themeManager.mutedTextColor;
+
+    return Container(
+      padding: const EdgeInsets.all(6),
+      decoration: BoxDecoration(
+        color: card,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: border),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: _SegmentPill(
+              label: 'Berlangsung',
+              badge: berlangsungCount > 0 ? '$berlangsungCount' : null,
+              selected: _tabIndex == 0,
+              onTap: () => setState(() => _tabIndex = 0),
+              themeManager: _themeManager,
+              activeText: activeText,
+              inactiveText: inactiveText,
+            ),
+          ),
+          Expanded(
+            child: _SegmentPill(
+              label: 'Selesai',
+              badge: selesaiCount > 0 ? '$selesaiCount' : null,
+              selected: _tabIndex == 1,
+              onTap: () => setState(() => _tabIndex = 1),
+              themeManager: _themeManager,
+              activeText: activeText,
+              inactiveText: inactiveText,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -922,5 +961,74 @@ class _PklPreOrderPageState extends State<PklPreOrderPage> {
       default:
         return Colors.orange;
     }
+  }
+}
+
+class _SegmentPill extends StatelessWidget {
+  const _SegmentPill({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+    required this.themeManager,
+    required this.activeText,
+    required this.inactiveText,
+    this.badge,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  final ThemeManager themeManager;
+  final Color activeText;
+  final Color inactiveText;
+  final String? badge;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(999),
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: selected ? themeManager.surfaceColor : Colors.transparent,
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                color: selected ? activeText : inactiveText,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            if (badge != null) ...[
+              const SizedBox(width: 8),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: selected
+                      ? themeManager.accentGold
+                      : themeManager.accentGold.withValues(alpha: 0.18),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  badge!,
+                  style: TextStyle(
+                    color: selected ? Colors.white : themeManager.accentGold,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
   }
 }

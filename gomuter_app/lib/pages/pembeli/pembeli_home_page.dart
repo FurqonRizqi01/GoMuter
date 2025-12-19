@@ -1641,6 +1641,7 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
         ? 'Tanpa batas'
         : formatRadius(_selectedRadius!);
     final cardColor = _themeManager.cardColor;
+    final isDark = _themeManager.isDarkMode;
 
     return Align(
       child: ConstrainedBox(
@@ -1688,8 +1689,11 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
                           vertical: 4,
                         ),
                         decoration: BoxDecoration(
-                          color: _themeManager.primaryGreen.withValues(
-                            alpha: 0.18,
+                          color: Color.alphaBlend(
+                            _themeManager.primaryGreen.withValues(
+                              alpha: isDark ? 0.26 : 0.18,
+                            ),
+                            cardColor,
                           ),
                           borderRadius: BorderRadius.circular(999),
                         ),
@@ -1698,7 +1702,9 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
-                            color: _themeManager.primaryGreen,
+                            color: isDark
+                                ? _themeManager.textColor
+                                : _themeManager.primaryGreen,
                           ),
                         ),
                       ),
@@ -1717,7 +1723,9 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
                           child: Text(
                             'Hapus radius',
                             style: TextStyle(
-                              color: textColor.withValues(alpha: 0.55),
+                              color: textColor.withValues(
+                                alpha: isDark ? 0.70 : 0.60,
+                              ),
                             ),
                           ),
                         ),
@@ -1744,7 +1752,7 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
                         : Colors.grey[100],
                     labelStyle: TextStyle(
                       color: isSelected
-                          ? Colors.white
+                          ? _themeManager.textColor
                           : textColor.withValues(alpha: 0.7),
                       fontWeight: isSelected
                           ? FontWeight.bold
@@ -1770,6 +1778,7 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
   }
 
   Widget _buildCategoryChips(Color cardColor, Color textColor) {
+    final selectedTextColor = _themeManager.textColor;
     return SizedBox(
       height: 50,
       child: ListView.builder(
@@ -1798,7 +1807,7 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
               backgroundColor: cardColor,
               labelStyle: TextStyle(
                 color: isSelected
-                    ? Colors.white
+                    ? selectedTextColor
                     : textColor.withValues(alpha: 0.6),
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
               ),

@@ -23,6 +23,7 @@ class PKL(models.Model):
     nama_rekening = models.CharField(max_length=100, blank=True, null=True)
     qris_image_url = models.CharField(max_length=255, blank=True, null=True)
     qris_link = models.CharField(max_length=255, blank=True, null=True)
+    profile_image_url = models.CharField(max_length=255, blank=True, null=True)
 
     
     STATUS_VERIFIKASI_CHOICES = (

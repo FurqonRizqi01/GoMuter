@@ -1,13 +1,13 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
-import 'package:geolocator/geolocator.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:gomuter_app/api_service.dart';
 import 'package:gomuter_app/navigation/pkl_routes.dart';
 import 'package:gomuter_app/utils/chat_badge_manager.dart';
+import 'package:gomuter_app/utils/pkl_location_service.dart';
 import 'package:gomuter_app/utils/theme_manager.dart';
 import 'package:gomuter_app/utils/token_manager.dart';
 import 'package:gomuter_app/widgets/pkl_bottom_nav.dart';
+import 'package:latlong2/latlong.dart';
 
 class PklHomePage extends StatefulWidget {
   const PklHomePage({super.key});
@@ -18,15 +18,14 @@ class PklHomePage extends StatefulWidget {
 
 class _PklHomePageState extends State<PklHomePage> {
   final ThemeManager _themeManager = ThemeManager();
+  final PklLocationService _locationService = PklLocationService();
   final ScrollController _scrollController = ScrollController();
 
   bool _isLoading = true;
   bool _isNewProfile = false;
   bool _statusAktif = false;
-  bool _isUpdatingLocation = false;
+  bool _isUpdatingStatusAktif = false;
   String? _error;
-  String? _hoveredActionCard;
-  String? _pressedActionCard;
 
   String _namaUsaha = '';
   String _jenisDagangan = '';
@@ -34,18 +33,23 @@ class _PklHomePageState extends State<PklHomePage> {
   String _alamatDomisili = '';
   String _statusVerifikasi = '';
 
-  String? _locationMessage;
-  Timer? _locationTimer;
-  DateTime? _lastAutoUpdate;
+  double? _latestLatitude;
+  double? _latestLongitude;
+
   int _liveViewsToday = 0;
   int _searchHitsToday = 0;
   int _autoUpdatesToday = 0;
   int _unreadChatCount = 0;
 
+  DateTime? _lastLocationUpdate;
+  bool _autoLocationEnabled = false;
+
   @override
   void initState() {
     super.initState();
     _themeManager.addListener(_onThemeChanged);
+    _locationService.addListener(_onLocationServiceChanged);
+    _locationService.initialize();
     _loadProfile();
     _loadChatBadge();
   }
@@ -53,13 +57,30 @@ class _PklHomePageState extends State<PklHomePage> {
   @override
   void dispose() {
     _themeManager.removeListener(_onThemeChanged);
+    _locationService.removeListener(_onLocationServiceChanged);
     _scrollController.dispose();
-    _locationTimer?.cancel();
     super.dispose();
   }
 
   void _onThemeChanged() {
     if (mounted) setState(() {});
+  }
+
+  void _onLocationServiceChanged() {
+    if (!mounted) return;
+    setState(() {
+      _lastLocationUpdate = _locationService.lastUpdate;
+      _autoLocationEnabled = _locationService.isAutoMode;
+    });
+  }
+
+  String _formatDateTimeShort(DateTime dt) {
+    final local = dt.toLocal();
+    final dd = local.day.toString().padLeft(2, '0');
+    final mm = local.month.toString().padLeft(2, '0');
+    final hh = local.hour.toString().padLeft(2, '0');
+    final min = local.minute.toString().padLeft(2, '0');
+    return '$dd/$mm $hh:$min';
   }
 
   Future<String?> _getToken() async {
@@ -106,12 +127,15 @@ class _PklHomePageState extends State<PklHomePage> {
         setState(() {
           _isNewProfile = true;
           _statusAktif = false;
-          _locationMessage ??= 'Belum pernah update lokasi.';
           _liveViewsToday = 0;
           _searchHitsToday = 0;
           _autoUpdatesToday = 0;
+          _latestLatitude = null;
+          _latestLongitude = null;
         });
       } else {
+        final lat = (profile['latest_latitude'] as num?)?.toDouble();
+        final lng = (profile['latest_longitude'] as num?)?.toDouble();
         setState(() {
           _isNewProfile = false;
           _namaUsaha = profile['nama_usaha'] ?? '';
@@ -122,8 +146,8 @@ class _PklHomePageState extends State<PklHomePage> {
               .toString()
               .toUpperCase();
           _statusAktif = profile['status_aktif'] ?? false;
-          _locationMessage ??=
-              'Bagikan lokasi agar pembeli tahu posisi terbaru kamu.';
+          _latestLatitude = lat;
+          _latestLongitude = lng;
         });
         await _loadStats(token);
       }
@@ -143,6 +167,12 @@ class _PklHomePageState extends State<PklHomePage> {
     await _loadChatBadge();
   }
 
+  Future<void> _openLocationPage() async {
+    await Navigator.of(context).pushNamed(PklRoutes.location);
+    if (!mounted) return;
+    await _loadProfile();
+  }
+
   Future<void> _loadStats(String token) async {
     try {
       final stats = await ApiService.getPKLDailyStats(token: token);
@@ -157,131 +187,55 @@ class _PklHomePageState extends State<PklHomePage> {
     }
   }
 
-  Future<void> _updateLocation() async {
-    if (_isUpdatingLocation) return;
-
-    final token = await _getToken();
-    if (token == null) {
-      setState(() {
-        _error = 'Token tidak ditemukan. Silakan login ulang.';
-      });
+  Future<void> _setStatusAktif(bool value) async {
+    if (_isUpdatingStatusAktif) return;
+    if (_isNewProfile) {
+      _showProfileRequired();
       return;
     }
 
-    final hasAccess = await _ensureLocationAccess();
-    if (!hasAccess) return;
+    final token = await _getToken();
+    if (token == null) {
+      _showSnack('Token tidak ditemukan. Silakan login ulang.');
+      return;
+    }
+
+    final previous = _statusAktif;
 
     setState(() {
-      _isUpdatingLocation = true;
-      _locationMessage = 'Mengambil lokasi perangkat...';
+      _isUpdatingStatusAktif = true;
+      _statusAktif = value;
     });
 
     try {
-      final position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-      );
-
-      await ApiService.updatePKLLocation(
+      final updated = await ApiService.savePKLProfile(
         token: token,
-        latitude: position.latitude,
-        longitude: position.longitude,
+        data: {'status_aktif': value},
+        isNew: false,
       );
 
-      final now = DateTime.now();
       if (!mounted) return;
       setState(() {
-        _locationMessage = 'Lokasi diperbarui ${_formatTime(now)}';
-        _lastAutoUpdate = now;
-        _autoUpdatesToday += 1;
+        _statusAktif = updated['status_aktif'] == true;
       });
-      _showSnack('Lokasi berhasil diperbarui.');
+
+      _showSnack(
+        _statusAktif
+            ? 'Status aktif dihidupkan. Kamu akan terlihat oleh pembeli.'
+            : 'Status aktif dimatikan. Kamu tidak tampil di pembeli.',
+      );
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _locationMessage = 'Gagal memperbarui lokasi.';
+        _statusAktif = previous;
       });
-      _showSnack('Gagal memperbarui lokasi. $e');
+      _showSnack('Gagal mengubah status aktif. $e');
     } finally {
       if (mounted) {
         setState(() {
-          _isUpdatingLocation = false;
+          _isUpdatingStatusAktif = false;
         });
       }
-    }
-  }
-
-  Future<bool> _ensureLocationAccess() async {
-    final serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      _showSnack('Aktifkan layanan lokasi terlebih dahulu.');
-      return false;
-    }
-
-    var permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-    }
-
-    if (permission == LocationPermission.denied ||
-        permission == LocationPermission.deniedForever) {
-      _showSnack('Izin lokasi ditolak. Buka pengaturan untuk mengaktifkannya.');
-      return false;
-    }
-    return true;
-  }
-
-  Future<void> _toggleAutoSync() async {
-    if (_locationTimer != null) {
-      _stopAutoSync();
-    } else {
-      await _startAutoSync();
-    }
-  }
-
-  Future<void> _startAutoSync() async {
-    final hasAccess = await _ensureLocationAccess();
-    if (!hasAccess) return;
-
-    _locationTimer?.cancel();
-    await _updateLocation();
-    _locationTimer = Timer.periodic(const Duration(minutes: 5), (_) {
-      _updateLocation();
-    });
-    setState(() {});
-    _showSnack('Auto-update lokasi aktif.');
-  }
-
-  void _stopAutoSync() {
-    _locationTimer?.cancel();
-    _locationTimer = null;
-    setState(() {});
-    _showSnack('Auto-update lokasi dimatikan.');
-  }
-
-  Future<void> _logout() async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Konfirmasi Keluar'),
-        content: const Text('Apakah Anda yakin ingin keluar dari aplikasi?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Batal'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Keluar'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirm == true) {
-      await TokenManager.clearTokens();
-      if (!mounted) return;
-      Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
     }
   }
 
@@ -326,458 +280,480 @@ class _PklHomePageState extends State<PklHomePage> {
     ).showSnackBar(SnackBar(content: Text(message)));
   }
 
-  String _formatTime(DateTime time) {
-    final hours = time.hour.toString().padLeft(2, '0');
-    final minutes = time.minute.toString().padLeft(2, '0');
-    return '$hours:$minutes';
-  }
-
-  Widget _buildHeroSection() {
-    const overlap = 12.0;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _buildHeaderCard(),
-          const SizedBox(height: 16 + overlap),
-          Transform.translate(
-            offset: const Offset(0, -overlap),
-            child: _buildLocationPanel(),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildHeaderCard() {
-    final status = _statusVerifikasi.isEmpty ? 'PENDING' : _statusVerifikasi;
-    final colors = _statusChipColors(status);
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(28),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF0B7332), Color(0xFF10A14D), Color(0xFF25D366)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(32),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF0D8A3A).withValues(alpha: 0.3),
-            blurRadius: 24,
-            offset: const Offset(0, 12),
-            spreadRadius: 0,
-          ),
-          BoxShadow(
-            color: const Color(0xFF0D8A3A).withValues(alpha: 0.1),
-            blurRadius: 48,
-            offset: const Offset(0, 20),
-            spreadRadius: 0,
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.3),
-                    width: 1.5,
-                  ),
-                ),
-                child: const Icon(
-                  Icons.store_rounded,
-                  color: Colors.white,
-                  size: 28,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      _namaUsaha.isEmpty
-                          ? 'Selamat datang, Mitra PKL!'
-                          : _namaUsaha,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 24,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -0.5,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      _jenisDagangan.isEmpty
-                          ? 'Lengkapi kategori daganganmu.'
-                          : _jenisDagangan,
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.85),
-                        fontSize: 15,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          Row(
-            children: [
-              Expanded(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 10,
-                  ),
-                  decoration: BoxDecoration(
-                    color: colors.background.withValues(alpha: 0.95),
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.1),
-                        blurRadius: 8,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        status == 'DITERIMA'
-                            ? Icons.verified_rounded
-                            : status == 'DITOLAK'
-                            ? Icons.cancel_rounded
-                            : Icons.schedule_rounded,
-                        color: colors.text,
-                        size: 18,
-                      ),
-                      const SizedBox(width: 8),
-                      Flexible(
-                        child: Text(
-                          status,
-                          style: TextStyle(
-                            color: colors.text,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 13,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              _buildLiveStatusChip(),
-            ],
-          ),
-          const SizedBox(height: 20),
-          Container(
-            padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(22),
-              border: Border.all(
-                color: Colors.white.withValues(alpha: 0.2),
-                width: 1,
-              ),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.25),
-                    borderRadius: BorderRadius.circular(18),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.1),
-                        blurRadius: 8,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: const Icon(
-                    Icons.location_on_rounded,
-                    color: Colors.white,
-                    size: 24,
-                  ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Alamat Basecamp',
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.8),
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        _alamatDomisili.isEmpty
-                            ? 'Tambahkan alamat domisili agar pembeli tahu basecamp kamu.'
-                            : _alamatDomisili,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          height: 1.4,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  _StatusChipColors _statusChipColors(String status) {
-    switch (status) {
-      case 'DITERIMA':
-        return const _StatusChipColors(
-          background: Color(0xFFB9F6CA),
-          text: Color(0xFF1B5E20),
-        );
-      case 'DITOLAK':
-        return const _StatusChipColors(
-          background: Color(0xFFFFCDD2),
-          text: Color(0xFFB71C1C),
-        );
-      default:
-        return const _StatusChipColors(
-          background: Color(0xFFFFF9C4),
-          text: Color(0xFFF57F17),
-        );
-    }
-  }
-
-  Widget _buildLiveStatusChip() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.5),
-          width: 1.5,
-        ),
-        color: Colors.white.withValues(alpha: 0.12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
-            blurRadius: 8,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 8,
-            height: 8,
-            decoration: BoxDecoration(
-              color: _statusAktif ? Colors.greenAccent : Colors.white70,
-              shape: BoxShape.circle,
-              boxShadow: _statusAktif
-                  ? [
-                      BoxShadow(
-                        color: Colors.greenAccent.withValues(alpha: 0.6),
-                        blurRadius: 8,
-                        spreadRadius: 2,
-                      ),
-                    ]
-                  : null,
-            ),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            _statusAktif ? 'Live' : 'Offline',
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w700,
-              fontSize: 13,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildActionRow() {
-    return IntrinsicHeight(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Expanded(
-            child: _buildActionCard(
-              icon: Icons.navigation_outlined,
-              title: 'Update Lokasi',
-              subtitle: 'Bagikan posisi terbaru',
-              color: const Color(0xFFE6F6EE),
-              iconColor: const Color(0xFF0D8A3A),
-              onTap: _isNewProfile
-                  ? _showProfileRequired
-                  : () => _updateLocation(),
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: _buildActionCard(
-              icon: Icons.storefront_outlined,
-              title: 'Edit Dagangan',
-              subtitle: 'Nama usaha & menu',
-              color: const Color(0xFFFFF2E0),
-              iconColor: const Color(0xFFE65100),
-              onTap: _openEditInfoPage,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildActionCard({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required Color color,
-    required Color iconColor,
-    required VoidCallback onTap,
-  }) {
-    final isDark = _themeManager.isDarkMode;
+  Widget _buildSectionHeading({required String title, String? subtitle}) {
     final textColor = _themeManager.textColor;
     final mutedText = _themeManager.mutedTextColor;
 
-    final isHovered = _hoveredActionCard == title;
-    final isPressed = _pressedActionCard == title;
-    final baseColor = isDark
-        ? Color.alphaBlend(
-            color.withValues(alpha: 0.12),
-            _themeManager.cardColor,
-          )
-        : color;
-    final cardColor = isHovered && !isDark
-        ? _darkenColor(baseColor, 0.05)
-        : baseColor;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: TextStyle(
+              color: textColor,
+              fontWeight: FontWeight.w900,
+              fontSize: 20,
+              letterSpacing: -0.4,
+            ),
+          ),
+          if (subtitle != null) ...[
+            const SizedBox(height: 6),
+            Text(
+              subtitle,
+              style: TextStyle(
+                color: mutedText,
+                fontWeight: FontWeight.w600,
+                height: 1.35,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
 
-    return AnimatedScale(
-      duration: const Duration(milliseconds: 150),
-      curve: Curves.easeOutCubic,
-      scale: isPressed ? 0.96 : (isHovered ? 1.02 : 1),
+  String _resolveGreeting() {
+    final hour = DateTime.now().hour;
+    if (hour >= 4 && hour < 11) return 'Selamat Pagi';
+    if (hour >= 11 && hour < 15) return 'Selamat Siang';
+    return 'Halo';
+  }
+
+  Widget _buildGreetingHeader() {
+    final textColor = _themeManager.textColor;
+    final mutedText = _themeManager.mutedTextColor;
+    final borderColor = _themeManager.borderColor;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 6),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            _resolveGreeting(),
+            style: TextStyle(
+              color: mutedText,
+              fontWeight: FontWeight.w800,
+              fontSize: 13,
+              letterSpacing: 0.2,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            _namaUsaha.isEmpty ? 'Mitra PKL' : _namaUsaha,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: textColor,
+              fontWeight: FontWeight.w900,
+              fontSize: 22,
+              letterSpacing: -0.4,
+            ),
+          ),
+          const SizedBox(height: 14),
+          Divider(height: 1, thickness: 1, color: borderColor),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatusWarungCard() {
+    final isDark = _themeManager.isDarkMode;
+    final cardColor = _themeManager.cardColor;
+    final borderColor = _themeManager.borderColor;
+    final textColor = _themeManager.textColor;
+    final mutedText = _themeManager.mutedTextColor;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
       child: Container(
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(24),
-          boxShadow: isHovered
-              ? [
-                  BoxShadow(
-                    color: iconColor.withValues(alpha: 0.2),
-                    blurRadius: 24,
-                    offset: const Offset(0, 12),
-                    spreadRadius: 0,
-                  ),
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.08),
-                    blurRadius: 32,
-                    offset: const Offset(0, 16),
-                  ),
-                ]
-              : [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.06),
-                    blurRadius: 16,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
-        ),
-        child: Material(
           color: cardColor,
           borderRadius: BorderRadius.circular(24),
-          clipBehavior: Clip.antiAlias,
-          child: InkWell(
-            onTap: onTap,
-            mouseCursor: SystemMouseCursors.click,
-            onTapDown: (_) {
-              setState(() => _pressedActionCard = title);
-            },
-            onTapUp: (_) {
-              setState(() => _pressedActionCard = null);
-            },
-            onTapCancel: () {
-              setState(() => _pressedActionCard = null);
-            },
-            onHover: (hovering) {
-              if (!mounted) return;
-              setState(() {
-                _hoveredActionCard = hovering ? title : null;
-              });
-            },
-            splashColor: Colors.black.withValues(alpha: 0.05),
-            highlightColor: Colors.transparent,
-            hoverColor: Colors.transparent,
-            child: Container(
-              constraints: const BoxConstraints(minHeight: 160),
-              padding: const EdgeInsets.all(22),
+          border: Border.all(color: borderColor),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: isDark ? 0.20 : 0.05),
+              blurRadius: 16,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: _themeManager.accentSurfaceColor,
+                shape: BoxShape.circle,
+                border: Border.all(color: borderColor),
+              ),
+              child: Icon(
+                Icons.store_mall_directory_outlined,
+                color: _themeManager.primaryGreen,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: isDark
-                          ? _themeManager.accentSurfaceColor
-                          : Colors.white,
-                      borderRadius: BorderRadius.circular(18),
-                      boxShadow: [
-                        BoxShadow(
-                          color: iconColor.withValues(alpha: 0.2),
-                          blurRadius: 12,
-                          offset: const Offset(0, 6),
-                        ),
-                      ],
-                    ),
-                    child: Icon(icon, color: iconColor, size: 28),
-                  ),
-                  const Spacer(),
                   Text(
-                    title,
+                    'Status Warung',
                     style: TextStyle(
-                      fontWeight: FontWeight.w800,
-                      fontSize: 16,
-                      letterSpacing: -0.3,
                       color: textColor,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 16,
                     ),
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 2),
                   Text(
-                    subtitle,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
+                    'Buka untuk menerima pesanan',
                     style: TextStyle(
                       color: mutedText,
-                      fontSize: 13,
-                      height: 1.3,
-                      fontWeight: FontWeight.w500,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
+                ],
+              ),
+            ),
+            Switch.adaptive(
+              value: _statusAktif,
+              onChanged: _isUpdatingStatusAktif
+                  ? null
+                  : (value) {
+                      if (_isNewProfile) {
+                        _showProfileRequired();
+                        return;
+                      }
+                      _setStatusAktif(value);
+                    },
+              activeThumbColor: Colors.white,
+              activeTrackColor: _themeManager.primaryGreen.withValues(
+                alpha: 0.55,
+              ),
+              inactiveThumbColor: Colors.white,
+              inactiveTrackColor: Colors.black.withValues(
+                alpha: isDark ? 0.35 : 0.18,
+              ),
+              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLocationPreviewCard() {
+    final isDark = _themeManager.isDarkMode;
+    final cardColor = _themeManager.cardColor;
+    final borderColor = _themeManager.borderColor;
+    final textColor = _themeManager.textColor;
+
+    final overlayBase = isDark ? Colors.black : Colors.white;
+    final overlayTextColor = textColor;
+
+    final previewTint = Color.alphaBlend(
+      _themeManager.primaryGreen.withValues(alpha: isDark ? 0.20 : 0.10),
+      cardColor,
+    );
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 6, 16, 14),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(28),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: _isNewProfile ? _showProfileRequired : _openLocationPage,
+            child: Container(
+              height: 240,
+              decoration: BoxDecoration(
+                color: previewTint,
+                borderRadius: BorderRadius.circular(28),
+                border: Border.all(color: borderColor),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: isDark ? 0.24 : 0.08),
+                    blurRadius: 26,
+                    offset: const Offset(0, 16),
+                  ),
+                ],
+              ),
+              child: Stack(
+                children: [
+                  Positioned.fill(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(28),
+                      child: AbsorbPointer(
+                        child: _buildLocationMapPreview(
+                          isDark: isDark,
+                          previewTint: previewTint,
+                        ),
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    left: 16,
+                    top: 16,
+                    child: AnimatedOpacity(
+                      duration: const Duration(milliseconds: 200),
+                      opacity: _statusAktif ? 1 : 0.0,
+                      child: Container(
+                        constraints: const BoxConstraints(maxWidth: 110),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 10,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Color.alphaBlend(
+                            _themeManager.primaryGreen.withValues(alpha: 0.90),
+                            cardColor,
+                          ),
+                          borderRadius: BorderRadius.circular(999),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.18),
+                              blurRadius: 16,
+                              offset: const Offset(0, 8),
+                            ),
+                          ],
+                        ),
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: const [
+                              Icon(Icons.circle, size: 10, color: Colors.white),
+                              SizedBox(width: 8),
+                              Text(
+                                'LIVE',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 0.6,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    child: Container(
+                      padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            overlayBase.withValues(alpha: 0.0),
+                            overlayBase.withValues(alpha: isDark ? 0.82 : 0.92),
+                          ],
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 46,
+                            height: 46,
+                            decoration: BoxDecoration(
+                              color: _themeManager.accentGold,
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.2),
+                                  blurRadius: 14,
+                                  offset: const Offset(0, 8),
+                                ),
+                              ],
+                            ),
+                            child: const Icon(
+                              Icons.storefront_rounded,
+                              color: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  _namaUsaha.isEmpty ? 'Mitra PKL' : _namaUsaha,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: overlayTextColor,
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 20,
+                                    letterSpacing: -0.4,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  _alamatDomisili.isEmpty
+                                      ? 'Tambahkan alamat domisili kamu'
+                                      : _alamatDomisili,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: overlayTextColor.withValues(
+                                      alpha: isDark ? 0.85 : 0.75,
+                                    ),
+                                    fontWeight: FontWeight.w600,
+                                    height: 1.3,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Flexible(
+                            child: Text(
+                              _jenisDagangan.isNotEmpty
+                                  ? _jenisDagangan
+                                  : 'Lengkapi kategori',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              textAlign: TextAlign.right,
+                              style: TextStyle(
+                                color: overlayTextColor.withValues(
+                                  alpha: _jenisDagangan.isNotEmpty
+                                      ? 0.85
+                                      : (isDark ? 0.75 : 0.70),
+                                ),
+                                fontWeight: FontWeight.w700,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    right: 16,
+                    top: 16,
+                    child: Container(
+                      constraints: const BoxConstraints(maxWidth: 160),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Color.alphaBlend(
+                          (isDark
+                                  ? Colors.black
+                                  : _themeManager.overlayScrimColor)
+                              .withValues(alpha: isDark ? 0.45 : 0.92),
+                          isDark ? cardColor : Colors.white,
+                        ),
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(color: borderColor),
+                      ),
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              (_statusVerifikasi.isEmpty
+                                          ? 'PENDING'
+                                          : _statusVerifikasi) ==
+                                      'DITERIMA'
+                                  ? Icons.verified_rounded
+                                  : (_statusVerifikasi.isEmpty
+                                            ? 'PENDING'
+                                            : _statusVerifikasi) ==
+                                        'DITOLAK'
+                                  ? Icons.cancel_rounded
+                                  : Icons.schedule_rounded,
+                              size: 16,
+                              color: overlayTextColor,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              (_statusVerifikasi.isEmpty
+                                      ? 'PENDING'
+                                      : _statusVerifikasi)
+                                  .toUpperCase(),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: overlayTextColor,
+                                fontWeight: FontWeight.w900,
+                                fontSize: 12,
+                                letterSpacing: 0.4,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    right: 18,
+                    bottom: 18,
+                    child: ElevatedButton.icon(
+                      onPressed: _isNewProfile ? null : _openLocationPage,
+                      icon: const Icon(Icons.my_location_rounded, size: 18),
+                      label: const Text('Update'),
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 10,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                      ),
+                    ),
+                  ),
+                  if (_isNewProfile)
+                    Positioned(
+                      left: 16,
+                      right: 16,
+                      bottom: 74,
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Color.alphaBlend(
+                            _themeManager.accentGold.withValues(alpha: 0.20),
+                            cardColor,
+                          ),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: borderColor),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.info_outline_rounded,
+                              color: _themeManager.accentGold,
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                'Lengkapi profil dagangan untuk mengaktifkan fitur lokasi.',
+                                style: TextStyle(
+                                  color: textColor,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -787,13 +763,102 @@ class _PklHomePageState extends State<PklHomePage> {
     );
   }
 
-  Color _darkenColor(Color color, double amount) {
-    final hsl = HSLColor.fromColor(color);
-    final lightness = (hsl.lightness - amount).clamp(0.0, 1.0);
-    return hsl.withLightness(lightness).toColor();
+  Widget _buildHeroSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _buildGreetingHeader(),
+        _buildStatusWarungCard(),
+        _buildLocationPreviewCard(),
+      ],
+    );
+  }
+
+  Widget _buildQuickMenu() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSectionHeading(
+          title: 'Menu Cepat',
+          subtitle: 'Akses fitur utama dengan sekali tap.',
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Row(
+            children: [
+              Expanded(
+                child: _buildQuickMenuButton(
+                  icon: Icons.storefront_outlined,
+                  label: 'Produk',
+                  onTap: _openEditInfoPage,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: _buildQuickMenuButton(
+                  icon: Icons.receipt_long_rounded,
+                  label: 'Pesanan',
+                  onTap: () =>
+                      Navigator.of(context).pushNamed(PklRoutes.orders),
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: _buildQuickMenuButton(
+                  icon: Icons.qr_code_2_rounded,
+                  label: 'QRIS',
+                  onTap: () =>
+                      Navigator.of(context).pushNamed(PklRoutes.payment),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildQuickMenuButton({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    final borderColor = _themeManager.borderColor;
+    final textColor = _themeManager.textColor;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                color: _themeManager.cardColor,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: borderColor),
+              ),
+              child: Icon(icon, color: _themeManager.primaryGreen, size: 28),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: textColor, fontWeight: FontWeight.w700),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildInfoCard() {
+    final borderColor = _themeManager.borderColor;
     return Card(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
       elevation: 0,
@@ -802,6 +867,7 @@ class _PklHomePageState extends State<PklHomePage> {
       child: Container(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(28),
+          border: Border.all(color: borderColor),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.06),
@@ -820,12 +886,13 @@ class _PklHomePageState extends State<PklHomePage> {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFE8F5E9),
+                      color: _themeManager.accentSurfaceColor,
                       borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: borderColor),
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.info_outline_rounded,
-                      color: Color(0xFF0D8A3A),
+                      color: _themeManager.primaryGreen,
                       size: 24,
                     ),
                   ),
@@ -902,6 +969,7 @@ class _PklHomePageState extends State<PklHomePage> {
   }
 
   Widget _buildStatsSection() {
+    final borderColor = _themeManager.borderColor;
     return Card(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
       elevation: 0,
@@ -909,6 +977,7 @@ class _PklHomePageState extends State<PklHomePage> {
       child: Container(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(28),
+          border: Border.all(color: borderColor),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.06),
@@ -927,12 +996,13 @@ class _PklHomePageState extends State<PklHomePage> {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFE3F2FD),
+                      color: _themeManager.accentSurfaceColor,
                       borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: borderColor),
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.analytics_outlined,
-                      color: Color(0xFF1976D2),
+                      color: _themeManager.accentGold,
                       size: 24,
                     ),
                   ),
@@ -957,10 +1027,10 @@ class _PklHomePageState extends State<PklHomePage> {
   }
 
   Widget _buildStatsRow() {
-    final autoStatus = _locationTimer != null ? 'Aktif' : 'Nonaktif';
-    final lastUpdate = _lastAutoUpdate != null
-        ? _formatTime(_lastAutoUpdate!)
-        : '--:--';
+    final autoStatus = _autoLocationEnabled ? 'Aktif' : 'Nonaktif';
+    final lastUpdateLabel = _lastLocationUpdate != null
+        ? _formatDateTimeShort(_lastLocationUpdate!)
+        : '--/-- --:--';
 
     return IntrinsicHeight(
       child: Row(
@@ -970,7 +1040,7 @@ class _PklHomePageState extends State<PklHomePage> {
               title: 'Live',
               subtitle: 'Tampilan',
               value: _liveViewsToday.toString(),
-              color: const Color(0xFF5C6BC0),
+              color: _themeManager.primaryGreen,
             ),
           ),
           const SizedBox(width: 14),
@@ -979,7 +1049,7 @@ class _PklHomePageState extends State<PklHomePage> {
               title: 'Pencarian',
               subtitle: 'Muncul di hasil',
               value: _searchHitsToday.toString(),
-              color: const Color(0xFF00ACC1),
+              color: _themeManager.accentGold,
             ),
           ),
           const SizedBox(width: 14),
@@ -988,8 +1058,8 @@ class _PklHomePageState extends State<PklHomePage> {
               title: 'Auto-update',
               subtitle: 'Sinkronisasi',
               value: _autoUpdatesToday.toString(),
-              color: const Color(0xFFFF8A00),
-              footnote: '$autoStatus • Terakhir $lastUpdate',
+              color: _themeManager.primaryGreen,
+              footnote: '$autoStatus • Terakhir $lastUpdateLabel',
             ),
           ),
         ],
@@ -1054,157 +1124,78 @@ class _PklHomePageState extends State<PklHomePage> {
             subtitle,
             style: TextStyle(
               fontSize: 12,
-              color: isDark ? mutedText : Colors.black.withValues(alpha: 0.6),
+              color: mutedText,
               fontWeight: FontWeight.w500,
             ),
           ),
           if (footnote != null) ...[
-            const Spacer(),
+            const SizedBox(height: 14),
             Text(
               footnote,
               style: TextStyle(
                 fontSize: 11,
-                color: isDark
-                    ? mutedText.withValues(alpha: 0.85)
-                    : Colors.black.withValues(alpha: 0.5),
+                color: mutedText.withValues(alpha: isDark ? 0.85 : 0.75),
                 fontWeight: FontWeight.w500,
               ),
             ),
-          ] else
-            const Spacer(),
+          ],
         ],
       ),
     );
   }
 
-  Widget _buildLocationPanel() {
-    final isDark = _themeManager.isDarkMode;
-    final textColor = _themeManager.textColor;
-    final mutedText = _themeManager.mutedTextColor;
-    final autoActive = _locationTimer != null;
-    final lastUpdateLabel = _lastAutoUpdate != null
-        ? 'Terakhir ${_formatTime(_lastAutoUpdate!)}'
-        : 'Belum ada riwayat';
-    final statusMessage =
-        _locationMessage ??
-        'Bagikan lokasi agar pembeli tahu posisi terbaru kamu.';
+  Widget _buildLocationMapPreview({
+    required bool isDark,
+    required Color previewTint,
+  }) {
+    final lat = _latestLatitude;
+    final lng = _latestLongitude;
+    if (lat == null || lng == null) {
+      return Opacity(
+        opacity: isDark ? 0.20 : 0.12,
+        child: const Center(child: Icon(Icons.map_outlined, size: 220)),
+      );
+    }
 
-    return Material(
-      color: Colors.transparent,
-      elevation: 0,
-      borderRadius: BorderRadius.circular(32),
-      child: Container(
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          color: _themeManager.cardColor,
-          borderRadius: BorderRadius.circular(32),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF0D8A3A).withValues(alpha: 0.08),
-              blurRadius: 30,
-              offset: const Offset(0, 16),
-              spreadRadius: 0,
+    final point = LatLng(lat, lng);
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        FlutterMap(
+          options: MapOptions(
+            initialCenter: point,
+            initialZoom: 16,
+            interactionOptions: const InteractionOptions(
+              flags: InteractiveFlag.none,
             ),
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 20,
-              offset: const Offset(0, 10),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          ),
           children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE8F9EF),
-                    borderRadius: BorderRadius.circular(18),
-                  ),
-                  child: const Icon(
-                    Icons.pin_drop_outlined,
-                    color: Color(0xFF0D8A3A),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Kontrol Lokasi',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 16,
-                          color: textColor,
-                        ),
-                      ),
-                      Text(
-                        lastUpdateLabel,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: isDark ? mutedText : Colors.black54,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                _buildAutoStatusChip(autoActive),
-              ],
+            TileLayer(
+              urlTemplate: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+              subdomains: const ['a', 'b', 'c'],
+              userAgentPackageName: 'com.example.gomuter_app',
             ),
-            const SizedBox(height: 12),
-            Text(
-              statusMessage,
-              style: TextStyle(color: textColor, height: 1.4),
-            ),
-            const SizedBox(height: 18),
-            Row(
-              children: [
-                Expanded(
-                  child: _AnimatedButton(
-                    child: ElevatedButton.icon(
-                      onPressed: _isUpdatingLocation
-                          ? null
-                          : () {
-                              if (_isNewProfile) {
-                                _showProfileRequired();
-                              } else {
-                                _updateLocation();
-                              }
-                            },
-                      icon: _isUpdatingLocation
-                          ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
-                            )
-                          : const Icon(Icons.navigation_outlined),
-                      label: Text(
-                        _isUpdatingLocation
-                            ? 'Memperbarui...'
-                            : 'Update Sekali',
+            MarkerLayer(
+              markers: [
+                Marker(
+                  point: point,
+                  width: 44,
+                  height: 44,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: _themeManager.accentGold,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: Colors.white.withValues(
+                          alpha: isDark ? 0.9 : 0.95,
+                        ),
+                        width: 2,
                       ),
                     ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _AnimatedButton(
-                    child: OutlinedButton.icon(
-                      onPressed: _isNewProfile
-                          ? _showProfileRequired
-                          : _toggleAutoSync,
-                      icon: Icon(
-                        autoActive
-                            ? Icons.pause_circle_filled
-                            : Icons.autorenew,
-                      ),
-                      label: Text(autoActive ? 'Matikan Auto' : 'Auto-update'),
+                    child: const Icon(
+                      Icons.storefront_rounded,
+                      color: Colors.white,
+                      size: 22,
                     ),
                   ),
                 ),
@@ -1212,44 +1203,14 @@ class _PklHomePageState extends State<PklHomePage> {
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildAutoStatusChip(bool active) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: active ? const Color(0xFFE6F6EE) : const Color(0xFFFFF2E0),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            active ? Icons.check_circle : Icons.offline_bolt_outlined,
-            size: 16,
-            color: active ? const Color(0xFF0D8A3A) : const Color(0xFFE65100),
-          ),
-          const SizedBox(width: 6),
-          Text(
-            active ? 'Auto-update aktif' : 'Auto-update mati',
-            style: TextStyle(
-              color: active ? const Color(0xFF0D8A3A) : const Color(0xFFE65100),
-              fontWeight: FontWeight.w600,
-              fontSize: 12,
-            ),
-          ),
-        ],
-      ),
+        Container(color: previewTint.withValues(alpha: isDark ? 0.10 : 0.06)),
+      ],
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final isDark = _themeManager.isDarkMode;
     final bgColor = _themeManager.backgroundColor;
-    final textColor = _themeManager.textColor;
 
     final bodyContent = SingleChildScrollView(
       controller: _scrollController,
@@ -1292,8 +1253,17 @@ class _PklHomePageState extends State<PklHomePage> {
                       style: TextStyle(color: Color(0xFFBF360C)),
                     ),
                   ),
-                _buildActionRow(),
-                const SizedBox(height: 18),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          _buildQuickMenu(),
+          const SizedBox(height: 18),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
                 _buildInfoCard(),
                 const SizedBox(height: 18),
                 _buildStatsSection(),
@@ -1306,36 +1276,7 @@ class _PklHomePageState extends State<PklHomePage> {
 
     return Scaffold(
       backgroundColor: bgColor,
-      appBar: AppBar(
-        automaticallyImplyLeading: false,
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        surfaceTintColor: Colors.transparent,
-        title: Text(
-          'Beranda PKL',
-          style: TextStyle(
-            fontWeight: FontWeight.w800,
-            fontSize: 20,
-            color: textColor,
-          ),
-        ),
-        actions: [
-          IconButton(
-            icon: Icon(
-              isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
-              color: textColor,
-            ),
-            onPressed: _themeManager.toggleTheme,
-            tooltip: isDark ? 'Mode terang' : 'Mode gelap',
-          ),
-          IconButton(
-            icon: const Icon(Icons.logout_rounded, color: Color(0xFFD32F2F)),
-            onPressed: _logout,
-            tooltip: 'Keluar',
-          ),
-          const SizedBox(width: 8),
-        ],
-      ),
+      appBar: null,
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : SafeArea(
@@ -1351,13 +1292,6 @@ class _PklHomePageState extends State<PklHomePage> {
       ),
     );
   }
-}
-
-class _StatusChipColors {
-  const _StatusChipColors({required this.background, required this.text});
-
-  final Color background;
-  final Color text;
 }
 
 class _AnimatedButton extends StatefulWidget {

@@ -63,32 +63,45 @@ class _AuthTextField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = scheme.brightness == Brightness.dark;
+    final textColor = Theme.of(context).textTheme.bodyMedium?.color;
+    final iconColor = Theme.of(context).iconTheme.color ?? textColor;
+    final borderColor = isDark
+        ? Colors.white.withValues(alpha: 0.10)
+        : Colors.black.withValues(alpha: 0.10);
+    final fillColor = isDark
+        ? Colors.white.withValues(alpha: 0.05)
+        : Colors.white.withValues(alpha: 0.78);
+
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.05),
+        color: fillColor,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
+        border: Border.all(color: borderColor),
       ),
       child: TextField(
         controller: controller,
         obscureText: obscureText,
         textInputAction: textInputAction,
-        style: const TextStyle(color: Colors.white),
+        style: TextStyle(color: textColor),
         decoration: InputDecoration(
           filled: false,
           border: InputBorder.none,
           enabledBorder: InputBorder.none,
           focusedBorder: InputBorder.none,
           hintText: label,
-          hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.65)),
-          prefixIcon: Icon(icon, color: Colors.white.withValues(alpha: 0.70)),
+          hintStyle: TextStyle(
+            color: textColor?.withValues(alpha: isDark ? 0.65 : 0.55),
+          ),
+          prefixIcon: Icon(icon, color: iconColor?.withValues(alpha: 0.70)),
           suffixIcon: suffixIcon == null
               ? null
               : IconButton(
                   onPressed: onSuffixPressed,
                   icon: Icon(
                     suffixIcon,
-                    color: Colors.white.withValues(alpha: 0.70),
+                    color: iconColor?.withValues(alpha: 0.70),
                   ),
                 ),
           contentPadding: const EdgeInsets.symmetric(

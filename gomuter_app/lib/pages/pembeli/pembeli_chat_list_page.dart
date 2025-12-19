@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:gomuter_app/api_service.dart';
 import 'package:gomuter_app/pages/pembeli/chat_page.dart';
 import 'package:gomuter_app/utils/chat_badge_manager.dart';
+import 'package:gomuter_app/utils/chat_read_tracker.dart';
 import 'package:gomuter_app/utils/theme_manager.dart';
 import 'package:gomuter_app/utils/token_manager.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class PembeliChatListPage extends StatefulWidget {
   const PembeliChatListPage({super.key});
@@ -18,6 +20,11 @@ class _PembeliChatListPageState extends State<PembeliChatListPage> {
   bool _isLoading = true;
   String? _error;
   List<dynamic> _chats = [];
+  Map<int, DateTime> _openedMap = <int, DateTime>{};
+  bool _showSearch = false;
+  String _searchQuery = '';
+  int _filterIndex = 0; // 0: semua, 1: belum dibaca
+  String _myInitial = 'B';
 
   @override
   void initState() {
@@ -34,6 +41,29 @@ class _PembeliChatListPageState extends State<PembeliChatListPage> {
 
   void _onThemeChanged() {
     if (mounted) setState(() {});
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _loadMyInitial();
+  }
+
+  Future<void> _loadMyInitial() async {
+    final prefs = await SharedPreferences.getInstance();
+    final username = (prefs.getString('username') ?? '').trim();
+    if (!mounted) return;
+    setState(() {
+      _myInitial = username.isEmpty ? 'B' : username[0].toUpperCase();
+    });
+  }
+
+  Future<void> _refreshOpenedMap() async {
+    final map = await ChatReadTracker.getOpenedMap(ChatRole.pembeli);
+    if (!mounted) return;
+    setState(() {
+      _openedMap = map;
+    });
   }
 
   Future<void> _loadChats() async {
@@ -58,6 +88,7 @@ class _PembeliChatListPageState extends State<PembeliChatListPage> {
       setState(() {
         _chats = chats;
       });
+      await _refreshOpenedMap();
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -72,6 +103,49 @@ class _PembeliChatListPageState extends State<PembeliChatListPage> {
     }
   }
 
+  List<Map<String, dynamic>> _filteredChats() {
+    final base = _chats.whereType<Map<String, dynamic>>().toList();
+    final q = _searchQuery.trim().toLowerCase();
+
+    Iterable<Map<String, dynamic>> result = base;
+    if (q.isNotEmpty) {
+      result = result.where((chat) {
+        final name = (chat['pkl_nama_usaha'] ?? '').toString().toLowerCase();
+        return name.contains(q);
+      });
+    }
+
+    if (_filterIndex == 1) {
+      result = result.where((chat) {
+        final id = (chat['id'] as num?)?.toInt();
+        if (id == null) return false;
+        return ChatReadTracker.isUnread(
+          openedMap: _openedMap,
+          chatId: id,
+          updatedAt: chat['updated_at']?.toString(),
+        );
+      });
+    }
+
+    return result.toList();
+  }
+
+  int _unreadCount() {
+    var count = 0;
+    for (final chat in _chats.whereType<Map<String, dynamic>>()) {
+      final id = (chat['id'] as num?)?.toInt();
+      if (id == null) continue;
+      if (ChatReadTracker.isUnread(
+        openedMap: _openedMap,
+        chatId: id,
+        updatedAt: chat['updated_at']?.toString(),
+      )) {
+        count++;
+      }
+    }
+    return count;
+  }
+
   String _formatTimestamp(String? raw) {
     if (raw == null) return '-';
     try {
@@ -84,10 +158,11 @@ class _PembeliChatListPageState extends State<PembeliChatListPage> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = _themeManager.isDarkMode;
     final bgColor = _themeManager.backgroundColor;
-    final cardColor = _themeManager.cardColor;
     final textColor = _themeManager.textColor;
+    final borderColor = _themeManager.borderColor;
+    final unreadCount = _unreadCount();
+    final chats = _filteredChats();
 
     return Scaffold(
       backgroundColor: bgColor,
@@ -96,13 +171,10 @@ class _PembeliChatListPageState extends State<PembeliChatListPage> {
         elevation: 0,
         surfaceTintColor: Colors.transparent,
         foregroundColor: textColor,
-        title: const Text('Pesan Saya'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _isLoading ? null : _loadChats,
-          ),
-        ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Divider(height: 1, thickness: 1, color: borderColor),
+        ),
       ),
       body: _isLoading
           ? Center(
@@ -115,22 +187,37 @@ class _PembeliChatListPageState extends State<PembeliChatListPage> {
               child: RefreshIndicator(
                 onRefresh: _loadChats,
                 color: _themeManager.primaryGreen,
-                backgroundColor: cardColor,
                 child: ListView(
                   physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 24),
                   children: [
-                    const SizedBox(height: 12),
-                    _buildHeroBanner(isDark: isDark, bgColor: bgColor),
-                    const SizedBox(height: 18),
+                    _buildHeader(unreadCount: unreadCount),
+                    const SizedBox(height: 14),
+                    if (_showSearch) _buildSearchField(),
+                    if (_showSearch) const SizedBox(height: 12),
+                    _buildFilters(),
+                    const SizedBox(height: 14),
+                    if (chats.isNotEmpty) _buildQuickAvatars(chats),
+                    if (chats.isNotEmpty) const SizedBox(height: 14),
                     if (_error != null) _buildErrorBanner(_error!),
-                    if (_chats.isEmpty)
-                      _buildEmptyState(cardColor: cardColor, textColor: textColor)
+                    if (chats.isEmpty)
+                      _buildEmptyState(textColor: textColor)
                     else
-                      ..._chats.map<Widget>((chat) {
+                      ...chats.map<Widget>((chat) {
+                        final id = (chat['id'] as num?)?.toInt() ?? 0;
+                        final unread = id == 0
+                            ? false
+                            : ChatReadTracker.isUnread(
+                                openedMap: _openedMap,
+                                chatId: id,
+                                updatedAt: chat['updated_at']?.toString(),
+                              );
                         return Padding(
                           padding: const EdgeInsets.only(bottom: 14),
-                          child: _buildChatTile(chat as Map<String, dynamic>),
+                          child: _buildChatTile(
+                            chat,
+                            isUnread: unread,
+                          ),
                         );
                       }),
                   ],
@@ -140,44 +227,265 @@ class _PembeliChatListPageState extends State<PembeliChatListPage> {
     );
   }
 
-  Widget _buildHeroBanner({
-    required bool isDark,
-    required Color bgColor,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            _themeManager.primaryGreen.withValues(alpha: 0.8),
-            bgColor.withValues(alpha: 0.0),
-          ],
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
+  Widget _buildHeader({required int unreadCount}) {
+    final textColor = _themeManager.textColor;
+    final mutedText = _themeManager.mutedTextColor;
+    final badgeBg = _themeManager.accentGold.withValues(alpha: 0.14);
+    final badgeBorder = _themeManager.accentGold.withValues(alpha: 0.3);
+    final badgeText = _themeManager.accentGold;
+
+    return Row(
+      children: [
+        Expanded(
+          child: Row(
+            children: [
+              Text(
+                'Pesan',
+                style: TextStyle(
+                  fontSize: 30,
+                  fontWeight: FontWeight.w900,
+                  color: textColor,
+                  letterSpacing: -0.6,
+                ),
+              ),
+              if (unreadCount > 0) ...[
+                const SizedBox(width: 10),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: badgeBg,
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(color: badgeBorder),
+                  ),
+                  child: Text(
+                    '$unreadCount Baru',
+                    style: TextStyle(
+                      color: badgeText,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+              ],
+              if (unreadCount == 0) ...[
+                const SizedBox(width: 10),
+                Text(
+                  'Tidak ada pesan baru',
+                  style: TextStyle(
+                    color: mutedText,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ],
+          ),
         ),
-        borderRadius: BorderRadius.circular(30),
-        border: Border.all(
-          color: _themeManager.primaryGreen.withValues(alpha: 0.3),
+        IconButton(
+          tooltip: 'Cari',
+          onPressed: () {
+            setState(() {
+              _showSearch = !_showSearch;
+              if (!_showSearch) _searchQuery = '';
+            });
+          },
+          icon: Icon(
+            _showSearch ? Icons.close_rounded : Icons.search_rounded,
+          ),
+        ),
+        const SizedBox(width: 4),
+        CircleAvatar(
+          radius: 18,
+          backgroundColor: _themeManager.accentSurfaceColor,
+          foregroundColor: _themeManager.primaryGreen,
+          child: Text(
+            _myInitial,
+            style: const TextStyle(fontWeight: FontWeight.w800),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSearchField() {
+    final borderColor = _themeManager.borderColor;
+    final fill = _themeManager.cardColor;
+    final muted = _themeManager.mutedTextColor;
+    final text = _themeManager.textColor;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      decoration: BoxDecoration(
+        color: fill,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: borderColor),
+      ),
+      child: TextField(
+        onChanged: (v) => setState(() => _searchQuery = v),
+        style: TextStyle(color: text),
+        decoration: InputDecoration(
+          border: InputBorder.none,
+          hintText: 'Cari nama PKL…',
+          hintStyle: TextStyle(color: muted),
+          icon: Icon(Icons.search_rounded, color: muted),
         ),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: const [
-          Text(
-            'Pesan dengan PKL',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 20,
-              fontWeight: FontWeight.w700,
+    );
+  }
+
+  Widget _buildFilters() {
+    final border = _themeManager.borderColor;
+    final card = _themeManager.cardColor;
+    final muted = _themeManager.mutedTextColor;
+    final active = _themeManager.textColor;
+    return Container(
+      padding: const EdgeInsets.all(6),
+      decoration: BoxDecoration(
+        color: card,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: border),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: _FilterPill(
+              label: 'Semua',
+              selected: _filterIndex == 0,
+              onTap: () => setState(() => _filterIndex = 0),
+              themeManager: _themeManager,
+              activeText: active,
+              inactiveText: muted,
             ),
           ),
-          SizedBox(height: 6),
-          Text(
-            'Lanjutkan obrolan dengan penjual favoritmu.',
-            style: TextStyle(color: Colors.white70),
+          Expanded(
+            child: _FilterPill(
+              label: 'Belum Dibaca',
+              selected: _filterIndex == 1,
+              onTap: () => setState(() => _filterIndex = 1),
+              themeManager: _themeManager,
+              activeText: active,
+              inactiveText: muted,
+            ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildQuickAvatars(List<Map<String, dynamic>> chats) {
+    final border = _themeManager.borderColor;
+    final text = _themeManager.textColor;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'SEDANG BERLANGSUNG',
+          style: TextStyle(
+            color: _themeManager.mutedTextColor,
+            fontWeight: FontWeight.w900,
+            letterSpacing: 0.6,
+          ),
+        ),
+        const SizedBox(height: 10),
+        SizedBox(
+          height: 92,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: chats.length.clamp(0, 10),
+            separatorBuilder: (_, __) => const SizedBox(width: 12),
+            itemBuilder: (context, i) {
+              final chat = chats[i];
+              final id = (chat['id'] as num?)?.toInt();
+              final name = (chat['pkl_nama_usaha'] ?? 'PKL') as String;
+              final unread = id == null
+                  ? false
+                  : ChatReadTracker.isUnread(
+                      openedMap: _openedMap,
+                      chatId: id,
+                      updatedAt: chat['updated_at']?.toString(),
+                    );
+
+              return InkWell(
+                borderRadius: BorderRadius.circular(18),
+                onTap: id == null
+                    ? null
+                    : () {
+                        final pklId = (chat['pkl'] as num?)?.toInt();
+                        if (pklId == null) return;
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => ChatPage(pklId: pklId, pklNama: name),
+                          ),
+                        ).then((_) => _loadChats());
+                      },
+                child: Container(
+                  width: 72,
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: _themeManager.cardColor,
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(
+                      color: unread
+                          ? _themeManager.accentGold.withValues(alpha: 0.55)
+                          : border,
+                      width: unread ? 2 : 1,
+                    ),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          CircleAvatar(
+                            radius: 20,
+                            backgroundColor: _themeManager.accentSurfaceColor,
+                            foregroundColor: _themeManager.primaryGreen,
+                            child: Text(
+                              name.isEmpty ? '?' : name[0].toUpperCase(),
+                              style: const TextStyle(fontWeight: FontWeight.w800),
+                            ),
+                          ),
+                          if (unread)
+                            Positioned(
+                              right: -2,
+                              bottom: -2,
+                              child: Container(
+                                width: 12,
+                                height: 12,
+                                decoration: BoxDecoration(
+                                  color: _themeManager.accentGold,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: _themeManager.cardColor,
+                                    width: 2,
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 12,
+                          color: text,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 
@@ -195,24 +503,18 @@ class _PembeliChatListPageState extends State<PembeliChatListPage> {
           Icon(Icons.error_outline, color: Colors.red.shade400),
           const SizedBox(width: 10),
           Expanded(
-            child: Text(
-              message,
-              style: TextStyle(color: Colors.red.shade200),
-            ),
+            child: Text(message, style: TextStyle(color: Colors.red.shade200)),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildEmptyState({
-    required Color cardColor,
-    required Color textColor,
-  }) {
+  Widget _buildEmptyState({required Color textColor}) {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: cardColor,
+        color: _themeManager.cardColor,
         borderRadius: BorderRadius.circular(28),
         border: Border.all(color: textColor.withValues(alpha: 0.1)),
       ),
@@ -226,10 +528,7 @@ class _PembeliChatListPageState extends State<PembeliChatListPage> {
           SizedBox(height: 10),
           Text(
             'Belum ada chat dengan PKL.',
-            style: TextStyle(
-              fontWeight: FontWeight.w600,
-              color: textColor,
-            ),
+            style: TextStyle(fontWeight: FontWeight.w600, color: textColor),
           ),
           SizedBox(height: 4),
           Text(
@@ -242,19 +541,31 @@ class _PembeliChatListPageState extends State<PembeliChatListPage> {
     );
   }
 
-  Widget _buildChatTile(Map<String, dynamic> chat) {
-    final cardColor = _themeManager.cardColor;
+  Widget _buildChatTile(Map<String, dynamic> chat, {bool? isUnread}) {
+    final border = _themeManager.borderColor;
     final textColor = _themeManager.textColor;
+    final mutedText = _themeManager.mutedTextColor;
     final pklName = (chat['pkl_nama_usaha'] ?? 'PKL') as String;
     final updatedAt = _formatTimestamp(chat['updated_at'] as String?);
+    final chatId = (chat['id'] as num?)?.toInt();
     final pklId = (chat['pkl'] as num?)?.toInt();
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
-      decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: textColor.withValues(alpha: 0.1)),
-      ),
+
+    final unread = isUnread ??
+        (chatId == null
+            ? false
+            : ChatReadTracker.isUnread(
+                openedMap: _openedMap,
+                chatId: chatId,
+                updatedAt: chat['updated_at']?.toString(),
+              ));
+
+    final stripeColor = unread
+        ? _themeManager.accentGold
+        : _themeManager.hintTextColor.withValues(alpha: 0.45);
+    final tileBg = unread ? _themeManager.cardColor : _themeManager.surfaceColor;
+
+    return Material(
+      color: Colors.transparent,
       child: InkWell(
         borderRadius: BorderRadius.circular(24),
         onTap: pklId == null
@@ -267,43 +578,133 @@ class _PembeliChatListPageState extends State<PembeliChatListPage> {
                   ),
                 ).then((_) => _loadChats());
               },
-        child: Row(
-          children: [
-            CircleAvatar(
-              backgroundColor:
-                  _themeManager.primaryGreen.withValues(alpha: 0.2),
-              foregroundColor: _themeManager.primaryGreen,
-              child: Text(pklName.isEmpty ? '?' : pklName[0].toUpperCase()),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+          decoration: BoxDecoration(
+            color: tileBg,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+              color: unread
+                  ? _themeManager.accentGold.withValues(alpha: 0.35)
+                  : border,
+              width: unread ? 1.5 : 1,
             ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    pklName,
-                    style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 15,
-                      color: textColor,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    'Update terakhir: $updatedAt',
-                    style: TextStyle(
-                      color: textColor.withValues(alpha: 0.6),
-                      fontSize: 12,
-                    ),
-                  ),
-                ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 6,
+                height: 52,
+                decoration: BoxDecoration(
+                  color: stripeColor,
+                  borderRadius: BorderRadius.circular(999),
+                ),
               ),
+              const SizedBox(width: 12),
+              CircleAvatar(
+                backgroundColor: _themeManager.accentSurfaceColor,
+                foregroundColor: _themeManager.primaryGreen,
+                child: Text(pklName.isEmpty ? '?' : pklName[0].toUpperCase()),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            pklName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontWeight: FontWeight.w900,
+                              fontSize: 15,
+                              color: textColor,
+                            ),
+                          ),
+                        ),
+                        if (unread)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 5,
+                            ),
+                            decoration: BoxDecoration(
+                              color: _themeManager.accentGold,
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: const Text(
+                              'Baru',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w900,
+                                fontSize: 11,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Update terakhir: $updatedAt',
+                      style: TextStyle(
+                        color: mutedText,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Icon(Icons.chevron_right, color: mutedText),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _FilterPill extends StatelessWidget {
+  const _FilterPill({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+    required this.themeManager,
+    required this.activeText,
+    required this.inactiveText,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  final ThemeManager themeManager;
+  final Color activeText;
+  final Color inactiveText;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(999),
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        decoration: BoxDecoration(
+          color: selected ? themeManager.surfaceColor : Colors.transparent,
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Center(
+          child: Text(
+            label,
+            style: TextStyle(
+              color: selected ? activeText : inactiveText,
+              fontWeight: FontWeight.w900,
             ),
-            Icon(
-              Icons.chevron_right,
-              color: textColor.withValues(alpha: 0.6),
-            ),
-          ],
+          ),
         ),
       ),
     );

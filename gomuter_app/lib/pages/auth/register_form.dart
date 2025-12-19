@@ -26,13 +26,18 @@ class RegisterForm extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = scheme.brightness == Brightness.dark;
+    final textColor = Theme.of(context).textTheme.bodyMedium?.color;
+    final mutedText = textColor?.withValues(alpha: isDark ? 0.70 : 0.60);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
           'PILIH PERAN',
           style: TextStyle(
-            color: Colors.white.withValues(alpha: 0.70),
+            color: mutedText,
             fontSize: 12,
             fontWeight: FontWeight.w800,
             letterSpacing: 1.2,
@@ -69,20 +74,20 @@ class RegisterForm extends StatelessWidget {
           child: TextButton.icon(
             onPressed: onAdminLoginTap,
             style: TextButton.styleFrom(
-              foregroundColor: Colors.white.withValues(alpha: 0.70),
+              foregroundColor: mutedText,
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             ),
             icon: Icon(
               Icons.admin_panel_settings_outlined,
               size: 18,
-              color: Colors.white.withValues(alpha: 0.70),
+              color: mutedText,
             ),
             label: Text(
               'MASUK SEBAGAI ADMIN',
               style: TextStyle(
                 fontWeight: FontWeight.w800,
                 letterSpacing: 1.0,
-                color: Colors.white.withValues(alpha: 0.70),
+                color: mutedText,
                 fontSize: 12,
               ),
             ),
@@ -138,6 +143,17 @@ class _RoleCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = scheme.brightness == Brightness.dark;
+    final textColor = Theme.of(context).textTheme.bodyMedium?.color;
+
+    final unselectedFill = isDark
+        ? Colors.white.withValues(alpha: 0.05)
+        : Colors.white.withValues(alpha: 0.78);
+    final unselectedBorder = isDark
+        ? Colors.white.withValues(alpha: 0.08)
+        : Colors.black.withValues(alpha: 0.08);
+
     return InkWell(
       borderRadius: BorderRadius.circular(18),
       onTap: onTap,
@@ -146,12 +162,12 @@ class _RoleCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: selected
               ? accent.withValues(alpha: 0.18)
-              : Colors.white.withValues(alpha: 0.05),
+              : unselectedFill,
           borderRadius: BorderRadius.circular(18),
           border: Border.all(
             color: selected
                 ? accent.withValues(alpha: 0.80)
-                : Colors.white.withValues(alpha: 0.08),
+                : unselectedBorder,
             width: selected ? 1.8 : 1,
           ),
         ),
@@ -167,18 +183,20 @@ class _RoleCard extends StatelessWidget {
                     height: 52,
                     width: 52,
                     decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.18),
+                      color: (isDark
+                              ? Colors.black.withValues(alpha: 0.18)
+                              : Colors.black.withValues(alpha: 0.06)),
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.08),
+                        color: unselectedBorder,
                       ),
                     ),
                     alignment: Alignment.center,
                     child: Icon(
                       icon,
                       color: selected
-                          ? Colors.white
-                          : Colors.white.withValues(alpha: 0.65),
+                          ? textColor
+                          : textColor?.withValues(alpha: 0.65),
                       size: 24,
                     ),
                   ),
@@ -188,9 +206,7 @@ class _RoleCard extends StatelessWidget {
                   label,
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    color: Colors.white.withValues(
-                      alpha: selected ? 1.0 : 0.75,
-                    ),
+                    color: textColor?.withValues(alpha: selected ? 1.0 : 0.75),
                     fontWeight: FontWeight.w800,
                     height: 1.2,
                     fontSize: 12,
@@ -207,7 +223,7 @@ class _RoleCard extends StatelessWidget {
                 child: Icon(
                   Icons.check_circle_rounded,
                   size: 20,
-                  color: selected ? Colors.white : Colors.transparent,
+                  color: selected ? (textColor ?? scheme.onSurface) : Colors.transparent,
                 ),
               ),
             ),
@@ -239,32 +255,45 @@ class _AuthTextField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = scheme.brightness == Brightness.dark;
+    final textColor = Theme.of(context).textTheme.bodyMedium?.color;
+    final iconColor = Theme.of(context).iconTheme.color ?? textColor;
+    final borderColor = isDark
+        ? Colors.white.withValues(alpha: 0.10)
+        : Colors.black.withValues(alpha: 0.10);
+    final fillColor = isDark
+        ? Colors.white.withValues(alpha: 0.05)
+        : Colors.white.withValues(alpha: 0.78);
+
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.05),
+        color: fillColor,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
+        border: Border.all(color: borderColor),
       ),
       child: TextField(
         controller: controller,
         obscureText: obscureText,
         textInputAction: textInputAction,
-        style: const TextStyle(color: Colors.white),
+        style: TextStyle(color: textColor),
         decoration: InputDecoration(
           filled: false,
           border: InputBorder.none,
           enabledBorder: InputBorder.none,
           focusedBorder: InputBorder.none,
           hintText: label,
-          hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.65)),
-          prefixIcon: Icon(icon, color: Colors.white.withValues(alpha: 0.70)),
+          hintStyle: TextStyle(
+            color: textColor?.withValues(alpha: isDark ? 0.65 : 0.55),
+          ),
+          prefixIcon: Icon(icon, color: iconColor?.withValues(alpha: 0.70)),
           suffixIcon: suffixIcon == null
               ? null
               : IconButton(
                   onPressed: onSuffixPressed,
                   icon: Icon(
                     suffixIcon,
-                    color: Colors.white.withValues(alpha: 0.70),
+                    color: iconColor?.withValues(alpha: 0.70),
                   ),
                 ),
           contentPadding: const EdgeInsets.symmetric(
