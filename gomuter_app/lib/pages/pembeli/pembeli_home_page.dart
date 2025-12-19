@@ -1299,28 +1299,41 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
                           _buyerPosition!.latitude,
                           _buyerPosition!.longitude,
                         ),
-                        width: 24,
-                        height: 24,
+                        width: 44,
+                        height: 44,
                         alignment: Alignment.center,
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: _themeManager.primaryGreen,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white, width: 2),
-                            boxShadow: [
-                              BoxShadow(
-                                color: _themeManager.primaryGreen.withValues(
-                                  alpha: 0.5,
-                                ),
-                                blurRadius: 8,
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            Container(
+                              width: 42,
+                              height: 42,
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.18),
+                                    blurRadius: 10,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
                               ),
-                            ],
-                          ),
-                          child: const Icon(
-                            Icons.my_location_rounded,
-                            color: Colors.white,
-                            size: 14,
-                          ),
+                            ),
+                            Container(
+                              width: 34,
+                              height: 34,
+                              decoration: BoxDecoration(
+                                color: _themeManager.accentGold,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.person_rounded,
+                                color: Colors.white,
+                                size: 20,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
