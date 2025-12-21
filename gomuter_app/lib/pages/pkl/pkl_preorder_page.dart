@@ -4,6 +4,7 @@ import 'package:gomuter_app/utils/theme_manager.dart';
 import 'package:gomuter_app/utils/token_manager.dart';
 import 'package:gomuter_app/widgets/pkl_bottom_nav.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 class PklPreOrderPage extends StatefulWidget {
   const PklPreOrderPage({super.key});
@@ -368,6 +369,44 @@ class _PklPreOrderPageState extends State<PklPreOrderPage> {
     );
   }
 
+  Future<void> _showPickupMapDialog(LatLng pos, String address) async {
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Lokasi Penjemputan'),
+          content: SizedBox(
+            width: double.maxFinite,
+            height: 320,
+            child: Column(
+              children: [
+                Expanded(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: GoogleMap(
+                      initialCameraPosition: CameraPosition(target: pos, zoom: 16),
+                      markers: {
+                        Marker(markerId: const MarkerId('pickup'), position: pos),
+                      },
+                      zoomControlsEnabled: false,
+                      myLocationEnabled: false,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(address, style: const TextStyle(fontSize: 13)),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Tutup')),
+          ],
+        );
+      },
+    );
+  }
+
   Widget _buildEmptyState() {
     final textColor = _themeManager.textColor;
     final mutedText = _themeManager.mutedTextColor;
@@ -614,10 +653,19 @@ class _PklPreOrderPageState extends State<PklPreOrderPage> {
                 ),
               ),
               const SizedBox(height: 14),
-              _buildInfoRow(
-                Icons.location_on_rounded,
-                'Alamat pickup',
-                pickupAddress,
+              GestureDetector(
+                onTap: (latitude != null && longitude != null)
+                    ? () {
+                        final lat = (latitude as num).toDouble();
+                        final lng = (longitude as num).toDouble();
+                        _showPickupMapDialog(LatLng(lat, lng), pickupAddress);
+                      }
+                    : null,
+                child: _buildInfoRow(
+                  Icons.location_on_rounded,
+                  'Alamat pickup',
+                  pickupAddress,
+                ),
               ),
               if (latitude != null && longitude != null)
                 _buildInfoRow(

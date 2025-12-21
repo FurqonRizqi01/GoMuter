@@ -1,5 +1,14 @@
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:geocoding/geocoding.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:gomuter_app/api_service.dart';
 import 'package:gomuter_app/utils/theme_manager.dart';
 import 'package:gomuter_app/utils/token_manager.dart';
@@ -24,9 +33,19 @@ class _PreOrderPageState extends State<PreOrderPage>
   final _deskripsiController = TextEditingController();
   final _catatanController = TextEditingController();
   final _addressController = TextEditingController();
+  final _searchController = TextEditingController();
   final _latController = TextEditingController();
   final _lngController = TextEditingController();
   final _perkiraanTotalController = TextEditingController();
+
+  // Map related
+  final MapController _mapController = MapController();
+  LatLng? _selectedLatLng;
+  LatLng? _initialCenter;
+  double _initialZoom = 12;
+  bool _mapLoading = true;
+
+  static const LatLng _fallbackCenter = LatLng(-6.200000, 106.816666);
 
   late TabController _tabController;
 
@@ -53,6 +72,7 @@ class _PreOrderPageState extends State<PreOrderPage>
     super.initState();
     _themeManager.addListener(_onThemeChanged);
     _tabController = TabController(length: 2, vsync: this);
+    _initMap();
     _loadPKLDetail();
     _loadMyOrders();
   }
@@ -64,6 +84,7 @@ class _PreOrderPageState extends State<PreOrderPage>
     _deskripsiController.dispose();
     _catatanController.dispose();
     _addressController.dispose();
+    _searchController.dispose();
     _latController.dispose();
     _lngController.dispose();
     _perkiraanTotalController.dispose();
@@ -177,6 +198,176 @@ class _PreOrderPageState extends State<PreOrderPage>
     setState(() {
       _dpAmount = computed < 5000 ? 5000 : computed;
     });
+  }
+
+  Future<void> _initMap() async {
+    // Always show a map quickly (avoid infinite spinner on web/permission issues).
+    if (mounted) {
+      setState(() {
+        _initialCenter ??= _fallbackCenter;
+        _initialZoom = 12;
+        _mapLoading = false;
+      });
+    }
+
+    try {
+      // On web, geolocation may hang while waiting for permission.
+      final permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        await Geolocator.requestPermission().timeout(
+          const Duration(seconds: 4),
+          onTimeout: () => LocationPermission.denied,
+        );
+      }
+
+      Position? pos;
+      try {
+        pos = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.high,
+        ).timeout(const Duration(seconds: 5));
+      } catch (_) {
+        pos = null;
+      }
+
+      if (pos == null) return;
+
+      final center = LatLng(pos.latitude, pos.longitude);
+      if (!mounted) return;
+      setState(() {
+        _initialCenter = center;
+        _initialZoom = 16;
+      });
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _mapController.move(center, 16);
+      });
+    } catch (_) {
+      // keep fallback
+    }
+  }
+
+  Future<LatLng?> _geocodeViaNominatim(String query) async {
+    final url = Uri.parse(
+      'https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${Uri.encodeComponent(query)}',
+    );
+    final response = await http.get(
+      url,
+      headers: const {
+        'User-Agent': 'GoMuter/1.0 (flutter)',
+      },
+    );
+    if (response.statusCode != 200) return null;
+    final decoded = jsonDecode(response.body);
+    if (decoded is! List || decoded.isEmpty) return null;
+    final first = decoded.first;
+    if (first is! Map) return null;
+    final latStr = first['lat']?.toString();
+    final lonStr = first['lon']?.toString();
+    if (latStr == null || lonStr == null) return null;
+    final lat = double.tryParse(latStr);
+    final lon = double.tryParse(lonStr);
+    if (lat == null || lon == null) return null;
+    return LatLng(lat, lon);
+  }
+
+  Future<String?> _reverseGeocodeViaNominatim(LatLng pos) async {
+    final url = Uri.parse(
+      'https://nominatim.openstreetmap.org/reverse?format=json&lat=${pos.latitude}&lon=${pos.longitude}',
+    );
+    final response = await http.get(
+      url,
+      headers: const {
+        'User-Agent': 'GoMuter/1.0 (flutter)',
+      },
+    );
+    if (response.statusCode != 200) return null;
+    final decoded = jsonDecode(response.body);
+    if (decoded is! Map) return null;
+    final name = decoded['display_name']?.toString();
+    if (name == null || name.trim().isEmpty) return null;
+    return name.trim();
+  }
+
+  Future<void> _searchAddress(String query) async {
+    if (query.trim().isEmpty) return;
+    try {
+      LatLng? latlng;
+      if (kIsWeb) {
+        latlng = await _geocodeViaNominatim(query);
+      } else {
+        final results = await locationFromAddress(query);
+        if (results.isNotEmpty) {
+          final r = results.first;
+          latlng = LatLng(r.latitude, r.longitude);
+        }
+      }
+
+      // Fallback (also covers unexpected plugin failures).
+      latlng ??= await _geocodeViaNominatim(query);
+
+      if (latlng == null) {
+        throw Exception('Alamat tidak ditemukan');
+      }
+      _selectedLatLng = latlng;
+      _addressController.text = query;
+      _latController.text = latlng.latitude.toString();
+      _lngController.text = latlng.longitude.toString();
+      _mapController.move(latlng, 16);
+      setState(() {});
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Gagal menemukan alamat: $e')),
+        );
+      }
+    }
+  }
+
+  Future<String?> _reverseGeocode(LatLng pos) async {
+    try {
+      if (kIsWeb) {
+        return await _reverseGeocodeViaNominatim(pos);
+      }
+
+      final placemarks = await placemarkFromCoordinates(
+        pos.latitude,
+        pos.longitude,
+      );
+      if (placemarks.isEmpty) {
+        return await _reverseGeocodeViaNominatim(pos);
+      }
+      final p = placemarks.first;
+      final parts = <String>[];
+      if (p.street != null && p.street!.isNotEmpty) {
+        parts.add(p.street!);
+      }
+      if (p.subLocality != null && p.subLocality!.isNotEmpty) {
+        parts.add(p.subLocality!);
+      }
+      if (p.locality != null && p.locality!.isNotEmpty) {
+        parts.add(p.locality!);
+      }
+      if (p.administrativeArea != null && p.administrativeArea!.isNotEmpty) {
+        parts.add(p.administrativeArea!);
+      }
+      final built = parts.join(', ');
+      if (built.trim().isNotEmpty) {
+        return built;
+      }
+      return await _reverseGeocodeViaNominatim(pos);
+    } catch (_) {
+      return await _reverseGeocodeViaNominatim(pos);
+    }
+  }
+
+  Future<void> _onMapTap(LatLng pos) async {
+    _selectedLatLng = pos;
+    _latController.text = pos.latitude.toString();
+    _lngController.text = pos.longitude.toString();
+    final addr = await _reverseGeocode(pos);
+    if (addr != null && addr.isNotEmpty) {
+      _addressController.text = addr;
+    }
+    if (mounted) setState(() {});
   }
 
   Future<void> _submitPreOrder({bool retryOnAuthError = true}) async {
@@ -672,6 +863,7 @@ class _PreOrderPageState extends State<PreOrderPage>
     TextInputType? keyboardType,
     String? Function(String?)? validator,
     void Function(String)? onChanged,
+    bool readOnly = false,
   }) {
     final isDark = _themeManager.isDarkMode;
     final cardBg = _themeManager.cardColor;
@@ -695,6 +887,7 @@ class _PreOrderPageState extends State<PreOrderPage>
         keyboardType: keyboardType,
         validator: validator,
         onChanged: onChanged,
+        readOnly: readOnly,
         style: TextStyle(fontSize: 15, color: _darkColor),
         decoration: InputDecoration(
           labelText: label,
@@ -978,36 +1171,8 @@ class _PreOrderPageState extends State<PreOrderPage>
               maxLines: 3,
             ),
             const SizedBox(height: 16),
-            _buildModernTextField(
-              controller: _addressController,
-              label: 'Alamat Penjemputan',
-              hint: 'Contoh: Depan Gedung A, lantai 1',
-              icon: Icons.location_on_outlined,
-            ),
+            _buildLocationPicker(),
             const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildModernTextField(
-                    controller: _latController,
-                    label: 'Latitude',
-                    hint: '-6.xxx',
-                    icon: Icons.my_location,
-                    keyboardType: TextInputType.number,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _buildModernTextField(
-                    controller: _lngController,
-                    label: 'Longitude',
-                    hint: '106.xxx',
-                    icon: Icons.explore,
-                    keyboardType: TextInputType.number,
-                  ),
-                ),
-              ],
-            ),
             const SizedBox(height: 16),
             _buildModernTextField(
               controller: _perkiraanTotalController,
@@ -1089,6 +1254,120 @@ class _PreOrderPageState extends State<PreOrderPage>
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildLocationPicker() {
+    final border = BorderRadius.circular(12);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Lokasi Penjemputan', style: TextStyle(fontWeight: FontWeight.w700, color: _darkColor)),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: TextFormField(
+                controller: _searchController,
+                decoration: InputDecoration(
+                  prefixIcon: const Icon(Icons.search),
+                  hintText: 'Cari alamat...',
+                  border: OutlineInputBorder(borderRadius: border),
+                ),
+                textInputAction: TextInputAction.search,
+                onFieldSubmitted: (v) => _searchAddress(v),
+              ),
+            ),
+            const SizedBox(width: 8),
+            ElevatedButton(
+              onPressed: () => _searchAddress(_searchController.text),
+              child: const Text('Cari'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Container(
+          height: 220,
+          decoration: BoxDecoration(
+            borderRadius: border,
+            border: Border.all(color: _borderColor),
+            color: _themeManager.surfaceColor,
+          ),
+          child: ClipRRect(
+            borderRadius: border,
+            child: _mapLoading || _initialCenter == null
+                ? const Center(child: CircularProgressIndicator())
+                : FlutterMap(
+                    mapController: _mapController,
+                    options: MapOptions(
+                      initialCenter: _initialCenter!,
+                      initialZoom: _initialZoom,
+                      onTap: (tapPosition, point) => _onMapTap(point),
+                      interactionOptions: const InteractionOptions(
+                        flags: InteractiveFlag.all,
+                      ),
+                    ),
+                    children: [
+                      TileLayer(
+                        urlTemplate:
+                            'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                        userAgentPackageName: 'com.gomuter.app',
+                      ),
+                      if (_selectedLatLng != null)
+                        MarkerLayer(
+                          markers: [
+                            Marker(
+                              point: _selectedLatLng!,
+                              width: 46,
+                              height: 46,
+                              child: Icon(
+                                Icons.location_on_rounded,
+                                size: 42,
+                                color: _primaryColor,
+                              ),
+                            ),
+                          ],
+                        ),
+                    ],
+                  ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: _buildModernTextField(
+                controller: _addressController,
+                label: 'Alamat (tersimpan)',
+                hint: 'Alamat hasil pencarian / titik di peta',
+                icon: Icons.location_on_outlined,
+                readOnly: true,
+              ),
+            ),
+            const SizedBox(width: 8),
+            ElevatedButton(
+              onPressed: _selectedLatLng == null
+                  ? null
+                  : () async {
+                      // Save selected location into controllers
+                      final pos = _selectedLatLng!;
+                      _latController.text = pos.latitude.toString();
+                      _lngController.text = pos.longitude.toString();
+                      final addr = await _reverseGeocode(pos);
+                      if (addr != null && addr.isNotEmpty) {
+                        _addressController.text = addr;
+                      }
+                      if (!mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Titik penjemputan disimpan.')),
+                      );
+                      setState(() {});
+                    },
+              child: const Text('Simpan titik'),
+            ),
+          ],
+        ),
+      ],
     );
   }
 
