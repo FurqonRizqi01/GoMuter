@@ -4,7 +4,8 @@ import 'package:gomuter_app/utils/theme_manager.dart';
 import 'package:gomuter_app/utils/token_manager.dart';
 import 'package:gomuter_app/widgets/pkl_bottom_nav.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 
 class PklPreOrderPage extends StatefulWidget {
   const PklPreOrderPage({super.key});
@@ -384,13 +385,38 @@ class _PklPreOrderPageState extends State<PklPreOrderPage> {
                 Expanded(
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(8),
-                    child: GoogleMap(
-                      initialCameraPosition: CameraPosition(target: pos, zoom: 16),
-                      markers: {
-                        Marker(markerId: const MarkerId('pickup'), position: pos),
-                      },
-                      zoomControlsEnabled: false,
-                      myLocationEnabled: false,
+                    child: FlutterMap(
+                      options: MapOptions(
+                        initialCenter: pos,
+                        initialZoom: 16,
+                        interactionOptions: const InteractionOptions(
+                          flags: InteractiveFlag.drag |
+                              InteractiveFlag.pinchZoom |
+                              InteractiveFlag.doubleTapZoom |
+                              InteractiveFlag.flingAnimation,
+                        ),
+                      ),
+                      children: [
+                        TileLayer(
+                          urlTemplate:
+                              'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                          userAgentPackageName: 'com.example.gomuter_app',
+                        ),
+                        MarkerLayer(
+                          markers: [
+                            Marker(
+                              point: pos,
+                              width: 44,
+                              height: 44,
+                              child: Icon(
+                                Icons.location_on_rounded,
+                                color: _themeManager.primaryGreen,
+                                size: 44,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
                   ),
                 ),
