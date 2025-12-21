@@ -1,4 +1,5 @@
 import 'dart:ui';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -440,8 +441,34 @@ class _AuthPageState extends State<AuthPage> {
         _isLogin = true;
       });
     } catch (e) {
+      String message = 'Registrasi gagal. Pastikan data valid.';
+      try {
+        final jsonMatch = RegExp(r'(\{.*\})', dotAll: true).firstMatch(e.toString())?.group(1);
+        if (jsonMatch != null) {
+          final Map<String, dynamic> body = jsonDecode(jsonMatch);
+          if (body.containsKey('username')) {
+            final uErr = body['username'];
+            final errMsg = uErr is List ? uErr.join(' ') : uErr.toString();
+            final uname = _usernameController.text.trim();
+            message = "Username '$uname' sudah digunakan. $errMsg Silakan pilih username lain.";
+          } else if (body.containsKey('email')) {
+            final eErr = body['email'];
+            message = eErr is List ? eErr.join(' ') : eErr.toString();
+          } else if (body.containsKey('non_field_errors')) {
+            final nf = body['non_field_errors'];
+            message = nf is List ? nf.join(' ') : nf.toString();
+          } else if (body.isNotEmpty) {
+            final first = body.entries.first;
+            final val = first.value;
+            message = val is List ? val.join(' ') : val.toString();
+          }
+        }
+      } catch (_) {
+        // ignore parse errors and fall back to generic message
+      }
+
       setState(() {
-        _errorText = 'Registrasi gagal. Pastikan data valid.';
+        _errorText = message;
       });
     } finally {
       if (mounted) {

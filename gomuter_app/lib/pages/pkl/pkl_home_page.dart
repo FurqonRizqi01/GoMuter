@@ -719,41 +719,7 @@ class _PklHomePageState extends State<PklHomePage> {
                       ),
                     ),
                   ),
-                  if (_isNewProfile)
-                    Positioned(
-                      left: 16,
-                      right: 16,
-                      bottom: 74,
-                      child: Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Color.alphaBlend(
-                            _themeManager.accentGold.withValues(alpha: 0.20),
-                            cardColor,
-                          ),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: borderColor),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.info_outline_rounded,
-                              color: _themeManager.accentGold,
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Text(
-                                'Lengkapi profil dagangan untuk mengaktifkan fitur lokasi.',
-                                style: TextStyle(
-                                  color: textColor,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
+
                 ],
               ),
             ),
@@ -761,6 +727,7 @@ class _PklHomePageState extends State<PklHomePage> {
         ),
       ),
     );
+
   }
 
   Widget _buildHeroSection() {
@@ -789,7 +756,7 @@ class _PklHomePageState extends State<PklHomePage> {
               Expanded(
                 child: _buildQuickMenuButton(
                   icon: Icons.storefront_outlined,
-                  label: 'Produk',
+                  label: 'Dagangan',
                   onTap: _openEditInfoPage,
                 ),
               ),
@@ -1245,14 +1212,45 @@ class _PklHomePageState extends State<PklHomePage> {
                   Container(
                     width: double.infinity,
                     margin: const EdgeInsets.only(bottom: 12),
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFFFF3E0),
+                      color: Color.alphaBlend(
+                        _themeManager.accentGold.withValues(alpha: 0.20),
+                        Theme.of(context).cardColor,
+                      ),
                       borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Theme.of(context).dividerColor),
                     ),
-                    child: const Text(
-                      'Profil kamu belum diajukan. Lengkapi data dagangan agar pembeli dapat menemukanmu.',
-                      style: TextStyle(color: Color(0xFFBF360C)),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.info_outline_rounded,
+                          color: _themeManager.accentGold,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Lengkapi profil dagangan untuk mengaktifkan fitur lokasi.',
+                                style: TextStyle(
+                                  color: _themeManager.textColor,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                'Klik menu cepat dagangan atau ikon tambah pada navbar untuk mengisi informasi profil dagangan.',
+                                style: TextStyle(
+                                  color: _themeManager.textColor,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                   ),
               ],
