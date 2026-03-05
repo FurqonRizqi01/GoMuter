@@ -28,6 +28,7 @@ from .views import (
     NotificationMarkReadView,
     PKLProductListCreateView,
     PKLProductDetailView,
+    UpdateFCMTokenView,
 )
 from .views_chat import ChatListView, StartChatView, ChatMessagesView
 
@@ -42,6 +43,7 @@ urlpatterns = [
     path('buyer/favorites/<int:pkl_id>/', FavoritePKLDeleteView.as_view(), name='buyer-favorite-delete'),
     path('buyer/notifications/', NotificationListView.as_view(), name='buyer-notification-list'),
     path('buyer/notifications/<int:notification_id>/read/', NotificationMarkReadView.as_view(), name='buyer-notification-read'),
+    path('accounts/fcm-token/', UpdateFCMTokenView.as_view(), name='update-fcm-token'),
 
     # PKL product management
     path('products/', PKLProductListCreateView.as_view(), name='pkl-product-list-create'),

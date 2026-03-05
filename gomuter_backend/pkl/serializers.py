@@ -6,6 +6,7 @@ from .models import (
     Chat,
     ChatMessage,
     PreOrder,
+    PreOrderItem,
     BuyerLocation,
     FavoritePKL,
     Notification,
@@ -178,9 +179,26 @@ class ChatSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'created_at', 'updated_at', 'pembeli']
 
 
+class PreOrderItemSerializer(serializers.ModelSerializer):
+    subtotal = serializers.IntegerField(read_only=True)
+
+    class Meta:
+        model = PreOrderItem
+        fields = [
+            'id',
+            'product',
+            'product_name',
+            'product_price',
+            'quantity',
+            'subtotal',
+        ]
+        read_only_fields = ['id']
+
+
 class PreOrderSerializer(serializers.ModelSerializer):
     pkl_nama_usaha = serializers.CharField(source='pkl.nama_usaha', read_only=True)
     pembeli_username = serializers.CharField(source='pembeli.username', read_only=True)
+    items = PreOrderItemSerializer(many=True, read_only=True)
 
     class Meta:
         model = PreOrder
@@ -196,11 +214,13 @@ class PreOrderSerializer(serializers.ModelSerializer):
             'pickup_latitude',
             'pickup_longitude',
             'status',
+            'total_price',
             'dp_amount',
             'dp_status',
             'bukti_dp_url',
             'created_at',
             'updated_at',
+            'items',
         ]
         read_only_fields = ['id', 'pembeli', 'pkl', 'status', 'created_at', 'updated_at']
 

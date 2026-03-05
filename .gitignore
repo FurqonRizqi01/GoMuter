@@ -20,6 +20,23 @@ secret.key
 *.pem
 *.crt
 
+# Django settings with hardcoded secrets
+# Use .env + django-environ in production instead
+gomuter_backend/gomuter_backend/settings.py
+
+# Firebase service account key
+**/serviceAccountKey.json
+
+# User-uploaded media files
+gomuter_backend/media/
+
+# Flutter app local config (IP addresses etc)
+gomuter_app/lib/config.dart
+
+# Database files
+*.sqlite3
+db.sqlite3
+
 # Flutter / Dart tool output
 .dart_tool/
 .flutter-plugins

@@ -625,7 +625,7 @@ class _PklEditInfoPageState extends State<PklEditInfoPage> {
                           child: ElevatedButton(
                             onPressed: submit,
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF0D8A3A),
+                              backgroundColor: const Color(0xFFF97316),
                             ),
                             child: const Text('Simpan'),
                           ),
@@ -727,7 +727,7 @@ class _PklEditInfoPageState extends State<PklEditInfoPage> {
                     ? null
                     : _handleAddProduct,
                 style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFF0D8A3A),
+                  backgroundColor: const Color(0xFFF97316),
                   padding: const EdgeInsets.symmetric(
                     horizontal: 16,
                     vertical: 12,
@@ -742,8 +742,8 @@ class _PklEditInfoPageState extends State<PklEditInfoPage> {
             const Padding(
               padding: EdgeInsets.only(top: 16),
               child: LinearProgressIndicator(
-                color: Color(0xFF0D8A3A),
-                backgroundColor: Color(0xFFE8F5E9),
+                color: Color(0xFFF97316),
+                backgroundColor: Color(0xFFFFF7ED),
               ),
             ),
           if (_productError != null)
@@ -776,12 +776,12 @@ class _PklEditInfoPageState extends State<PklEditInfoPage> {
                   Container(
                     padding: const EdgeInsets.all(18),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFE8F5E9),
+                      color: const Color(0xFFFFF7ED),
                       shape: BoxShape.circle,
                     ),
                     child: const Icon(
                       Icons.coffee_maker_outlined,
-                      color: Color(0xFF0D8A3A),
+                      color: Color(0xFFF97316),
                       size: 32,
                     ),
                   ),
@@ -852,7 +852,7 @@ class _PklEditInfoPageState extends State<PklEditInfoPage> {
                   style: const TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFF0D8A3A),
+                    color: Color(0xFFF97316),
                   ),
                 ),
                 if (description != null && description.isNotEmpty) ...[
@@ -874,7 +874,7 @@ class _PklEditInfoPageState extends State<PklEditInfoPage> {
                     _buildTag(
                       isAvailable ? 'Tersedia' : 'Stok habis',
                       isAvailable
-                          ? const Color(0xFF0D8A3A)
+                          ? const Color(0xFFF97316)
                           : const Color(0xFFD32F2F),
                     ),
                   ],
@@ -1070,7 +1070,7 @@ class _PklEditInfoPageState extends State<PklEditInfoPage> {
                     child: ElevatedButton(
                       onPressed: _isSaving ? null : _saveProfile,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF0D8A3A),
+                        backgroundColor: const Color(0xFFF97316),
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 18),
                         shape: RoundedRectangleBorder(
@@ -1145,10 +1145,10 @@ class _PklEditInfoPageState extends State<PklEditInfoPage> {
               margin: const EdgeInsets.all(12),
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: _themeManager.accentSurfaceColor,
+                color: _themeManager.pklAccentSurface,
                 borderRadius: BorderRadius.circular(14),
               ),
-              child: Icon(icon, color: _themeManager.primaryGreen, size: 22),
+              child: Icon(icon, color: _themeManager.pklPrimary, size: 22),
             ),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(22),
@@ -1160,7 +1160,7 @@ class _PklEditInfoPageState extends State<PklEditInfoPage> {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(22),
-              borderSide: const BorderSide(color: Color(0xFF0D8A3A), width: 2),
+              borderSide: const BorderSide(color: Color(0xFFF97316), width: 2),
             ),
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 20,
@@ -1170,7 +1170,7 @@ class _PklEditInfoPageState extends State<PklEditInfoPage> {
             hintStyle: TextStyle(color: _themeManager.hintTextColor),
           ),
           style: TextStyle(color: textColor),
-          cursorColor: _themeManager.primaryGreen,
+          cursorColor: _themeManager.pklPrimary,
         ),
       ],
     );

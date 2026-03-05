@@ -176,14 +176,14 @@ class _PklChatRoomPageState extends State<PklChatRoomPage> {
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
-                  colors: [Color(0xFF25D366), Color(0xFF0D8A3A)],
+                  colors: [Color(0xFFF97316), Color(0xFFFB923C)],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFF0D8A3A).withValues(alpha: 0.3),
+                    color: const Color(0xFFF97316).withValues(alpha: 0.3),
                     blurRadius: 8,
                     offset: const Offset(0, 4),
                   ),
@@ -284,13 +284,13 @@ class _PklChatRoomPageState extends State<PklChatRoomPage> {
             Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                color: _themeManager.accentSurfaceColor,
+                color: _themeManager.pklAccentSurface,
                 shape: BoxShape.circle,
               ),
               child: Icon(
                 Icons.chat_bubble_outline_rounded,
                 size: 48,
-                color: _themeManager.primaryGreen,
+                color: _themeManager.pklPrimary,
               ),
             ),
             const SizedBox(height: 20),
@@ -333,7 +333,7 @@ class _PklChatRoomPageState extends State<PklChatRoomPage> {
             decoration: BoxDecoration(
               gradient: isMe
                   ? const LinearGradient(
-                      colors: [Color(0xFF25D366), Color(0xFF0D8A3A)],
+                      colors: [Color(0xFFF97316), Color(0xFFFB923C)],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     )
@@ -348,7 +348,7 @@ class _PklChatRoomPageState extends State<PklChatRoomPage> {
               boxShadow: [
                 BoxShadow(
                   color: isMe
-                      ? const Color(0xFF0D8A3A).withValues(alpha: 0.3)
+                      ? const Color(0xFFF97316).withValues(alpha: 0.3)
                       : Colors.black.withValues(alpha: 0.06),
                   blurRadius: 12,
                   offset: const Offset(0, 4),
@@ -367,7 +367,7 @@ class _PklChatRoomPageState extends State<PklChatRoomPage> {
                     fontWeight: FontWeight.w700,
                     color: isMe
                         ? Colors.white.withValues(alpha: 0.8)
-                        : _themeManager.primaryGreen,
+                        : _themeManager.pklPrimary,
                   ),
                 ),
                 const SizedBox(height: 6),
@@ -438,14 +438,14 @@ class _PklChatRoomPageState extends State<PklChatRoomPage> {
             Container(
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
-                  colors: [Color(0xFF25D366), Color(0xFF0D8A3A)],
+                  colors: [Color(0xFFF97316), Color(0xFFFB923C)],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFF0D8A3A).withValues(alpha: 0.4),
+                    color: const Color(0xFFF97316).withValues(alpha: 0.4),
                     blurRadius: 12,
                     offset: const Offset(0, 6),
                   ),

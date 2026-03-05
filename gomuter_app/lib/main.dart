@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'navigation/admin_routes.dart';
 import 'navigation/pkl_routes.dart';
 import 'pages/admin/admin_home_page.dart';
@@ -13,12 +15,79 @@ import 'pages/pkl/pkl_profile_page.dart';
 import 'web/file_picker_web_registrar.dart';
 import 'pages/auth/auth_page.dart';
 import 'utils/theme_manager.dart';
+import 'utils/notification_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  await _initializeFirebase();
+
   ensureFilePickerWebRegistered();
   await initializeDateFormatting('id');
   runApp(const GoMuterApp());
+
+  // Initialize notifications AFTER app UI is shown (non-blocking)
+  if (Firebase.apps.isNotEmpty) {
+    try {
+      await NotificationService().initialize();
+    } catch (e) {
+      debugPrint('Warning: Failed to initialize NotificationService: $e');
+    }
+  } else {
+    debugPrint(
+      'Warning: Skipping NotificationService initialization because Firebase is not initialized.',
+    );
+  }
+}
+
+Future<void> _initializeFirebase() async {
+  try {
+    if (kIsWeb) {
+      const apiKey = String.fromEnvironment('FIREBASE_WEB_API_KEY');
+      const appId = String.fromEnvironment('FIREBASE_WEB_APP_ID');
+      const messagingSenderId = String.fromEnvironment(
+        'FIREBASE_WEB_MESSAGING_SENDER_ID',
+      );
+      const projectId = String.fromEnvironment('FIREBASE_WEB_PROJECT_ID');
+      const authDomain = String.fromEnvironment('FIREBASE_WEB_AUTH_DOMAIN');
+      const storageBucket = String.fromEnvironment(
+        'FIREBASE_WEB_STORAGE_BUCKET',
+      );
+      const measurementId = String.fromEnvironment(
+        'FIREBASE_WEB_MEASUREMENT_ID',
+      );
+
+      final hasRequiredWebOptions =
+          apiKey.isNotEmpty &&
+          appId.isNotEmpty &&
+          messagingSenderId.isNotEmpty &&
+          projectId.isNotEmpty;
+
+      if (!hasRequiredWebOptions) {
+        debugPrint(
+          'Warning: Firebase Web config is missing. Pass --dart-define FIREBASE_WEB_API_KEY, FIREBASE_WEB_APP_ID, FIREBASE_WEB_MESSAGING_SENDER_ID, and FIREBASE_WEB_PROJECT_ID.',
+        );
+        return;
+      }
+
+      await Firebase.initializeApp(
+        options: FirebaseOptions(
+          apiKey: apiKey,
+          appId: appId,
+          messagingSenderId: messagingSenderId,
+          projectId: projectId,
+          authDomain: authDomain.isEmpty ? null : authDomain,
+          storageBucket: storageBucket.isEmpty ? null : storageBucket,
+          measurementId: measurementId.isEmpty ? null : measurementId,
+        ),
+      );
+      return;
+    }
+
+    await Firebase.initializeApp();
+  } catch (e) {
+    debugPrint('Warning: Failed to initialize Firebase: $e');
+  }
 }
 
 class GoMuterApp extends StatelessWidget {

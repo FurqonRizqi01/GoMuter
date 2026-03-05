@@ -2,6 +2,7 @@ from rest_framework import generics, permissions, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from rest_framework_simplejwt.views import TokenObtainPairView
 
 from django.conf import settings
 from django.contrib.auth.tokens import default_token_generator
@@ -13,6 +14,7 @@ import logging
 
 from .models import User
 from .serializers import (
+    CustomTokenObtainPairSerializer,
     RegisterSerializer,
     UserMeSerializer,
     UserMeUpdateSerializer,
@@ -21,6 +23,10 @@ from .serializers import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+class CustomTokenObtainPairView(TokenObtainPairView):
+    serializer_class = CustomTokenObtainPairSerializer
 
 class RegisterView(generics.CreateAPIView):
     queryset = User.objects.all()

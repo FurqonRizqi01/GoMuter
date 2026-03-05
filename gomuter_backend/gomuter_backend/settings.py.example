@@ -1,0 +1,39 @@
+# Copy this file to settings.py and fill in your values
+# DO NOT commit settings.py to git!
+
+import os
+from pathlib import Path
+from datetime import timedelta
+
+import firebase_admin
+from firebase_admin import credentials
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+# SECURITY WARNING: Change this to a unique, unpredictable value!
+SECRET_KEY = 'CHANGE-ME-to-a-random-secret-key'
+
+DEBUG = True
+
+ALLOWED_HOSTS = ['*']
+
+# Database
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'gomuter_db',
+        'USER': 'postgres',
+        'PASSWORD': 'YOUR_DB_PASSWORD_HERE',
+        'HOST': 'localhost',
+        'PORT': '5432',
+    }
+}
+
+# Firebase
+FIREBASE_KEY_PATH = BASE_DIR / "serviceAccountKey.json"
+
+# Email (password reset)
+EMAIL_HOST_USER = os.getenv('GOMUTER_EMAIL_HOST_USER', '').strip()
+EMAIL_HOST_PASSWORD = os.getenv('GOMUTER_EMAIL_HOST_PASSWORD', '').strip()
+
+# See the full settings.py for remaining configuration (INSTALLED_APPS, MIDDLEWARE, etc.)

@@ -7,6 +7,8 @@ from .models import (
     Notification,
     PKLDailyStats,
     PKLProduct,
+    PreOrder,
+    PreOrderItem,
 )
 
 @admin.register(PKL)
@@ -51,3 +53,17 @@ class PKLProductAdmin(admin.ModelAdmin):
     list_display = ('name', 'pkl', 'price', 'is_available', 'is_featured', 'updated_at')
     list_filter = ('is_available', 'is_featured')
     search_fields = ('name', 'pkl__nama_usaha')
+
+
+class PreOrderItemInline(admin.TabularInline):
+    model = PreOrderItem
+    extra = 0
+    readonly_fields = ('product', 'product_name', 'product_price', 'quantity')
+
+
+@admin.register(PreOrder)
+class PreOrderAdmin(admin.ModelAdmin):
+    list_display = ('id', 'pembeli', 'pkl', 'status', 'dp_amount', 'dp_status', 'created_at')
+    list_filter = ('status', 'dp_status')
+    search_fields = ('pembeli__username', 'pkl__nama_usaha')
+    inlines = [PreOrderItemInline]

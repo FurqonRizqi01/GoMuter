@@ -25,11 +25,12 @@ class PklDetailPage extends StatefulWidget {
 
 class _PklDetailPageState extends State<PklDetailPage> {
   final ThemeManager _themeManager = ThemeManager();
+  static const Duration _statusPollingInterval = Duration(seconds: 10);
 
-  Color get _primary => _themeManager.primaryGreen;
-  Color get _secondary => _themeManager.primaryGreen.withValues(alpha: 0.85);
-  Color get _softSurface => _themeManager.accentSurfaceColor;
-  Color get _ctaAccent => _themeManager.accentGold;
+  Color get _primary => _themeManager.primaryOrange;
+  Color get _secondary => _themeManager.secondaryOrange;
+  Color get _softSurface => _themeManager.orangeSurfaceColor;
+  Color get _ctaAccent => _themeManager.primaryOrange;
 
   Map<String, dynamic>? _detail;
   bool _isLoading = false;
@@ -42,9 +43,16 @@ class _PklDetailPageState extends State<PklDetailPage> {
   double? _userRatingScore;
   String? _userRatingComment;
   bool _isRatingLoading = false;
+  bool _isFavorite = false;
+  bool _isFavoriteLoading = false;
+  Timer? _statusPollingTimer;
+  bool _isStatusPolling = false;
 
   bool _isBuyerMarkerSelected = false;
   bool _isPklMarkerSelected = false;
+
+  // Cart: productId → quantity
+  final Map<int, int> _cart = {};
 
   @override
   void initState() {
@@ -57,12 +65,41 @@ class _PklDetailPageState extends State<PklDetailPage> {
     _loadDetail(initial: true);
     _loadRatingSummary();
     _loadBuyerLocation();
+    _loadFavoriteState();
+    _startStatusPolling();
   }
 
   @override
   void dispose() {
+    _statusPollingTimer?.cancel();
     _themeManager.removeListener(_onThemeChanged);
     super.dispose();
+  }
+
+  void _startStatusPolling() {
+    _statusPollingTimer?.cancel();
+    _statusPollingTimer = Timer.periodic(_statusPollingInterval, (_) {
+      _pollStatusSilently();
+    });
+  }
+
+  Future<void> _pollStatusSilently() async {
+    if (!mounted || _isStatusPolling) return;
+    _isStatusPolling = true;
+    try {
+      final data = await ApiService.getPKLDetail(widget.pklId);
+      if (!mounted) return;
+
+      setState(() {
+        _detail = Map<String, dynamic>.from(data);
+        _pklLatLng = _extractLatLng(_detail);
+        _distanceMeters = _computeDistance(_buyerLatLng, _pklLatLng);
+      });
+    } catch (_) {
+      // Keep UI stable when polling fails briefly (network spikes, backend restart).
+    } finally {
+      _isStatusPolling = false;
+    }
   }
 
   void _onThemeChanged() {
@@ -309,6 +346,81 @@ class _PklDetailPageState extends State<PklDetailPage> {
     await _loadRatingSummary();
   }
 
+  Future<void> _loadFavoriteState() async {
+    try {
+      final token = await TokenManager.getValidAccessToken();
+      if (token == null) return;
+
+      final favorites = await ApiService.getFavoritePKL(token: token);
+      final isFavorite = favorites.any((fav) {
+        if (fav is! Map<String, dynamic>) return false;
+        final pklValue = fav['pkl'];
+        if (pklValue is num) {
+          return pklValue.toInt() == widget.pklId;
+        }
+        return false;
+      });
+
+      if (!mounted) return;
+      setState(() {
+        _isFavorite = isFavorite;
+      });
+    } catch (_) {
+      // Ignore favorite state errors to keep detail page responsive.
+    }
+  }
+
+  Future<void> _toggleFavorite() async {
+    if (_isFavoriteLoading) return;
+
+    final token = await TokenManager.getValidAccessToken();
+    if (token == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Sesi berakhir. Silakan login ulang.')),
+      );
+      return;
+    }
+
+    setState(() {
+      _isFavoriteLoading = true;
+    });
+
+    try {
+      if (_isFavorite) {
+        await ApiService.removeFavoritePKL(token: token, pklId: widget.pklId);
+      } else {
+        await ApiService.addFavoritePKL(token: token, pklId: widget.pklId);
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _isFavorite = !_isFavorite;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            _isFavorite
+                ? 'PKL ditambahkan ke favorit'
+                : 'PKL dihapus dari favorit',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal memperbarui favorit: $e')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isFavoriteLoading = false;
+        });
+      }
+    }
+  }
+
   void _showRatingSheet() {
     double currentValue = _userRatingScore ?? 4.0;
     final controller = TextEditingController(text: _userRatingComment ?? '');
@@ -537,14 +649,65 @@ class _PklDetailPageState extends State<PklDetailPage> {
     await ChatBadgeManager.markChatsSeen(ChatRole.pembeli);
   }
 
+  int get _cartTotal {
+    final data = _detail;
+    if (data == null) return 0;
+    final productsRaw = data['products'];
+    final products = productsRaw is List ? productsRaw : const [];
+    int total = 0;
+    for (final entry in _cart.entries) {
+      final product = products.cast<Map<String, dynamic>?>().firstWhere(
+        (p) => p != null && p['id'] == entry.key,
+        orElse: () => null,
+      );
+      if (product != null) {
+        total += ((product['price'] as num?)?.toInt() ?? 0) * entry.value;
+      }
+    }
+    return total;
+  }
+
+  int get _cartItemCount {
+    int count = 0;
+    for (final qty in _cart.values) {
+      count += qty;
+    }
+    return count;
+  }
+
   void _openPreorder() {
     final data = _detail;
     if (data == null) return;
     final name = (data['nama_usaha'] ?? '-') as String;
+    final productsRaw = data['products'];
+    final products = productsRaw is List ? productsRaw : const [];
+
+    // Build cart items list
+    final cartItems = <Map<String, dynamic>>[];
+    for (final entry in _cart.entries) {
+      final product = products.cast<Map<String, dynamic>?>().firstWhere(
+        (p) => p != null && p['id'] == entry.key,
+        orElse: () => null,
+      );
+      if (product != null) {
+        cartItems.add({
+          'product_id': product['id'],
+          'name': product['name'],
+          'price': product['price'],
+          'quantity': entry.value,
+          'image_url': product['image_url'],
+        });
+      }
+    }
+
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => PreOrderPage(pklId: widget.pklId, pklName: name),
+        builder: (_) => PreOrderPage(
+          pklId: widget.pklId,
+          pklName: name,
+          initialCart: cartItems.isEmpty ? null : cartItems,
+        ),
       ),
     );
   }
@@ -710,210 +873,265 @@ class _PklDetailPageState extends State<PklDetailPage> {
   Widget _buildHeader(Map<String, dynamic> data) {
     final name = (data['nama_usaha'] ?? '-') as String;
     final jenis = (data['jenis_dagangan'] ?? '-') as String;
-    // jam_operasional is available in data if needed
+    final alamat = (data['alamat_domisili'] ?? '-') as String;
     final isActive = data['status_aktif'] == true;
     final avgRating = (_ratingSummary?['average_rating'] as num?)?.toDouble();
     final ratingCount = (_ratingSummary?['rating_count'] as num?)?.toInt() ?? 0;
 
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [_primary, _secondary],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: const BorderRadius.only(
-          bottomLeft: Radius.circular(32),
-          bottomRight: Radius.circular(32),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: _primary.withValues(alpha: 0.3),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
+    // Collect product images for hero
+    final productsRaw = data['products'];
+    final products = productsRaw is List ? productsRaw : const [];
+    String? heroImageUrl;
+    for (final item in products) {
+      if (item is Map) {
+        final url = item['image_url'];
+        if (url is String && url.isNotEmpty) {
+          heroImageUrl = url;
+          break;
+        }
+      }
+    }
+
+    final isDark = _themeManager.isDarkMode;
+
+    return SizedBox(
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          // Hero image
+          Container(
+            height: 220,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [_primary, _secondary],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+            ),
+            child: heroImageUrl != null
+                ? Image.network(
+                    heroImageUrl,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Center(
+                      child: Icon(
+                        _getCategoryIcon(jenis),
+                        size: 64,
+                        color: Colors.white.withValues(alpha: 0.5),
+                      ),
+                    ),
+                  )
+                : Center(
+                    child: Icon(
+                      _getCategoryIcon(jenis),
+                      size: 64,
+                      color: Colors.white.withValues(alpha: 0.5),
+                    ),
+                  ),
           ),
-        ],
-      ),
-      child: SafeArea(
-        bottom: false,
-        child: Column(
-          children: [
-            // App Bar
-            Padding(
-              padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
-              child: Row(
-                children: [
-                  IconButton(
-                    onPressed: () => Navigator.pop(context),
-                    icon: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Icon(
-                        Icons.arrow_back_rounded,
-                        color: Colors.white,
-                        size: 20,
+          // Gradient scrim for AppBar readability
+          Container(
+            height: 120,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Colors.black.withValues(alpha: 0.5),
+                  Colors.transparent,
+                ],
+              ),
+            ),
+          ),
+          // AppBar overlay
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: SafeArea(
+              bottom: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
+                child: Row(
+                  children: [
+                    IconButton(
+                      onPressed: () => Navigator.pop(context),
+                      icon: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.3),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(
+                          Icons.arrow_back_rounded,
+                          color: Colors.white,
+                          size: 20,
+                        ),
                       ),
                     ),
-                  ),
-                  const Expanded(
-                    child: Text(
-                      'Detail PKL',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
+                    const Expanded(
+                      child: Text(
+                        'Detail PKL',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
-                  ),
-                  IconButton(
-                    onPressed: () => _loadDetail(initial: false),
-                    icon: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: _isRefreshing
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(
-                                  Colors.white,
+                    IconButton(
+                      onPressed: () => _loadDetail(initial: false),
+                      icon: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.3),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: _isRefreshing
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    Colors.white,
+                                  ),
                                 ),
+                              )
+                            : const Icon(
+                                Icons.share_rounded,
+                                color: Colors.white,
+                                size: 20,
                               ),
-                            )
-                          : const Icon(
-                              Icons.refresh_rounded,
-                              color: Colors.white,
-                              size: 20,
-                            ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          // Status badge
+          Positioned(
+            top: 80,
+            right: 16,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: BoxDecoration(
+                color: isActive ? const Color(0xFF22C55E) : Colors.red,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    isActive ? 'BUKA SEKARANG' : 'TUTUP',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                 ],
               ),
             ),
-            // PKL Image/Icon
-            Padding(
-              padding: const EdgeInsets.all(20),
-              child: Container(
-                width: 100,
-                height: 100,
-                decoration: BoxDecoration(
-                  color: _themeManager.cardColor,
-                  borderRadius: BorderRadius.circular(24),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(
-                        alpha: _themeManager.isDarkMode ? 0.35 : 0.1,
-                      ),
-                      blurRadius: 20,
-                      offset: const Offset(0, 8),
-                    ),
-                  ],
-                ),
-                child: Center(
-                  child: Icon(
-                    _getCategoryIcon(jenis),
-                    size: 48,
-                    color: _primary,
-                  ),
-                ),
+          ),
+          // Card overlay
+          Container(
+            margin: const EdgeInsets.only(top: 190),
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: _themeManager.cardColor,
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(28),
+                topRight: Radius.circular(28),
               ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.08),
+                  blurRadius: 20,
+                  offset: const Offset(0, -4),
+                ),
+              ],
             ),
-            // PKL Info
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Category tag
                   Text(
-                    name,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
+                    jenis.toUpperCase(),
+                    style: TextStyle(
+                      color: _primary,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 1.0,
                     ),
-                    textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 8),
-                  // Rating Row
+                  // Name + Rating row
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.star_rounded,
-                              color: _themeManager.accentGold,
-                              size: 18,
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              avgRating != null
-                                  ? _formatRatingValue(avgRating)
-                                  : '-',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            Text(
-                              ' ($ratingCount ulasan)',
-                              style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.8),
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
+                      Expanded(
+                        child: Text(
+                          name,
+                          style: TextStyle(
+                            color: _themeManager.textColor,
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                       const SizedBox(width: 12),
+                      // Rating box
                       Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 12,
-                          vertical: 6,
+                          vertical: 8,
                         ),
                         decoration: BoxDecoration(
-                          color: isActive
-                              ? _primary.withValues(alpha: 0.22)
-                              : Colors.white.withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(20),
+                          color: _softSurface,
+                          borderRadius: BorderRadius.circular(12),
                         ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
+                        child: Column(
                           children: [
-                            Container(
-                              width: 8,
-                              height: 8,
-                              decoration: BoxDecoration(
-                                color: isActive
-                                    ? _themeManager.accentGold
-                                    : Colors.white.withValues(alpha: 0.7),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  avgRating != null
+                                      ? _formatRatingValue(avgRating)
+                                      : '-',
+                                  style: TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold,
+                                    color: _themeManager.textColor,
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                Icon(
+                                  Icons.star_rounded,
+                                  color: _primary,
+                                  size: 20,
+                                ),
+                              ],
                             ),
-                            const SizedBox(width: 6),
                             Text(
-                              isActive ? 'Buka' : 'Tutup',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w500,
+                              '$ratingCount ulasan',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: _themeManager.mutedTextColor,
                               ),
                             ),
                           ],
@@ -921,11 +1139,34 @@ class _PklDetailPageState extends State<PklDetailPage> {
                       ),
                     ],
                   ),
+                  const SizedBox(height: 10),
+                  // Address
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.location_on_rounded,
+                        color: _themeManager.mutedTextColor,
+                        size: 16,
+                      ),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          alamat,
+                          style: TextStyle(
+                            color: _themeManager.mutedTextColor,
+                            fontSize: 13,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -951,80 +1192,71 @@ class _PklDetailPageState extends State<PklDetailPage> {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          Expanded(
-            child: _buildActionButton(
-              icon: Icons.phone_rounded,
-              label: 'Hubungi',
-              color: _primary,
-              filled: true,
-              onTap: _detail == null ? null : _openChat,
-            ),
+          _buildCircularAction(
+            icon: Icons.phone_rounded,
+            label: 'Telepon',
+            color: _primary,
+            onTap: _detail == null ? null : _openChat,
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: _buildActionButton(
-              icon: Icons.map_rounded,
-              label: 'Lihat di Peta',
-              color: _ctaAccent,
-              textColor: Colors.black,
-              filled: true,
-              onTap: _pklLatLng == null ? null : _showMapSheet,
-            ),
+          _buildCircularAction(
+            icon: Icons.near_me_rounded,
+            label: 'Rute',
+            color: const Color(0xFF3B82F6),
+            onTap: _pklLatLng == null ? null : _showMapSheet,
+          ),
+          _buildCircularAction(
+            icon: Icons.chat_bubble_rounded,
+            label: 'Chat',
+            color: _primary,
+            onTap: _detail == null ? null : _openChat,
+          ),
+          _buildCircularAction(
+            icon: _isFavorite
+                ? Icons.favorite_rounded
+                : Icons.favorite_border_rounded,
+            label: 'Favorit',
+            color: Colors.red,
+            onTap: _isFavoriteLoading ? null : _toggleFavorite,
           ),
         ],
       ),
     );
   }
 
-  Widget _buildActionButton({
+  Widget _buildCircularAction({
     required IconData icon,
     required String label,
     required Color color,
-    Color? textColor,
-    bool filled = false,
     VoidCallback? onTap,
   }) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 14),
-          decoration: BoxDecoration(
-            color: filled ? color : Colors.transparent,
-            borderRadius: BorderRadius.circular(16),
-            border: filled ? null : Border.all(color: color),
-            boxShadow: filled
-                ? [
-                    BoxShadow(
-                      color: color.withValues(alpha: 0.3),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ]
-                : null,
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Center(
+              child: Icon(icon, color: color, size: 24),
+            ),
           ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                icon,
-                size: 20,
-                color: textColor ?? (filled ? Colors.white : color),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                label,
-                style: TextStyle(
-                  color: textColor ?? (filled ? Colors.white : color),
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
+          const SizedBox(height: 8),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: _themeManager.textColor,
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -1055,8 +1287,8 @@ class _PklDetailPageState extends State<PklDetailPage> {
           _buildInfoCard(
             icon: Icons.payments_rounded,
             title: 'Harga',
-            subtitle: 'Rp 15.000 - Rp 50.000',
-            detail: 'Harga bervariasi',
+            subtitle: _priceRangeLabel(data),
+            detail: 'Pilih menu di bawah',
           ),
         ],
       ),
@@ -1340,89 +1572,296 @@ class _PklDetailPageState extends State<PklDetailPage> {
 
   Widget _buildPhotoSection(Map<String, dynamic> data) {
     final productsRaw = data['products'];
-    final products = productsRaw is List ? productsRaw : const [];
-    final imageUrls = <String>[];
-    for (final item in products) {
-      if (item is Map) {
-        final url = item['image_url'];
-        if (url is String && url.isNotEmpty) {
-          imageUrls.add(url);
-        }
-      }
-    }
+    final products = (productsRaw is List ? productsRaw : const [])
+        .whereType<Map<String, dynamic>>()
+        .where((p) => p['is_available'] == true)
+        .toList();
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Foto',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: _themeManager.textColor,
-            ),
+          Row(
+            children: [
+              Icon(Icons.restaurant_menu, color: _primary, size: 22),
+              const SizedBox(width: 8),
+              Text(
+                'Menu',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: _themeManager.textColor,
+                ),
+              ),
+              const Spacer(),
+              if (_cartItemCount > 0)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: _primary,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '$_cartItemCount item',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+            ],
           ),
           const SizedBox(height: 12),
-          SizedBox(
-            height: 90,
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              itemCount: imageUrls.isEmpty ? 3 : imageUrls.length,
-              itemBuilder: (context, index) {
-                if (imageUrls.isNotEmpty) {
-                  final url = imageUrls[index];
-                  return Container(
-                    width: 90,
-                    height: 90,
-                    margin: EdgeInsets.only(
-                      right: index < imageUrls.length - 1 ? 12 : 0,
-                    ),
-                    decoration: BoxDecoration(
-                      color: _softSurface,
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(16),
-                      child: Image.network(
-                        url,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) {
-                          return Icon(
-                            _getCategoryIcon(
-                              _detail?['jenis_dagangan'] as String? ?? '',
-                            ),
-                            color: _primary.withValues(alpha: 0.5),
-                            size: 32,
-                          );
-                        },
-                      ),
-                    ),
-                  );
-                }
-                return Container(
-                  width: 90,
-                  height: 90,
-                  margin: EdgeInsets.only(right: index < 2 ? 12 : 0),
-                  decoration: BoxDecoration(
-                    color: _softSurface,
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Icon(
-                    _getCategoryIcon(
-                      _detail?['jenis_dagangan'] as String? ?? '',
-                    ),
-                    color: _primary.withValues(alpha: 0.5),
-                    size: 32,
-                  ),
-                );
-              },
-            ),
-          ),
+          if (products.isEmpty)
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: _softSurface,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Center(
+                child: Text(
+                  'Belum ada menu tersedia',
+                  style: TextStyle(color: _themeManager.mutedTextColor),
+                ),
+              ),
+            )
+          else
+            ...products.map((product) => _buildMenuItemCard(product)),
         ],
       ),
     );
+  }
+
+  Widget _buildMenuItemCard(Map<String, dynamic> product) {
+    final id = product['id'] as int;
+    final name = (product['name'] ?? '-') as String;
+    final price = (product['price'] as num?)?.toInt() ?? 0;
+    final imageUrl = product['image_url'] as String?;
+    final description = (product['description'] ?? '') as String;
+    final isFeatured = product['is_featured'] == true;
+    final qty = _cart[id] ?? 0;
+    final isDark = _themeManager.isDarkMode;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: _themeManager.cardColor,
+        borderRadius: BorderRadius.circular(16),
+        border: qty > 0
+            ? Border.all(color: _primary, width: 1.5)
+            : Border.all(color: _themeManager.borderColor.withValues(alpha: 0.3)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: IntrinsicHeight(
+        child: Row(
+          children: [
+            // Product image
+            ClipRRect(
+              borderRadius: const BorderRadius.horizontal(left: Radius.circular(16)),
+              child: SizedBox(
+                width: 100,
+                child: imageUrl != null && imageUrl.isNotEmpty
+                    ? Image.network(
+                        imageUrl,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Container(
+                          color: _softSurface,
+                          child: Icon(
+                            Icons.fastfood_rounded,
+                            color: _primary.withValues(alpha: 0.4),
+                            size: 32,
+                          ),
+                        ),
+                      )
+                    : Container(
+                        color: _softSurface,
+                        child: Icon(
+                          Icons.fastfood_rounded,
+                          color: _primary.withValues(alpha: 0.4),
+                          size: 32,
+                        ),
+                      ),
+              ),
+            ),
+            // Product info
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Row(
+                      children: [
+                        if (isFeatured)
+                          Container(
+                            margin: const EdgeInsets.only(right: 6),
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.amber.withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Text(
+                              '\u2B50',
+                              style: TextStyle(fontSize: 10),
+                            ),
+                          ),
+                        Expanded(
+                          child: Text(
+                            name,
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 14,
+                              color: _themeManager.textColor,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (description.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        description,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: _themeManager.mutedTextColor,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'Rp ${_formatPrice(price)}',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 15,
+                              color: _primary,
+                            ),
+                          ),
+                        ),
+                        if (qty == 0)
+                          InkWell(
+                            onTap: () => setState(() => _cart[id] = 1),
+                            borderRadius: BorderRadius.circular(10),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: _primary,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Text(
+                                'Tambah',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          )
+                        else
+                          Container(
+                            decoration: BoxDecoration(
+                              color: isDark
+                                  ? _primary.withValues(alpha: 0.15)
+                                  : _softSurface,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                InkWell(
+                                  onTap: () {
+                                    setState(() {
+                                      if (qty <= 1) {
+                                        _cart.remove(id);
+                                      } else {
+                                        _cart[id] = qty - 1;
+                                      }
+                                    });
+                                  },
+                                  borderRadius: BorderRadius.circular(10),
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(6),
+                                    child: Icon(Icons.remove, size: 18, color: _primary),
+                                  ),
+                                ),
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                                  child: Text(
+                                    '$qty',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14,
+                                      color: _themeManager.textColor,
+                                    ),
+                                  ),
+                                ),
+                                InkWell(
+                                  onTap: () => setState(() => _cart[id] = qty + 1),
+                                  borderRadius: BorderRadius.circular(10),
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(6),
+                                    child: Icon(Icons.add, size: 18, color: _primary),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _formatPrice(int price) {
+    final str = price.toString();
+    final buffer = StringBuffer();
+    for (int i = 0; i < str.length; i++) {
+      if (i > 0 && (str.length - i) % 3 == 0) buffer.write('.');
+      buffer.write(str[i]);
+    }
+    return buffer.toString();
+  }
+
+  String _priceRangeLabel(Map<String, dynamic> data) {
+    final productsRaw = data['products'];
+    final products = (productsRaw is List ? productsRaw : const [])
+        .whereType<Map<String, dynamic>>()
+        .where((p) => p['is_available'] == true)
+        .toList();
+    if (products.isEmpty) return 'Belum ada menu';
+    final prices = products
+        .map((p) => (p['price'] as num?)?.toInt() ?? 0)
+        .where((p) => p > 0)
+        .toList();
+    if (prices.isEmpty) return 'Harga bervariasi';
+    prices.sort();
+    final low = _formatPrice(prices.first);
+    final high = _formatPrice(prices.last);
+    if (prices.first == prices.last) return 'Rp $low';
+    return 'Rp $low - Rp $high';
   }
 
   Widget _buildQrisPreview(Map<String, dynamic> data) {
@@ -1703,32 +2142,68 @@ class _PklDetailPageState extends State<PklDetailPage> {
                     ),
                   ),
                 ),
-                // Bottom Floating Buttons
+                // Bottom Floating Bar
                 Positioned(
-                  left: 20,
-                  right: 20,
-                  bottom: MediaQuery.of(context).padding.bottom + 16,
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: _buildFloatingButton(
-                          icon: Icons.chat_bubble_rounded,
-                          label: 'Chat',
-                          color: _primary,
-                          onTap: _openChat,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  child: Container(
+                    padding: EdgeInsets.fromLTRB(
+                      20,
+                      14,
+                      20,
+                      MediaQuery.of(context).padding.bottom + 14,
+                    ),
+                    decoration: BoxDecoration(
+                      color: _themeManager.cardColor,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(
+                            alpha: _themeManager.isDarkMode ? 0.25 : 0.08,
+                          ),
+                          blurRadius: 16,
+                          offset: const Offset(0, -4),
                         ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _buildFloatingButton(
-                          icon: Icons.receipt_long_rounded,
-                          label: 'Pre-order',
-                          color: _ctaAccent,
-                          textColor: Colors.black,
-                          onTap: _openPreorder,
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          flex: 2,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                'Total Harga',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: _themeManager.mutedTextColor,
+                                ),
+                              ),
+                              Text(
+                                'Rp ${_formatPrice(_cartTotal)}',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: _primary,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                    ],
+                        const SizedBox(width: 12),
+                        Expanded(
+                          flex: 3,
+                          child: _buildFloatingButton(
+                            icon: Icons.shopping_bag_rounded,
+                            label: 'Pesan Sekarang',
+                            color: _primary,
+                            onTap: _openPreorder,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ],
@@ -1751,11 +2226,15 @@ class _PklDetailPageState extends State<PklDetailPage> {
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 16),
           decoration: BoxDecoration(
-            color: color,
+            gradient: LinearGradient(
+              colors: [_primary, _secondary],
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+            ),
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                color: color.withValues(alpha: 0.4),
+                color: _primary.withValues(alpha: 0.4),
                 blurRadius: 12,
                 offset: const Offset(0, 4),
               ),
@@ -1764,7 +2243,7 @@ class _PklDetailPageState extends State<PklDetailPage> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: 22, color: textColor ?? Colors.white),
+              Icon(icon, size: 20, color: textColor ?? Colors.white),
               const SizedBox(width: 8),
               Text(
                 label,

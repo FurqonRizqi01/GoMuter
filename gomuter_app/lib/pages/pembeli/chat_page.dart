@@ -226,7 +226,7 @@ class _ChatPageState extends State<ChatPage> {
   }
 
   PreferredSizeWidget _buildAppBar() {
-    final primary = _themeManager.primaryGreen;
+    final primary = _themeManager.primaryOrange;
     return AppBar(
       elevation: 0,
       backgroundColor: primary,
@@ -291,7 +291,7 @@ class _ChatPageState extends State<ChatPage> {
                       width: 8,
                       height: 8,
                       decoration: BoxDecoration(
-                        color: _themeManager.lightGreen,
+                        color: _themeManager.lightOrange,
                         borderRadius: BorderRadius.circular(4),
                       ),
                     ),
@@ -328,7 +328,7 @@ class _ChatPageState extends State<ChatPage> {
   }
 
   Widget _buildLoadingState() {
-    final primary = _themeManager.primaryGreen;
+    final primary = _themeManager.primaryOrange;
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -336,7 +336,7 @@ class _ChatPageState extends State<ChatPage> {
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: _themeManager.accentSurfaceColor,
+              color: _themeManager.orangeSurfaceColor,
               borderRadius: BorderRadius.circular(20),
             ),
             child: CircularProgressIndicator(
@@ -355,7 +355,7 @@ class _ChatPageState extends State<ChatPage> {
   }
 
   Widget _buildErrorState() {
-    final primary = _themeManager.primaryGreen;
+    final primary = _themeManager.primaryOrange;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
@@ -409,7 +409,7 @@ class _ChatPageState extends State<ChatPage> {
 
   Widget _buildMessages() {
     if (_messages.isEmpty) {
-      final primary = _themeManager.primaryGreen;
+      final primary = _themeManager.primaryOrange;
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(32),
@@ -419,7 +419,7 @@ class _ChatPageState extends State<ChatPage> {
               Container(
                 padding: const EdgeInsets.all(32),
                 decoration: BoxDecoration(
-                  color: _themeManager.accentSurfaceColor,
+                  color: _themeManager.orangeSurfaceColor,
                   borderRadius: BorderRadius.circular(24),
                 ),
                 child: Icon(
@@ -525,7 +525,7 @@ class _ChatPageState extends State<ChatPage> {
     final otherTextColor = isDark
         ? textColor
         : (Colors.grey[800] ?? Colors.black87);
-    final primary = _themeManager.primaryGreen;
+    final primary = _themeManager.primaryOrange;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -637,7 +637,7 @@ class _ChatPageState extends State<ChatPage> {
               width: 32,
               height: 32,
               decoration: BoxDecoration(
-                color: _themeManager.accentSurfaceColor,
+                color: _themeManager.orangeSurfaceColor,
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Center(
@@ -652,7 +652,7 @@ class _ChatPageState extends State<ChatPage> {
 
   Widget _buildInputArea() {
     final isDark = _themeManager.isDarkMode;
-    final primary = _themeManager.primaryGreen;
+    final primary = _themeManager.primaryOrange;
     final inputBg = _themeManager.cardColor;
     final fieldBg = isDark
         ? _themeManager.surfaceColor
@@ -678,7 +678,7 @@ class _ChatPageState extends State<ChatPage> {
         children: [
           Container(
             decoration: BoxDecoration(
-              color: _themeManager.accentSurfaceColor,
+              color: _themeManager.orangeSurfaceColor,
               borderRadius: BorderRadius.circular(14),
             ),
             child: IconButton(

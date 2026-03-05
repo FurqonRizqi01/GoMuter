@@ -272,7 +272,7 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
   }
 
   Widget _buildPklMarkerWidget({required String name, required bool selected}) {
-    final markerColor = _themeManager.primaryGreen;
+    final markerColor = _themeManager.primaryOrange;
     final borderBase = _themeManager.isDarkMode
         ? _themeManager.textColor
         : Colors.white;
@@ -763,12 +763,12 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
                           Container(
                             padding: const EdgeInsets.all(10),
                             decoration: BoxDecoration(
-                              color: _themeManager.accentSurfaceColor,
+                              color: _themeManager.orangeSurfaceColor,
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Icon(
                               Icons.favorite_rounded,
-                              color: _themeManager.primaryGreen,
+                              color: _themeManager.primaryOrange,
                               size: 20,
                             ),
                           ),
@@ -790,7 +790,7 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
                         },
                         icon: Icon(
                           Icons.refresh_rounded,
-                          color: _themeManager.primaryGreen,
+                          color: _themeManager.primaryOrange,
                         ),
                         tooltip: 'Muat ulang',
                       ),
@@ -846,12 +846,12 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
                                 width: 48,
                                 height: 48,
                                 decoration: BoxDecoration(
-                                  color: _themeManager.accentSurfaceColor,
+                                  color: _themeManager.orangeSurfaceColor,
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: Icon(
                                   _getCategoryIcon(jenis),
-                                  color: _themeManager.primaryGreen,
+                                  color: _themeManager.primaryOrange,
                                 ),
                               ),
                               title: Text(
@@ -964,12 +964,12 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
                                 Container(
                                   padding: const EdgeInsets.all(10),
                                   decoration: BoxDecoration(
-                                    color: _themeManager.accentSurfaceColor,
+                                    color: _themeManager.orangeSurfaceColor,
                                     borderRadius: BorderRadius.circular(12),
                                   ),
                                   child: Icon(
                                     Icons.notifications_rounded,
-                                    color: _themeManager.primaryGreen,
+                                    color: _themeManager.primaryOrange,
                                     size: 20,
                                   ),
                                 ),
@@ -987,7 +987,7 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
                             IconButton(
                               icon: Icon(
                                 Icons.refresh_rounded,
-                                color: _themeManager.primaryGreen,
+                                color: _themeManager.primaryOrange,
                               ),
                               onPressed: _isLoadingNotifications
                                   ? null
@@ -1002,7 +1002,7 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
                     LinearProgressIndicator(
                       backgroundColor: Colors.grey[200],
                       valueColor: AlwaysStoppedAnimation<Color>(
-                        _themeManager.primaryGreen,
+                        _themeManager.primaryOrange,
                       ),
                     ),
                   Padding(
@@ -1015,7 +1015,7 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
                             : markAll,
                         child: Text(
                           'Tandai semua dibaca',
-                          style: TextStyle(color: _themeManager.primaryGreen),
+                          style: TextStyle(color: _themeManager.primaryOrange),
                         ),
                       ),
                     ),
@@ -1067,9 +1067,9 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
                                             ? Colors.transparent
                                             : Colors.grey[50])
                                       : (_themeManager.isDarkMode
-                                            ? _themeManager.primaryGreen
+                                            ? _themeManager.primaryOrange
                                                   .withValues(alpha: 0.1)
-                                            : _themeManager.lightGreen),
+                                            : _themeManager.lightOrange),
                                   borderRadius: BorderRadius.circular(16),
                                   border: isRead
                                       ? Border.all(
@@ -1080,7 +1080,7 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
                                               : Colors.transparent,
                                         )
                                       : Border.all(
-                                          color: _themeManager.primaryGreen
+                                          color: _themeManager.primaryOrange
                                               .withValues(alpha: 0.3),
                                         ),
                                 ),
@@ -1093,7 +1093,7 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
                                           ? (_themeManager.isDarkMode
                                                 ? Colors.grey[800]
                                                 : Colors.grey[200])
-                                          : _themeManager.primaryGreen
+                                          : _themeManager.primaryOrange
                                                 .withValues(alpha: 0.1),
                                       borderRadius: BorderRadius.circular(12),
                                     ),
@@ -1103,7 +1103,7 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
                                           : Icons.notifications_active_rounded,
                                       color: isRead
                                           ? Colors.grey
-                                          : _themeManager.primaryGreen,
+                                          : _themeManager.primaryOrange,
                                     ),
                                   ),
                                   title: Text(
@@ -1127,7 +1127,7 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
                                         Text(
                                           pklName,
                                           style: TextStyle(
-                                            color: _themeManager.primaryGreen,
+                                            color: _themeManager.primaryOrange,
                                             fontSize: 12,
                                           ),
                                         ),
@@ -1149,7 +1149,7 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
                                           child: Text(
                                             'Baca',
                                             style: TextStyle(
-                                              color: _themeManager.primaryGreen,
+                                              color: _themeManager.primaryOrange,
                                               fontSize: 12,
                                             ),
                                           ),
@@ -1346,7 +1346,7 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
             right: 16,
             child: FloatingActionButton(
               heroTag: 'my_location_fab',
-              backgroundColor: _themeManager.primaryGreen,
+              backgroundColor: _themeManager.primaryOrange,
               onPressed: () {
                 if (_buyerPosition != null) {
                   _mapController.move(
@@ -1595,13 +1595,13 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
           child: TextField(
             controller: _searchController,
             style: TextStyle(color: textColor),
-            cursorColor: _themeManager.primaryGreen,
+            cursorColor: _themeManager.primaryOrange,
             onSubmitted: (value) =>
                 _loadPkls(jenis: value.isEmpty ? null : value),
             decoration: InputDecoration(
               hintText: 'Cari PKL atau jenis dagangan...',
               hintStyle: TextStyle(color: _themeManager.hintTextColor),
-              prefixIcon: Icon(Icons.search, color: _themeManager.primaryGreen),
+              prefixIcon: Icon(Icons.search, color: _themeManager.primaryOrange),
               suffixIcon: _searchController.text.isNotEmpty
                   ? IconButton(
                       icon: Icon(
@@ -1667,7 +1667,7 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(Icons.my_location, color: _themeManager.primaryGreen),
+                  Icon(Icons.my_location, color: _themeManager.primaryOrange),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -1690,7 +1690,7 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
                         ),
                         decoration: BoxDecoration(
                           color: Color.alphaBlend(
-                            _themeManager.primaryGreen.withValues(
+                            _themeManager.primaryOrange.withValues(
                               alpha: isDark ? 0.26 : 0.18,
                             ),
                             cardColor,
@@ -1704,7 +1704,7 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
                             fontWeight: FontWeight.w700,
                             color: isDark
                                 ? _themeManager.textColor
-                                : _themeManager.primaryGreen,
+                                : _themeManager.primaryOrange,
                           ),
                         ),
                       ),
@@ -1746,7 +1746,7 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
                     onSelected: (selected) {
                       _onRadiusChanged(selected ? radius : null);
                     },
-                    selectedColor: _themeManager.primaryGreen,
+                    selectedColor: _themeManager.primaryOrange,
                     backgroundColor: _themeManager.isDarkMode
                         ? Colors.white.withValues(alpha: 0.06)
                         : Colors.grey[100],
@@ -1760,7 +1760,7 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
                     ),
                     side: BorderSide(
                       color: isSelected
-                          ? _themeManager.primaryGreen
+                          ? _themeManager.primaryOrange
                           : textColor.withValues(alpha: 0.10),
                     ),
                     padding: const EdgeInsets.symmetric(
@@ -1803,7 +1803,7 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
                   _loadPkls(jenis: category);
                 }
               },
-              selectedColor: _themeManager.primaryGreen,
+              selectedColor: _themeManager.primaryOrange,
               backgroundColor: cardColor,
               labelStyle: TextStyle(
                 color: isSelected
@@ -1813,7 +1813,7 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
               ),
               side: BorderSide(
                 color: isSelected
-                    ? _themeManager.primaryGreen
+                    ? _themeManager.primaryOrange
                     : textColor.withValues(alpha: 0.1),
               ),
             ),
@@ -1980,6 +1980,7 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
                       builder: (_) => PklDetailPage(pklId: pklId),
                     ),
                   );
+                  await _loadFavorites();
                   await _loadChatBadge();
                 },
           child: Padding(
@@ -2088,7 +2089,7 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
                               vertical: 3,
                             ),
                             decoration: BoxDecoration(
-                              color: _themeManager.primaryGreen.withValues(
+                              color: _themeManager.primaryOrange.withValues(
                                 alpha: 0.18,
                               ),
                               borderRadius: BorderRadius.circular(999),
@@ -2096,7 +2097,7 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
                             child: Text(
                               jenis,
                               style: TextStyle(
-                                color: _themeManager.primaryGreen,
+                                color: _themeManager.primaryOrange,
                                 fontSize: 10,
                                 fontWeight: FontWeight.w700,
                               ),
@@ -2120,7 +2121,7 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
                                 }
                               : null,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: _themeManager.primaryGreen,
+                            backgroundColor: _themeManager.primaryOrange,
                             foregroundColor: Colors.white,
                             padding: const EdgeInsets.symmetric(horizontal: 10),
                             shape: RoundedRectangleBorder(

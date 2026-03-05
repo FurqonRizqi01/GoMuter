@@ -410,7 +410,7 @@ class _PklPreOrderPageState extends State<PklPreOrderPage> {
                               height: 44,
                               child: Icon(
                                 Icons.location_on_rounded,
-                                color: _themeManager.primaryGreen,
+                                color: _themeManager.pklPrimary,
                                 size: 44,
                               ),
                             ),
@@ -454,13 +454,13 @@ class _PklPreOrderPageState extends State<PklPreOrderPage> {
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: _themeManager.accentSurfaceColor,
+              color: _themeManager.pklAccentSurface,
               shape: BoxShape.circle,
             ),
             child: Icon(
               Icons.receipt_long_rounded,
               size: 48,
-              color: _themeManager.primaryGreen,
+              color: _themeManager.pklPrimary,
             ),
           ),
           const SizedBox(height: 20),
@@ -493,6 +493,7 @@ class _PklPreOrderPageState extends State<PklPreOrderPage> {
     final status = order['status'] as String? ?? 'PENDING';
     final dpStatus = order['dp_status'] as String? ?? 'BELUM_BAYAR';
     final dpAmount = order['dp_amount'] as int? ?? 0;
+    final totalPrice = order['total_price'] as int? ?? 0;
     final buktiDp = order['bukti_dp_url'] as String?;
     final orderId = (order['id'] as num?)?.toInt() ?? -1;
     final isUpdating = orderId != -1 && _updatingOrderIds.contains(orderId);
@@ -534,12 +535,12 @@ class _PklPreOrderPageState extends State<PklPreOrderPage> {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFE8F5E9),
+                      color: _themeManager.pklAccentSurface,
                       borderRadius: BorderRadius.circular(16),
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.person_rounded,
-                      color: Color(0xFF0D8A3A),
+                      color: _themeManager.pklPrimary,
                       size: 24,
                     ),
                   ),
@@ -699,7 +700,9 @@ class _PklPreOrderPageState extends State<PklPreOrderPage> {
                   'Koordinat',
                   '$latitude / $longitude',
                 ),
-              _buildInfoRow(Icons.payments_rounded, 'DP', 'Rp$dpAmount'),
+              if (totalPrice > 0)
+                _buildInfoRow(Icons.shopping_cart_rounded, 'Total Pembelian', 'Rp${_formatCurrency(totalPrice)}'),
+              _buildInfoRow(Icons.payments_rounded, 'DP', 'Rp${_formatCurrency(dpAmount)}'),
               _buildInfoRow(
                 Icons.account_balance_wallet_rounded,
                 'Status DP',
@@ -760,7 +763,7 @@ class _PklPreOrderPageState extends State<PklPreOrderPage> {
                             ? null
                             : () => _changeStatus(orderId, 'SELESAI'),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: _themeManager.primaryGreen,
+                          backgroundColor: _themeManager.pklPrimary,
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           shape: RoundedRectangleBorder(
@@ -835,7 +838,7 @@ class _PklPreOrderPageState extends State<PklPreOrderPage> {
                             ? null
                             : () => _handleDPAction(orderId, true),
                         style: TextButton.styleFrom(
-                          foregroundColor: const Color(0xFF0D8A3A),
+                          foregroundColor: _themeManager.pklPrimary,
                           padding: const EdgeInsets.symmetric(
                             horizontal: 16,
                             vertical: 12,
@@ -906,6 +909,16 @@ class _PklPreOrderPageState extends State<PklPreOrderPage> {
         ],
       ),
     );
+  }
+
+  String _formatCurrency(int amount) {
+    final str = amount.toString();
+    final buffer = StringBuffer();
+    for (int i = 0; i < str.length; i++) {
+      if (i > 0 && (str.length - i) % 3 == 0) buffer.write('.');
+      buffer.write(str[i]);
+    }
+    return buffer.toString();
   }
 
   @override

@@ -13,7 +13,7 @@ from .models import (
 )
 from .utils import haversine_distance_km
 
-NOTIFICATION_COOLDOWN_MINUTES = 30
+NOTIFICATION_COOLDOWN_MINUTES = 5
 
 
 def _latest_coordinates(pkl: PKL) -> Optional[Tuple[float, float]]:
@@ -35,11 +35,13 @@ def _should_skip_notification(buyer, pkl, notif_type: str) -> bool:
     return queryset.exists()
 
 
+from firebase_admin import messaging
+
 def _create_notification(*, buyer, pkl, notif_type: str, message: str, radius_m: int, distance_m: Optional[float], metadata: Optional[dict] = None):
     if _should_skip_notification(buyer, pkl, notif_type):
         return None
 
-    return Notification.objects.create(
+    notification = Notification.objects.create(
         buyer=buyer,
         pkl=pkl,
         notif_type=notif_type,
@@ -48,6 +50,27 @@ def _create_notification(*, buyer, pkl, notif_type: str, message: str, radius_m:
         distance_m=distance_m,
         metadata=metadata or {},
     )
+
+    # Send FCM push notification if token exists
+    if hasattr(buyer, 'fcm_token') and buyer.fcm_token:
+        try:
+            fcm_message = messaging.Message(
+                notification=messaging.Notification(
+                    title="PKL di Dekatmu!",
+                    body=message,
+                ),
+                data={
+                    'notif_type': notif_type,
+                    'pkl_id': str(pkl.id) if pkl else '',
+                    'click_action': 'FLUTTER_NOTIFICATION_CLICK',
+                },
+                token=buyer.fcm_token,
+            )
+            messaging.send(fcm_message)
+        except Exception as e:
+            print(f"Error sending FCM message: {e}")
+
+    return notification
 
 
 def notify_nearby_pkls(location: BuyerLocation) -> list[Notification]:

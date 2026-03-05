@@ -16,10 +16,16 @@ import 'package:gomuter_app/utils/token_manager.dart';
 enum _DPProofAction { uploadFile, manualUrl }
 
 class PreOrderPage extends StatefulWidget {
-  const PreOrderPage({super.key, required this.pklId, required this.pklName});
+  const PreOrderPage({
+    super.key,
+    required this.pklId,
+    required this.pklName,
+    this.initialCart,
+  });
 
   final int pklId;
   final String pklName;
+  final List<Map<String, dynamic>>? initialCart;
 
   @override
   State<PreOrderPage> createState() => _PreOrderPageState();
@@ -30,13 +36,14 @@ class _PreOrderPageState extends State<PreOrderPage>
   final ThemeManager _themeManager = ThemeManager();
 
   final _formKey = GlobalKey<FormState>();
-  final _deskripsiController = TextEditingController();
   final _catatanController = TextEditingController();
   final _addressController = TextEditingController();
   final _searchController = TextEditingController();
   final _latController = TextEditingController();
   final _lngController = TextEditingController();
-  final _perkiraanTotalController = TextEditingController();
+
+  // Cart: productId → quantity
+  final Map<int, int> _cart = {};
 
   // Map related
   final MapController _mapController = MapController();
@@ -59,10 +66,9 @@ class _PreOrderPageState extends State<PreOrderPage>
   int _dpAmount = 5000;
   int? _uploadingDPOrderId;
 
-  Color get _primaryColor => _themeManager.primaryGreen;
-  Color get _secondaryColor =>
-      _themeManager.primaryGreen.withValues(alpha: 0.85);
-  Color get _accentColor => _themeManager.accentSurfaceColor;
+  Color get _primaryColor => _themeManager.primaryOrange;
+  Color get _secondaryColor => _themeManager.secondaryOrange;
+  Color get _accentColor => _themeManager.orangeSurfaceColor;
   Color get _darkColor => _themeManager.textColor;
   Color get _mutedTextColor => _themeManager.mutedTextColor;
   Color get _borderColor => _themeManager.borderColor;
@@ -72,6 +78,14 @@ class _PreOrderPageState extends State<PreOrderPage>
     super.initState();
     _themeManager.addListener(_onThemeChanged);
     _tabController = TabController(length: 2, vsync: this);
+    // Populate cart from initial data
+    if (widget.initialCart != null) {
+      for (final item in widget.initialCart!) {
+        final id = item['product_id'] as int?;
+        final qty = item['quantity'] as int? ?? 1;
+        if (id != null) _cart[id] = qty;
+      }
+    }
     _initMap();
     _loadPKLDetail();
     _loadMyOrders();
@@ -81,13 +95,11 @@ class _PreOrderPageState extends State<PreOrderPage>
   void dispose() {
     _themeManager.removeListener(_onThemeChanged);
     _tabController.dispose();
-    _deskripsiController.dispose();
     _catatanController.dispose();
     _addressController.dispose();
     _searchController.dispose();
     _latController.dispose();
     _lngController.dispose();
-    _perkiraanTotalController.dispose();
     super.dispose();
   }
 
@@ -110,6 +122,7 @@ class _PreOrderPageState extends State<PreOrderPage>
       setState(() {
         _pklDetail = Map<String, dynamic>.from(detail);
       });
+      _recalculateDP();
     } catch (e) {
       setState(() {
         _pklError = 'Gagal memuat info PKL: $e';
@@ -180,23 +193,40 @@ class _PreOrderPageState extends State<PreOrderPage>
     return double.tryParse(value.trim());
   }
 
-  double? _parseTotal(String value) {
-    if (value.trim().isEmpty) return null;
-    return double.tryParse(value.trim());
+  int get _cartTotal {
+    final products = _availableProducts;
+    int total = 0;
+    for (final entry in _cart.entries) {
+      final product = products.firstWhere(
+        (p) => p['id'] == entry.key,
+        orElse: () => <String, dynamic>{},
+      );
+      total += ((product['price'] as num?)?.toInt() ?? 0) * entry.value;
+    }
+    return total;
+  }
+
+  int get _cartItemCount {
+    int count = 0;
+    for (final qty in _cart.values) {
+      count += qty;
+    }
+    return count;
+  }
+
+  List<Map<String, dynamic>> get _availableProducts {
+    final productsRaw = _pklDetail?['products'];
+    if (productsRaw is! List) return [];
+    return productsRaw
+        .whereType<Map<String, dynamic>>()
+        .where((p) => p['is_available'] == true)
+        .toList();
   }
 
   void _recalculateDP() {
-    final total = _parseTotal(_perkiraanTotalController.text);
-    if (total == null) {
-      setState(() {
-        _dpAmount = 5000;
-      });
-      return;
-    }
-
-    final computed = (total * 0.2).round();
+    final total = _cartTotal;
     setState(() {
-      _dpAmount = computed < 5000 ? 5000 : computed;
+      _dpAmount = total > 0 ? (total * 0.2).round().clamp(5000, total) : 5000;
     });
   }
 
@@ -375,6 +405,13 @@ class _PreOrderPageState extends State<PreOrderPage>
       return;
     }
 
+    if (_cart.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Pilih minimal 1 item menu.')),
+      );
+      return;
+    }
+
     setState(() {
       _isSubmitting = true;
     });
@@ -387,12 +424,19 @@ class _PreOrderPageState extends State<PreOrderPage>
 
       final latitude = _parseCoordinate(_latController.text);
       final longitude = _parseCoordinate(_lngController.text);
-      final perkiraanTotal = _parseTotal(_perkiraanTotalController.text);
+
+      // Build items list for API
+      final items = <Map<String, dynamic>>[];
+      for (final entry in _cart.entries) {
+        items.add({
+          'product_id': entry.key,
+          'quantity': entry.value,
+        });
+      }
 
       await ApiService.createPreOrder(
         token: token,
         pklId: widget.pklId,
-        deskripsiPesanan: _deskripsiController.text.trim(),
         catatan: _catatanController.text.trim().isEmpty
             ? null
             : _catatanController.text.trim(),
@@ -401,8 +445,7 @@ class _PreOrderPageState extends State<PreOrderPage>
             : _addressController.text.trim(),
         pickupLatitude: latitude,
         pickupLongitude: longitude,
-        dpAmount: _dpAmount,
-        perkiraanTotal: perkiraanTotal,
+        items: items,
       );
 
       if (!mounted) return;
@@ -411,13 +454,12 @@ class _PreOrderPageState extends State<PreOrderPage>
         const SnackBar(content: Text('Pre-order berhasil dikirim.')),
       );
 
-      _deskripsiController.clear();
       _catatanController.clear();
       _addressController.clear();
       _latController.clear();
       _lngController.clear();
-      _perkiraanTotalController.clear();
       setState(() {
+        _cart.clear();
         _dpAmount = 5000;
       });
 
@@ -1147,20 +1189,8 @@ class _PreOrderPageState extends State<PreOrderPage>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildModernTextField(
-              controller: _deskripsiController,
-              label: 'Deskripsi Pesanan',
-              hint: 'Contoh: Nasi goreng 2 porsi, mie ayam 1 porsi',
-              icon: Icons.restaurant_menu,
-              minLines: 2,
-              maxLines: 4,
-              validator: (value) {
-                if (value == null || value.trim().isEmpty) {
-                  return 'Deskripsi pesanan wajib diisi.';
-                }
-                return null;
-              },
-            ),
+            // Menu section
+            _buildMenuSelectionSection(),
             const SizedBox(height: 16),
             _buildModernTextField(
               controller: _catatanController,
@@ -1172,16 +1202,8 @@ class _PreOrderPageState extends State<PreOrderPage>
             ),
             const SizedBox(height: 16),
             _buildLocationPicker(),
-            const SizedBox(height: 16),
-            const SizedBox(height: 16),
-            _buildModernTextField(
-              controller: _perkiraanTotalController,
-              label: 'Perkiraan Total Belanja',
-              hint: 'Contoh: 50000',
-              icon: Icons.payments_outlined,
-              keyboardType: TextInputType.number,
-              onChanged: (_) => _recalculateDP(),
-            ),
+            const SizedBox(height: 24),
+            _buildOrderSummaryCard(),
             const SizedBox(height: 24),
             _buildDPCard(),
             const SizedBox(height: 24),
@@ -1255,6 +1277,313 @@ class _PreOrderPageState extends State<PreOrderPage>
         ),
       ),
     );
+  }
+
+  Widget _buildMenuSelectionSection() {
+    final products = _availableProducts;
+    final isDark = _themeManager.isDarkMode;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(Icons.restaurant_menu, color: _primaryColor, size: 20),
+            const SizedBox(width: 8),
+            Text(
+              'Pilih Menu',
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                fontSize: 16,
+                color: _darkColor,
+              ),
+            ),
+            const Spacer(),
+            if (_cartItemCount > 0)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: _primaryColor,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  '$_cartItemCount item',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        if (_isLoadingPKL)
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: CircularProgressIndicator(color: _primaryColor),
+            ),
+          )
+        else if (products.isEmpty)
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: isDark
+                  ? _primaryColor.withValues(alpha: 0.08)
+                  : _accentColor.withValues(alpha: 0.3),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Center(
+              child: Text(
+                'Belum ada menu tersedia',
+                style: TextStyle(color: _mutedTextColor),
+              ),
+            ),
+          )
+        else
+          ...products.map((product) => _buildMenuItemRow(product)),
+      ],
+    );
+  }
+
+  Widget _buildMenuItemRow(Map<String, dynamic> product) {
+    final id = product['id'] as int;
+    final name = (product['name'] ?? '-') as String;
+    final price = (product['price'] as num?)?.toInt() ?? 0;
+    final imageUrl = product['image_url'] as String?;
+    final qty = _cart[id] ?? 0;
+    final isDark = _themeManager.isDarkMode;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: _themeManager.cardColor,
+        borderRadius: BorderRadius.circular(14),
+        border: qty > 0
+            ? Border.all(color: _primaryColor, width: 1.5)
+            : Border.all(color: _borderColor.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: SizedBox(
+              width: 56,
+              height: 56,
+              child: imageUrl != null && imageUrl.isNotEmpty
+                  ? Image.network(
+                      imageUrl,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Container(
+                        color: _accentColor,
+                        child: Icon(Icons.fastfood, color: _primaryColor.withValues(alpha: 0.4), size: 24),
+                      ),
+                    )
+                  : Container(
+                      color: _accentColor,
+                      child: Icon(Icons.fastfood, color: _primaryColor.withValues(alpha: 0.4), size: 24),
+                    ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  name,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                    color: _darkColor,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Rp ${_formatMenuPrice(price)}',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 14,
+                    color: _primaryColor,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (qty == 0)
+            InkWell(
+              onTap: () {
+                setState(() => _cart[id] = 1);
+                _recalculateDP();
+              },
+              borderRadius: BorderRadius.circular(10),
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: _primaryColor,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.add, color: Colors.white, size: 20),
+              ),
+            )
+          else
+            Container(
+              decoration: BoxDecoration(
+                color: isDark
+                    ? _primaryColor.withValues(alpha: 0.15)
+                    : _accentColor,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  InkWell(
+                    onTap: () {
+                      setState(() {
+                        if (qty <= 1) {
+                          _cart.remove(id);
+                        } else {
+                          _cart[id] = qty - 1;
+                        }
+                      });
+                      _recalculateDP();
+                    },
+                    borderRadius: BorderRadius.circular(10),
+                    child: Padding(
+                      padding: const EdgeInsets.all(6),
+                      child: Icon(Icons.remove, size: 18, color: _primaryColor),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    child: Text(
+                      '$qty',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                        color: _darkColor,
+                      ),
+                    ),
+                  ),
+                  InkWell(
+                    onTap: () {
+                      setState(() => _cart[id] = qty + 1);
+                      _recalculateDP();
+                    },
+                    borderRadius: BorderRadius.circular(10),
+                    child: Padding(
+                      padding: const EdgeInsets.all(6),
+                      child: Icon(Icons.add, size: 18, color: _primaryColor),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOrderSummaryCard() {
+    if (_cart.isEmpty) return const SizedBox.shrink();
+
+    final products = _availableProducts;
+    final total = _cartTotal;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: _themeManager.cardColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: _borderColor.withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
+            child: Text(
+              'Ringkasan Pesanan',
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                fontSize: 15,
+                color: _darkColor,
+              ),
+            ),
+          ),
+          const Divider(height: 1),
+          ...(_cart.entries.map((entry) {
+            final product = products.firstWhere(
+              (p) => p['id'] == entry.key,
+              orElse: () => <String, dynamic>{},
+            );
+            final name = (product['name'] ?? '-') as String;
+            final price = (product['price'] as num?)?.toInt() ?? 0;
+            final subtotal = price * entry.value;
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      '$name  x${entry.value}',
+                      style: TextStyle(fontSize: 13, color: _darkColor),
+                    ),
+                  ),
+                  Text(
+                    'Rp ${_formatMenuPrice(subtotal)}',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: _darkColor,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          })),
+          const Divider(height: 1),
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Total',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 15,
+                      color: _darkColor,
+                    ),
+                  ),
+                ),
+                Text(
+                  'Rp ${_formatMenuPrice(total)}',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 16,
+                    color: _primaryColor,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatMenuPrice(int price) {
+    final str = price.toString();
+    final buffer = StringBuffer();
+    for (int i = 0; i < str.length; i++) {
+      if (i > 0 && (str.length - i) % 3 == 0) buffer.write('.');
+      buffer.write(str[i]);
+    }
+    return buffer.toString();
   }
 
   Widget _buildLocationPicker() {
@@ -1431,12 +1760,12 @@ class _PreOrderPageState extends State<PreOrderPage>
                   ),
                   decoration: BoxDecoration(
                     color: isDark
-                        ? _themeManager.accentSurfaceColor
+                        ? _themeManager.orangeSurfaceColor
                         : Colors.white,
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
-                    'Rp $_dpAmount',
+                    'Rp ${_formatMenuPrice(_dpAmount)}',
                     style: TextStyle(
                       color: _primaryColor,
                       fontWeight: FontWeight.bold,
@@ -1655,7 +1984,7 @@ class _PreOrderPageState extends State<PreOrderPage>
                           padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
                             color: isDark
-                                ? _themeManager.accentSurfaceColor
+                                ? _themeManager.orangeSurfaceColor
                                 : Colors.orange.shade50,
                             borderRadius: BorderRadius.circular(12),
                           ),

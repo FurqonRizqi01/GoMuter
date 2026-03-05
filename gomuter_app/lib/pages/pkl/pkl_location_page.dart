@@ -155,7 +155,7 @@ class _PklLocationPageState extends State<PklLocationPage> {
     final overlayTextColor = _themeManager.textColor;
 
     final previewTint = Color.alphaBlend(
-      _themeManager.primaryGreen.withValues(alpha: isDark ? 0.20 : 0.10),
+      _themeManager.pklPrimary.withValues(alpha: isDark ? 0.20 : 0.10),
       cardColor,
     );
 
@@ -199,7 +199,7 @@ class _PklLocationPageState extends State<PklLocationPage> {
                 ),
                 decoration: BoxDecoration(
                   color: Color.alphaBlend(
-                    _themeManager.primaryGreen.withValues(alpha: 0.90),
+                    _themeManager.pklPrimary.withValues(alpha: 0.90),
                     cardColor,
                   ),
                   borderRadius: BorderRadius.circular(999),
@@ -656,7 +656,7 @@ class _PklLocationPageState extends State<PklLocationPage> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Color.alphaBlend(
-          _themeManager.primaryGreen.withValues(alpha: isDark ? 0.10 : 0.08),
+          _themeManager.pklPrimary.withValues(alpha: isDark ? 0.10 : 0.08),
           _themeManager.cardColor,
         ),
         borderRadius: BorderRadius.circular(20),
@@ -665,7 +665,7 @@ class _PklLocationPageState extends State<PklLocationPage> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.info_outline_rounded, color: _themeManager.primaryGreen),
+          Icon(Icons.info_outline_rounded, color: _themeManager.pklPrimary),
           const SizedBox(width: 12),
           Expanded(
             child: Text(

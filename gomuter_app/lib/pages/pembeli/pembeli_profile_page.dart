@@ -163,7 +163,7 @@ class _PembeliProfilePageState extends State<PembeliProfilePage> {
       body: _isLoading
           ? Center(
               child: CircularProgressIndicator(
-                color: _themeManager.primaryGreen,
+                color: _themeManager.primaryOrange,
               ),
             )
           : SingleChildScrollView(
@@ -224,7 +224,7 @@ class _PembeliProfilePageState extends State<PembeliProfilePage> {
                             focusedBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                               borderSide: BorderSide(
-                                color: _themeManager.primaryGreen,
+                                color: _themeManager.primaryOrange,
                                 width: 1.3,
                               ),
                             ),
@@ -236,7 +236,7 @@ class _PembeliProfilePageState extends State<PembeliProfilePage> {
                           child: ElevatedButton(
                             onPressed: _isSaving ? null : _saveUsername,
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: _themeManager.primaryGreen,
+                              backgroundColor: _themeManager.primaryOrange,
                               foregroundColor: Colors.white,
                               padding: const EdgeInsets.symmetric(vertical: 12),
                               shape: RoundedRectangleBorder(
@@ -272,7 +272,7 @@ class _PembeliProfilePageState extends State<PembeliProfilePage> {
                         style: TextStyle(color: muted),
                       ),
                       value: _themeManager.isDarkMode,
-                      activeThumbColor: _themeManager.primaryGreen,
+                      activeThumbColor: _themeManager.primaryOrange,
                       onChanged: (_) {
                         _themeManager.toggleTheme();
                       },

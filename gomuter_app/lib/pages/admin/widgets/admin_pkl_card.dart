@@ -1,10 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
-// Design constants
-const Color _primaryColor = Color(0xFF1B7B5A);
-const Color _secondaryColor = Color(0xFF2D9D78);
-const Color _darkText = Color(0xFF1A1A2E);
+import '../admin_theme.dart';
 
 class AdminPKLCard extends StatelessWidget {
   final Map<String, dynamic> pkl;
@@ -61,18 +58,13 @@ class AdminPKLCard extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        _primaryColor.withValues(alpha: 0.1),
-                        _secondaryColor.withValues(alpha: 0.05),
-                      ],
-                    ),
+                    color: adminPrimary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: const Icon(
                     Icons.store,
                     size: 28,
-                    color: _primaryColor,
+                    color: adminPrimary,
                   ),
                 ),
                 const SizedBox(width: 14),
@@ -86,7 +78,7 @@ class AdminPKLCard extends StatelessWidget {
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
-                          color: _darkText,
+                          color: adminDarkText,
                         ),
                       ),
                       const SizedBox(height: 4),
@@ -138,7 +130,7 @@ class AdminPKLCard extends StatelessWidget {
                             ),
                             decoration: BoxDecoration(
                               color: isActive
-                                  ? Colors.green.withValues(alpha: 0.12)
+                                  ? statusAccepted.withValues(alpha: 0.12)
                                   : Colors.grey.withValues(alpha: 0.12),
                               borderRadius: BorderRadius.circular(20),
                             ),
@@ -150,7 +142,7 @@ class AdminPKLCard extends StatelessWidget {
                                   height: 6,
                                   decoration: BoxDecoration(
                                     color: isActive
-                                        ? Colors.green
+                                        ? statusAccepted
                                         : Colors.grey,
                                     shape: BoxShape.circle,
                                   ),
@@ -160,7 +152,7 @@ class AdminPKLCard extends StatelessWidget {
                                   isActive ? 'Aktif' : 'Offline',
                                   style: TextStyle(
                                     color: isActive
-                                        ? Colors.green
+                                        ? statusAccepted
                                         : Colors.grey,
                                     fontSize: 11,
                                     fontWeight: FontWeight.w600,
@@ -206,7 +198,7 @@ class AdminPKLCard extends StatelessWidget {
                     ],
                     Container(
                       decoration: BoxDecoration(
-                        color: _primaryColor.withValues(alpha: 0.1),
+                        color: adminPrimary.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Material(
@@ -220,7 +212,7 @@ class AdminPKLCard extends StatelessWidget {
                             padding: EdgeInsets.all(10),
                             child: Icon(
                               Icons.info_outline,
-                              color: _primaryColor,
+                              color: adminPrimary,
                               size: 20,
                             ),
                           ),
@@ -250,7 +242,7 @@ class AdminPKLCard extends StatelessWidget {
                     const SizedBox(width: 10),
                     _InfoChip(
                       icon: Icons.location_on,
-                      iconColor: _primaryColor,
+                      iconColor: adminPrimary,
                       label: _formatDate(latestUpdate),
                     ),
                   ],
@@ -269,13 +261,11 @@ class AdminPKLCard extends StatelessWidget {
                       Expanded(
                         child: Container(
                           decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [_primaryColor, _secondaryColor],
-                            ),
+                            gradient: adminGradient,
                             borderRadius: BorderRadius.circular(12),
                             boxShadow: [
                               BoxShadow(
-                                color: _primaryColor.withValues(alpha: 0.3),
+                                color: adminPrimary.withValues(alpha: 0.3),
                                 blurRadius: 8,
                                 offset: const Offset(0, 4),
                               ),
@@ -288,20 +278,20 @@ class AdminPKLCard extends StatelessWidget {
                                   ? null
                                   : () => onVerify!(pkl, true),
                               borderRadius: BorderRadius.circular(12),
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(
+                              child: const Padding(
+                                padding: EdgeInsets.symmetric(
                                   vertical: 12,
                                 ),
                                 child: Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    const Icon(
+                                    Icon(
                                       Icons.check_circle,
                                       color: Colors.white,
                                       size: 18,
                                     ),
-                                    const SizedBox(width: 6),
-                                    const Text(
+                                    SizedBox(width: 6),
+                                    Text(
                                       'Terima',
                                       style: TextStyle(
                                         color: Colors.white,
@@ -367,9 +357,9 @@ class AdminPKLCard extends StatelessWidget {
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(10),
                         child: const LinearProgressIndicator(
-                          backgroundColor: Color(0xFFE8F5F0),
+                          backgroundColor: Color(0xFFFFF7ED),
                           valueColor: AlwaysStoppedAnimation<Color>(
-                            _primaryColor,
+                            adminPrimary,
                           ),
                           minHeight: 4,
                         ),
@@ -384,13 +374,13 @@ class AdminPKLCard extends StatelessWidget {
                     child: Container(
                       decoration: BoxDecoration(
                         color: isActive
-                            ? Colors.orange.withValues(alpha: 0.1)
-                            : _primaryColor.withValues(alpha: 0.1),
+                            ? adminPrimary.withValues(alpha: 0.1)
+                            : statusAccepted.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
                           color: isActive
-                              ? Colors.orange.withValues(alpha: 0.3)
-                              : _primaryColor.withValues(alpha: 0.3),
+                              ? adminPrimary.withValues(alpha: 0.3)
+                              : statusAccepted.withValues(alpha: 0.3),
                         ),
                       ),
                       child: Material(
@@ -410,8 +400,8 @@ class AdminPKLCard extends StatelessWidget {
                                       ? Icons.power_settings_new
                                       : Icons.play_arrow,
                                   color: isActive
-                                      ? Colors.orange
-                                      : _primaryColor,
+                                      ? adminPrimary
+                                      : statusAccepted,
                                   size: 18,
                                 ),
                                 const SizedBox(width: 6),
@@ -419,8 +409,8 @@ class AdminPKLCard extends StatelessWidget {
                                   isActive ? 'Set Offline' : 'Aktifkan',
                                   style: TextStyle(
                                     color: isActive
-                                        ? Colors.orange
-                                        : _primaryColor,
+                                        ? adminPrimary
+                                        : statusAccepted,
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),
@@ -481,11 +471,11 @@ class AdminPKLCard extends StatelessWidget {
   Color _getStatusColor(String status) {
     switch (status) {
       case 'DITERIMA':
-        return Colors.green;
+        return statusAccepted;
       case 'DITOLAK':
-        return Colors.red;
+        return statusRejected;
       case 'PENDING':
-        return Colors.orange;
+        return statusPending;
       default:
         return Colors.grey;
     }

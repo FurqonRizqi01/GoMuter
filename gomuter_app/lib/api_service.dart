@@ -23,7 +23,7 @@ class ApiService {
       url,
       headers: _jsonHeaders(),
       body: jsonEncode({"username": username, "password": password}),
-    );
+    ).timeout(const Duration(seconds: 12));
 
     if (response.statusCode == 200) {
       return jsonDecode(response.body);
@@ -516,7 +516,7 @@ class ApiService {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $accessToken',
       },
-    );
+    ).timeout(const Duration(seconds: 12));
 
     if (response.statusCode == 200) {
       return jsonDecode(response.body) as Map<String, dynamic>;
@@ -611,18 +611,20 @@ class ApiService {
   static Future<Map<String, dynamic>> createPreOrder({
     required String token,
     required int pklId,
-    required String deskripsiPesanan,
+    String? deskripsiPesanan,
     String? catatan,
     String? pickupAddress,
     double? pickupLatitude,
     double? pickupLongitude,
     int? dpAmount,
     double? perkiraanTotal,
+    List<Map<String, dynamic>>? items,
   }) async {
     final url = Uri.parse('$baseUrl/api/pkl/preorder/create/');
-    final payload = {
+    final payload = <String, dynamic>{
       'pkl_id': pklId,
-      'deskripsi_pesanan': deskripsiPesanan,
+      if (deskripsiPesanan != null && deskripsiPesanan.isNotEmpty)
+        'deskripsi_pesanan': deskripsiPesanan,
       if (catatan != null && catatan.isNotEmpty) 'catatan': catatan,
       if (pickupAddress != null && pickupAddress.isNotEmpty)
         'pickup_address': pickupAddress,
@@ -630,6 +632,7 @@ class ApiService {
       if (pickupLongitude != null) 'pickup_longitude': pickupLongitude,
       if (dpAmount != null) 'dp_amount': dpAmount,
       if (perkiraanTotal != null) 'perkiraan_total': perkiraanTotal,
+      if (items != null && items.isNotEmpty) 'items': items,
     };
 
     final response = await http.post(

@@ -18,6 +18,7 @@ from .models import (
     PKL,
     LokasiPKL,
     PreOrder,
+    PreOrderItem,
     BuyerLocation,
     FavoritePKL,
     Notification,
@@ -158,7 +159,21 @@ class PKLTodayStatsView(APIView):
 
         stats = _get_today_stats(pkl)
         serializer = PKLDailyStatsSerializer(stats)
-        return Response(serializer.data)
+        data = serializer.data
+
+        today = timezone.localdate()
+        order_agg = PreOrder.objects.filter(
+            pkl=pkl,
+            status='SELESAI',
+            updated_at__date=today,
+        ).aggregate(
+            today_revenue=Sum('total_price'),
+            today_completed=Count('id'),
+        )
+        data['today_revenue'] = order_agg['today_revenue'] or 0
+        data['today_completed'] = order_agg['today_completed'] or 0
+
+        return Response(data)
 
 
 class BuyerLocationView(APIView):
@@ -203,6 +218,23 @@ class BuyerLocationView(APIView):
             )
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class UpdateFCMTokenView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        fcm_token = request.data.get('fcm_token')
+        if not fcm_token:
+            return Response(
+                {"detail": "fcm_token wajib diisi."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        
+        request.user.fcm_token = fcm_token
+        request.user.save()
+        return Response({"detail": "Token FCM berhasil diperbarui."})
+
 
 # === VIEW UNTUK PEMBELI ===
 
@@ -758,17 +790,48 @@ class CreatePreOrderView(APIView):
             )
 
         payload = request.data.copy()
+        items_data = payload.pop('items', None)
         perkiraan_total = payload.pop('perkiraan_total', None)
-        dp_amount = payload.get('dp_amount')
 
-        if dp_amount in (None, '', 0, '0'):
-            computed_dp = 5000
+        # Calculate total from items if provided
+        computed_total = 0
+        validated_items = []
+        if items_data and isinstance(items_data, list):
+            for item in items_data:
+                product_id = item.get('product_id')
+                quantity = int(item.get('quantity', 1))
+                if quantity < 1:
+                    quantity = 1
+                try:
+                    product = PKLProduct.objects.get(id=product_id, pkl=pkl, is_available=True)
+                except PKLProduct.DoesNotExist:
+                    return Response(
+                        {"detail": f"Produk dengan id {product_id} tidak ditemukan."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+                validated_items.append({
+                    'product': product,
+                    'product_name': product.name,
+                    'product_price': product.price,
+                    'quantity': quantity,
+                })
+                computed_total += product.price * quantity
+
+            # Build deskripsi from items
+            desc_parts = [f"{vi['product_name']} x{vi['quantity']}" for vi in validated_items]
+            payload['deskripsi_pesanan'] = ', '.join(desc_parts)
+        else:
+            # Fallback: use perkiraan_total for legacy free-text flow
             if perkiraan_total:
                 try:
-                    total_float = float(perkiraan_total)
-                    computed_dp = max(5000, int(total_float * 0.2))
+                    computed_total = int(float(perkiraan_total))
                 except (TypeError, ValueError):
-                    computed_dp = 5000
+                    computed_total = 0
+
+        # Calculate DP: 20% of total, minimum Rp 5000
+        dp_amount = payload.get('dp_amount')
+        if dp_amount in (None, '', 0, '0'):
+            computed_dp = max(5000, int(computed_total * 0.2)) if computed_total > 0 else 5000
             payload['dp_amount'] = computed_dp
         else:
             try:
@@ -781,9 +844,21 @@ class CreatePreOrderView(APIView):
             preorder = serializer.save(
                 pembeli=request.user,
                 pkl=pkl,
+                total_price=computed_total,
                 status='PENDING',
                 dp_status='BELUM_BAYAR',
             )
+
+            # Create PreOrderItem records
+            for vi in validated_items:
+                PreOrderItem.objects.create(
+                    preorder=preorder,
+                    product=vi['product'],
+                    product_name=vi['product_name'],
+                    product_price=vi['product_price'],
+                    quantity=vi['quantity'],
+                )
+
             return Response(PreOrderSerializer(preorder).data, status=status.HTTP_201_CREATED)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

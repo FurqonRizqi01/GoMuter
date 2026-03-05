@@ -358,20 +358,20 @@ class _PklPaymentSettingsPageState extends State<PklPaymentSettingsPage> {
       padding: const EdgeInsets.all(28),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFF0B7332), Color(0xFF10A14D), Color(0xFF25D366)],
+          colors: [Color(0xFFEA580C), Color(0xFFF97316), Color(0xFFFB923C)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(32),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF0D8A3A).withValues(alpha: 0.3),
+            color: const Color(0xFFF97316).withValues(alpha: 0.3),
             blurRadius: 28,
             offset: const Offset(0, 14),
             spreadRadius: 0,
           ),
           BoxShadow(
-            color: const Color(0xFF0D8A3A).withValues(alpha: 0.1),
+            color: const Color(0xFFF97316).withValues(alpha: 0.1),
             blurRadius: 48,
             offset: const Offset(0, 24),
             spreadRadius: 0,
@@ -545,12 +545,12 @@ class _PklPaymentSettingsPageState extends State<PklPaymentSettingsPage> {
         Container(
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
-            color: _themeManager.accentSurfaceColor,
+            color: _themeManager.pklAccentSurface,
             borderRadius: BorderRadius.circular(14),
           ),
           child: Icon(
             title.contains('Link') ? Icons.link_rounded : Icons.image_rounded,
-            color: _themeManager.primaryGreen,
+            color: _themeManager.pklPrimary,
             size: 22,
           ),
         ),
@@ -604,12 +604,12 @@ class _PklPaymentSettingsPageState extends State<PklPaymentSettingsPage> {
                 margin: const EdgeInsets.all(12),
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: _themeManager.accentSurfaceColor,
+                  color: _themeManager.pklAccentSurface,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(
                   Icons.link_rounded,
-                  color: _themeManager.primaryGreen,
+                  color: _themeManager.pklPrimary,
                   size: 20,
                 ),
               ),
@@ -626,7 +626,7 @@ class _PklPaymentSettingsPageState extends State<PklPaymentSettingsPage> {
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(20),
                 borderSide: const BorderSide(
-                  color: Color(0xFF0D8A3A),
+                  color: Color(0xFFF97316),
                   width: 2,
                 ),
               ),
@@ -648,7 +648,7 @@ class _PklPaymentSettingsPageState extends State<PklPaymentSettingsPage> {
             child: ElevatedButton.icon(
               onPressed: _isSavingLink ? null : _saveQrisLink,
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF0D8A3A),
+                backgroundColor: const Color(0xFFF97316),
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(
@@ -820,11 +820,11 @@ class _PklPaymentSettingsPageState extends State<PklPaymentSettingsPage> {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(20),
             color: _isHoveringDrop
-                ? _themeManager.accentSurfaceColor
+                ? _themeManager.pklAccentSurface
                 : _themeManager.surfaceColor,
             border: Border.all(
               color: _isHoveringDrop
-                  ? _themeManager.primaryGreen
+                  ? _themeManager.pklPrimary
                   : _themeManager.borderColor,
               width: 1.4,
             ),

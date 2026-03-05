@@ -338,7 +338,7 @@ class _PklProfilePageState extends State<PklProfilePage> {
       body: _isLoading
           ? Center(
               child: CircularProgressIndicator(
-                color: _themeManager.primaryGreen,
+                color: _themeManager.pklPrimary,
               ),
             )
           : RefreshIndicator(
@@ -475,12 +475,12 @@ class _PklProfilePageState extends State<PklProfilePage> {
                       ),
                       decoration: BoxDecoration(
                         color: verified
-                            ? _themeManager.primaryGreen.withValues(alpha: 0.12)
+                            ? _themeManager.pklPrimary.withValues(alpha: 0.12)
                             : _themeManager.accentGold.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(999),
                         border: Border.all(
                           color: verified
-                              ? _themeManager.primaryGreen.withValues(
+                              ? _themeManager.pklPrimary.withValues(
                                   alpha: 0.25,
                                 )
                               : _themeManager.accentGold.withValues(
@@ -497,7 +497,7 @@ class _PklProfilePageState extends State<PklProfilePage> {
                                 : Icons.hourglass_bottom_rounded,
                             size: 16,
                             color: verified
-                                ? _themeManager.primaryGreen
+                                ? _themeManager.pklPrimary
                                 : _themeManager.accentGold,
                           ),
                           const SizedBox(width: 6),
@@ -506,7 +506,7 @@ class _PklProfilePageState extends State<PklProfilePage> {
                             style: TextStyle(
                               fontWeight: FontWeight.w700,
                               color: verified
-                                  ? _themeManager.primaryGreen
+                                  ? _themeManager.pklPrimary
                                   : _themeManager.accentGold,
                             ),
                           ),

@@ -1,0 +1,8 @@
+[warning] The value of the field '_isRefreshing' isn't used (C:\Project\GoMuter\gomuter_app\lib\pages\pembeli\pkl_detail_page.dart:34:8)
+[warning] The value of the field '_error' isn't used (C:\Project\GoMuter\gomuter_app\lib\pages\pembeli\pkl_detail_page.dart:35:11)
+[warning] The value of the field '_isRatingLoading' isn't used (C:\Project\GoMuter\gomuter_app\lib\pages\pembeli\pkl_detail_page.dart:43:8)
+[warning] The declaration '_toggleBuyerMarker' isn't referenced (C:\Project\GoMuter\gomuter_app\lib\pages\pembeli\pkl_detail_page.dart:189:8)
+[warning] The declaration '_togglePklMarker' isn't referenced (C:\Project\GoMuter\gomuter_app\lib\pages\pembeli\pkl_detail_page.dart:195:8)
+[warning] The declaration '_showRatingSheet' isn't referenced (C:\Project\GoMuter\gomuter_app\lib\pages\pembeli\pkl_detail_page.dart:355:8)
+[info] The private field _cart could be 'final' (C:\Project\GoMuter\gomuter_app\lib\pages\pembeli\pkl_detail_page.dart:53:20)
+[info] Unnecessary use of 'toList' in a spread (C:\Project\GoMuter\gomuter_app\lib\pages\pembeli\pkl_detail_page.dart:1253:22)

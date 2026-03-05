@@ -290,8 +290,8 @@ class _PklChatListPageState extends State<PklChatListPage> {
         const SizedBox(width: 4),
         CircleAvatar(
           radius: 18,
-          backgroundColor: _themeManager.accentSurfaceColor,
-          foregroundColor: _themeManager.primaryGreen,
+          backgroundColor: _themeManager.pklAccentSurface,
+          foregroundColor: _themeManager.pklPrimary,
           child: Text(
             _myInitial,
             style: const TextStyle(fontWeight: FontWeight.w800),
@@ -436,8 +436,8 @@ class _PklChatListPageState extends State<PklChatListPage> {
                         children: [
                           CircleAvatar(
                             radius: 20,
-                            backgroundColor: _themeManager.accentSurfaceColor,
-                            foregroundColor: _themeManager.primaryGreen,
+                            backgroundColor: _themeManager.pklAccentSurface,
+                            foregroundColor: _themeManager.pklPrimary,
                             child: Text(
                               name.isEmpty ? '?' : name[0].toUpperCase(),
                               style:
@@ -530,7 +530,7 @@ class _PklChatListPageState extends State<PklChatListPage> {
           Icon(
             Icons.chat_bubble_outline,
             size: 44,
-            color: _themeManager.primaryGreen,
+            color: _themeManager.pklPrimary,
           ),
           const SizedBox(height: 10),
           Text(
@@ -618,8 +618,8 @@ class _PklChatListPageState extends State<PklChatListPage> {
               ),
               const SizedBox(width: 12),
               CircleAvatar(
-                backgroundColor: _themeManager.accentSurfaceColor,
-                foregroundColor: _themeManager.primaryGreen,
+                backgroundColor: _themeManager.pklAccentSurface,
+                foregroundColor: _themeManager.pklPrimary,
                 child:
                     Text(pembeli.isEmpty ? '?' : pembeli[0].toUpperCase()),
               ),

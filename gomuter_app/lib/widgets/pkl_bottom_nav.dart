@@ -12,7 +12,7 @@ extension PklNavItemDetails on PklNavItem {
       case PklNavItem.chat:
         return 'Pesan';
       case PklNavItem.orders:
-        return 'Pesanan';
+        return 'Menu';
       case PklNavItem.profile:
         return 'Profil';
     }
@@ -21,13 +21,13 @@ extension PklNavItemDetails on PklNavItem {
   IconData get icon {
     switch (this) {
       case PklNavItem.home:
-        return Icons.home_outlined;
+        return Icons.home_rounded;
       case PklNavItem.chat:
-        return Icons.chat_bubble_outline;
+        return Icons.bar_chart_rounded;
       case PklNavItem.orders:
-        return Icons.receipt_long_outlined;
+        return Icons.restaurant_menu_rounded;
       case PklNavItem.profile:
-        return Icons.person_outline_rounded;
+        return Icons.person_rounded;
     }
   }
 
@@ -95,8 +95,8 @@ class _PklBottomNavBarState extends State<PklBottomNavBar> {
   @override
   Widget build(BuildContext context) {
     final bgColor = _themeManager.cardColor;
-    final activeBgColor = _themeManager.accentGold.withValues(alpha: 0.14);
-    final activeColor = _themeManager.accentGold;
+    final activeBgColor = _themeManager.pklPrimary.withValues(alpha: 0.14);
+    final activeColor = _themeManager.pklPrimary;
     final inactiveLabelColor = _themeManager.mutedTextColor;
     final inactiveIconColor = _themeManager.hintTextColor;
 

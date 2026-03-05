@@ -1,11 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../admin_theme.dart';
 import '../widgets/admin_pkl_card.dart';
 import '../widgets/admin_state_widgets.dart';
-
-// Design constants
-const Color _primaryColor = Color(0xFF1B7B5A);
-const Color _secondaryColor = Color(0xFF2D9D78);
 
 class AdminDataPKLTab extends StatefulWidget {
   final bool isLoading;
@@ -102,14 +99,14 @@ class _AdminDataPKLTabState extends State<AdminDataPKLTab> {
                 borderRadius: BorderRadius.circular(20),
                 boxShadow: [
                   BoxShadow(
-                    color: _primaryColor.withValues(alpha: 0.2),
+                    color: adminPrimary.withValues(alpha: 0.2),
                     blurRadius: 30,
                     offset: const Offset(0, 10),
                   ),
                 ],
               ),
               child: const CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(_primaryColor),
+                valueColor: AlwaysStoppedAnimation<Color>(adminPrimary),
                 strokeWidth: 3,
               ),
             ),
@@ -130,7 +127,7 @@ class _AdminDataPKLTabState extends State<AdminDataPKLTab> {
 
     return RefreshIndicator(
       onRefresh: widget.onRefresh,
-      color: _primaryColor,
+      color: adminPrimary,
       backgroundColor: Colors.white,
       child: ListView(
         padding: const EdgeInsets.all(20),
@@ -157,9 +154,7 @@ class _AdminDataPKLTabState extends State<AdminDataPKLTab> {
                   child: Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [_primaryColor, _secondaryColor],
-                      ),
+                      gradient: adminGradient,
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: const Icon(
@@ -224,9 +219,7 @@ class _AdminDataPKLTabState extends State<AdminDataPKLTab> {
                     Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [_primaryColor, _secondaryColor],
-                        ),
+                        gradient: adminGradient,
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: const Icon(
@@ -241,7 +234,7 @@ class _AdminDataPKLTabState extends State<AdminDataPKLTab> {
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF1A1A2E),
+                        color: adminDarkText,
                       ),
                     ),
                   ],
@@ -279,20 +272,13 @@ class _AdminDataPKLTabState extends State<AdminDataPKLTab> {
                                 vertical: 10,
                               ),
                               decoration: BoxDecoration(
-                                gradient: selected
-                                    ? const LinearGradient(
-                                        colors: [
-                                          _primaryColor,
-                                          _secondaryColor,
-                                        ],
-                                      )
-                                    : null,
+                                gradient: selected ? adminGradient : null,
                                 color: selected ? null : Colors.grey.shade100,
                                 borderRadius: BorderRadius.circular(12),
                                 boxShadow: selected
                                     ? [
                                         BoxShadow(
-                                          color: _primaryColor.withValues(
+                                          color: adminPrimary.withValues(
                                             alpha: 0.3,
                                           ),
                                           blurRadius: 8,
@@ -365,20 +351,13 @@ class _AdminDataPKLTabState extends State<AdminDataPKLTab> {
                                 vertical: 10,
                               ),
                               decoration: BoxDecoration(
-                                gradient: selected
-                                    ? const LinearGradient(
-                                        colors: [
-                                          _primaryColor,
-                                          _secondaryColor,
-                                        ],
-                                      )
-                                    : null,
+                                gradient: selected ? adminGradient : null,
                                 color: selected ? null : Colors.grey.shade100,
                                 borderRadius: BorderRadius.circular(12),
                                 boxShadow: selected
                                     ? [
                                         BoxShadow(
-                                          color: _primaryColor.withValues(
+                                          color: adminPrimary.withValues(
                                             alpha: 0.3,
                                           ),
                                           blurRadius: 8,
@@ -428,18 +407,18 @@ class _AdminDataPKLTabState extends State<AdminDataPKLTab> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
-              color: _primaryColor.withValues(alpha: 0.1),
+              color: adminPrimary.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Row(
               children: [
-                Icon(Icons.store, size: 18, color: _primaryColor),
+                const Icon(Icons.store, size: 18, color: adminPrimary),
                 const SizedBox(width: 8),
                 Text(
                   '${data.length} PKL ditemukan',
                   style: const TextStyle(
                     fontWeight: FontWeight.w600,
-                    color: _primaryColor,
+                    color: adminPrimary,
                   ),
                 ),
               ],

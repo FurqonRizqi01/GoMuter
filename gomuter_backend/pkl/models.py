@@ -131,6 +131,7 @@ class PreOrder(models.Model):
     pickup_latitude = models.FloatField(blank=True, null=True)
     pickup_longitude = models.FloatField(blank=True, null=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING')
+    total_price = models.IntegerField(default=0)
     dp_amount = models.IntegerField(default=0)
     dp_status = models.CharField(max_length=30, choices=DP_STATUS_CHOICES, default='BELUM_BAYAR')
     bukti_dp_url = models.CharField(max_length=255, blank=True, null=True)
@@ -142,6 +143,34 @@ class PreOrder(models.Model):
 
     def __str__(self):
         return f'PreOrder {self.pembeli} -> {self.pkl.nama_usaha} ({self.status})'
+
+
+class PreOrderItem(models.Model):
+    preorder = models.ForeignKey(
+        PreOrder,
+        on_delete=models.CASCADE,
+        related_name='items',
+    )
+    product = models.ForeignKey(
+        'PKLProduct',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='order_items',
+    )
+    product_name = models.CharField(max_length=120)
+    product_price = models.PositiveIntegerField()
+    quantity = models.PositiveIntegerField(default=1)
+
+    @property
+    def subtotal(self):
+        return self.product_price * self.quantity
+
+    class Meta:
+        ordering = ['id']
+
+    def __str__(self):
+        return f'{self.product_name} x{self.quantity} (PreOrder #{self.preorder_id})'
 
 
 class BuyerLocation(models.Model):

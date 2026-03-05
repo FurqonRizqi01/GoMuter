@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 
-// Design constants
-const Color _primaryColor = Color(0xFF1B7B5A);
-const Color _secondaryColor = Color(0xFF2D9D78);
+import '../admin_theme.dart';
 
 class AdminErrorState extends StatelessWidget {
   final String message;
@@ -50,7 +48,7 @@ class AdminErrorState extends StatelessWidget {
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
-                color: Color(0xFF1A1A2E),
+                color: adminDarkText,
               ),
             ),
             const SizedBox(height: 12),
@@ -78,13 +76,11 @@ class AdminErrorState extends StatelessWidget {
             // Retry Button
             Container(
               decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [_primaryColor, _secondaryColor],
-                ),
+                gradient: adminGradient,
                 borderRadius: BorderRadius.circular(14),
                 boxShadow: [
                   BoxShadow(
-                    color: _primaryColor.withValues(alpha: 0.3),
+                    color: adminPrimary.withValues(alpha: 0.3),
                     blurRadius: 12,
                     offset: const Offset(0, 6),
                   ),

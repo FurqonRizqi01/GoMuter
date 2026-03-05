@@ -83,12 +83,25 @@ class ThemeManager extends ChangeNotifier {
 
   // Colors
 
-  /// Brand
+  /// Brand — Green (used by PKL/admin pages)
   Color get primaryGreen => const Color(0xFF1B7B5A);
   Color get lightGreen => const Color(0xFFE8F5F0);
 
+  /// Brand — Orange (used by buyer/pembeli pages)
+  Color get primaryOrange => const Color(0xFFF97316);
+  Color get secondaryOrange => const Color(0xFFFB923C);
+  Color get accentOrange => const Color(0xFFFDBA74);
+  Color get lightOrange =>
+      _isDarkMode ? Colors.white.withValues(alpha: 0.06) : const Color(0xFFFFF7ED);
+
+  /// PKL brand — Orange (primary for PKL pages)
+  Color get pklPrimary => primaryOrange;
+  Color get pklSecondary => secondaryOrange;
+  Color get pklAccentSurface =>
+      _isDarkMode ? Colors.white.withValues(alpha: 0.06) : lightOrange;
+
   /// Premium accent (gold/amber) for highlights/CTAs.
-  Color get accentGold => const Color(0xFFF29F3D);
+  Color get accentGold => const Color(0xFFF97316);
 
   /// Surfaces
   /// Warm dark surfaces for an elegant "premium" look (less harsh than green-on-black).
@@ -99,7 +112,8 @@ class ThemeManager extends ChangeNotifier {
       _isDarkMode ? const Color(0xFF261D16) : (Colors.grey[50] ?? Colors.white);
 
   /// Text
-  Color get textColor => _isDarkMode ? const Color(0xFFF5EFE7) : Colors.black87;
+  Color get textColor =>
+      _isDarkMode ? const Color(0xFFF5EFE7) : const Color(0xFF1A1A2E);
   Color get mutedTextColor =>
       _isDarkMode ? const Color(0xFFB8ABA1) : Colors.black54;
   Color get hintTextColor =>
@@ -113,6 +127,8 @@ class ThemeManager extends ChangeNotifier {
   /// Accents
   Color get accentSurfaceColor =>
       _isDarkMode ? Colors.white.withValues(alpha: 0.06) : lightGreen;
+  Color get orangeSurfaceColor =>
+      _isDarkMode ? Colors.white.withValues(alpha: 0.06) : lightOrange;
   Color get overlayScrimColor => _isDarkMode
       ? Colors.black.withValues(alpha: 0.65)
       : Colors.white.withValues(alpha: 0.95);

@@ -1,12 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../admin_theme.dart';
 import '../widgets/admin_pkl_card.dart';
 import '../widgets/admin_state_widgets.dart';
-
-// Design constants
-const Color _primaryColor = Color(0xFF1B7B5A);
-const Color _secondaryColor = Color(0xFF2D9D78);
-const Color _darkText = Color(0xFF1A1A2E);
 
 class AdminReportsTab extends StatelessWidget {
   final bool isLoading;
@@ -51,14 +47,14 @@ class AdminReportsTab extends StatelessWidget {
                 borderRadius: BorderRadius.circular(20),
                 boxShadow: [
                   BoxShadow(
-                    color: _primaryColor.withValues(alpha: 0.2),
+                    color: adminPrimary.withValues(alpha: 0.2),
                     blurRadius: 30,
                     offset: const Offset(0, 10),
                   ),
                 ],
               ),
               child: const CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(_primaryColor),
+                valueColor: AlwaysStoppedAnimation<Color>(adminPrimary),
                 strokeWidth: 3,
               ),
             ),
@@ -80,7 +76,7 @@ class AdminReportsTab extends StatelessWidget {
 
     return RefreshIndicator(
       onRefresh: onRefresh,
-      color: _primaryColor,
+      color: adminPrimary,
       backgroundColor: Colors.white,
       child: ListView(
         padding: const EdgeInsets.all(20),
@@ -108,9 +104,7 @@ class AdminReportsTab extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF667eea), Color(0xFF764ba2)],
-                        ),
+                        gradient: adminGradient,
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: const Icon(
@@ -128,7 +122,7 @@ class AdminReportsTab extends StatelessWidget {
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
-                            color: _darkText,
+                            color: adminDarkText,
                           ),
                         ),
                         Text(
@@ -146,8 +140,8 @@ class AdminReportsTab extends StatelessWidget {
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: [
-                          _primaryColor.withValues(alpha: 0.08),
-                          _secondaryColor.withValues(alpha: 0.05),
+                          adminPrimary.withValues(alpha: 0.08),
+                          adminPrimaryLight.withValues(alpha: 0.05),
                         ],
                       ),
                       borderRadius: BorderRadius.circular(16),
@@ -157,13 +151,13 @@ class AdminReportsTab extends StatelessWidget {
                         Container(
                           padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
-                            color: _primaryColor.withValues(alpha: 0.1),
+                            color: adminPrimary.withValues(alpha: 0.1),
                             shape: BoxShape.circle,
                           ),
                           child: const Icon(
                             Icons.check_circle,
                             size: 40,
-                            color: _primaryColor,
+                            color: adminPrimary,
                           ),
                         ),
                         const SizedBox(height: 12),
@@ -171,7 +165,7 @@ class AdminReportsTab extends StatelessWidget {
                           'Semua Aman! 🎉',
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
-                            color: _darkText,
+                            color: adminDarkText,
                             fontSize: 16,
                           ),
                         ),
@@ -212,9 +206,7 @@ class AdminReportsTab extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFFf093fb), Color(0xFFf5576c)],
-                        ),
+                        gradient: adminGradient,
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: const Icon(
@@ -233,7 +225,7 @@ class AdminReportsTab extends StatelessWidget {
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
-                              color: _darkText,
+                              color: adminDarkText,
                             ),
                           ),
                           Text(
@@ -253,13 +245,13 @@ class AdminReportsTab extends StatelessWidget {
                           vertical: 6,
                         ),
                         decoration: BoxDecoration(
-                          color: Colors.orange.withValues(alpha: 0.1),
+                          color: adminPrimary.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Text(
                           '${pendingPkls.length}',
                           style: const TextStyle(
-                            color: Colors.orange,
+                            color: adminPrimary,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
@@ -348,7 +340,7 @@ class _ReportCard extends StatelessWidget {
                     report['title'] ?? '-',
                     style: const TextStyle(
                       fontWeight: FontWeight.w600,
-                      color: _darkText,
+                      color: adminDarkText,
                       fontSize: 15,
                     ),
                   ),

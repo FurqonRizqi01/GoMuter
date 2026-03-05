@@ -1,6 +1,8 @@
 import 'dart:ui';
 import 'dart:convert';
+import 'dart:async';
 
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -10,6 +12,7 @@ import '../../navigation/pkl_routes.dart';
 import '../pembeli/pembeli_home_page.dart';
 import '../../utils/token_manager.dart';
 import '../../utils/theme_manager.dart';
+import '../../utils/notification_service.dart';
 import 'login_form.dart';
 import 'register_form.dart';
 
@@ -53,8 +56,7 @@ class _AuthPageState extends State<AuthPage> {
   }
 
   Future<void> _openForgotPasswordSheet() async {
-    final colorScheme = Theme.of(context).colorScheme;
-    final primary = colorScheme.primary;
+    const primary = Color(0xFFF97316);
 
     if (_resetIdentifierController.text.trim().isEmpty) {
       _resetIdentifierController.text = _usernameController.text.trim();
@@ -386,27 +388,68 @@ class _AuthPageState extends State<AuthPage> {
         password: _passwordController.text,
       );
 
-      final accessToken = result['access'];
-      final refreshToken = result['refresh'];
-      final currentUser = await ApiService.getCurrentUser(accessToken);
-      final role = (currentUser['role'] as String?)?.toUpperCase() ?? 'USER';
-      final username =
-          (currentUser['username'] as String?)?.trim() ??
-          _usernameController.text.trim();
+      final accessToken = result['access'] as String;
+      final refreshToken = result['refresh'] as String;
+
+      var role = (result['role'] as String?)?.toUpperCase();
+      var username = (result['username'] as String?)?.trim();
+
+      // Fallback for old backend response that doesn't include role/username.
+      if (role == null || role.isEmpty || username == null || username.isEmpty) {
+        final currentUser = await ApiService.getCurrentUser(accessToken);
+        role = (currentUser['role'] as String?)?.toUpperCase() ?? 'USER';
+        username =
+            (currentUser['username'] as String?)?.trim() ??
+            _usernameController.text.trim();
+      }
+
+      final safeRole = role;
+      final safeUsername = username;
 
       await TokenManager.saveTokens(access: accessToken, refresh: refreshToken);
 
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('user_role', role);
-      await prefs.setString('username', username);
+      // Keep login success path robust on Web: profile/theme persistence is non-critical.
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('user_role', safeRole);
+        await prefs.setString('username', safeUsername);
+        await ThemeManager().useUserTheme(role: safeRole, username: safeUsername);
+      } catch (e) {
+        debugPrint('Warning: failed to persist user metadata after login: $e');
+      }
 
-      await ThemeManager().useUserTheme(role: role, username: username);
+      // Re-initialize notifications (fire-and-forget, don't block login)
+      if (Firebase.apps.isNotEmpty) {
+        try {
+          NotificationService().initialize().catchError((e) {
+            debugPrint('Warning: NotificationService init error: $e');
+          });
+        } catch (e) {
+          debugPrint('Warning: NotificationService create error: $e');
+        }
+      }
 
       if (!mounted) return;
-      _navigateToRoleHome(role, accessToken);
-    } catch (e) {
+      _navigateToRoleHome(safeRole, accessToken);
+    } on TimeoutException {
       setState(() {
-        _errorText = 'Login gagal. Periksa username/password.';
+        _errorText =
+            'Koneksi ke server timeout. Cek IP backend di config.dart dan jaringan HP/laptop.';
+      });
+    } catch (e, st) {
+      debugPrint('Login flow error: $e');
+      debugPrint('Login flow stack: $st');
+
+      final error = e.toString();
+      final isNetworkError =
+          error.contains('SocketException') ||
+          error.contains('Connection refused') ||
+          error.contains('Failed host lookup');
+
+      setState(() {
+        _errorText = isNetworkError
+            ? 'Tidak bisa terhubung ke server. Pastikan backend aktif dan baseUrl benar.'
+          : 'Login gagal. Periksa username/password.';
       });
     } finally {
       if (mounted) {
@@ -509,8 +552,7 @@ class _AuthPageState extends State<AuthPage> {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final primary = colorScheme.primary;
+    const primary = Color(0xFFF97316);
 
     return Scaffold(
       body: Stack(
@@ -695,14 +737,14 @@ class _AuthBackground extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final isDark = scheme.brightness == Brightness.dark;
-    final primary = scheme.primary;
+    const primary = Color(0xFFF97316);
     final background = Theme.of(context).scaffoldBackgroundColor;
 
     final top = isDark
-      ? const Color(0xFF04150B)
+      ? const Color(0xFF150A04)
       : Color.alphaBlend(primary.withValues(alpha: 0.10), background);
     final mid = isDark
-      ? const Color(0xFF071B10)
+      ? const Color(0xFF1B1007)
       : Color.alphaBlend(scheme.secondary.withValues(alpha: 0.06), background);
     final bottom = isDark ? const Color(0xFF050607) : background;
 
@@ -832,31 +874,33 @@ class _Header extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final isDark = scheme.brightness == Brightness.dark;
     final titleColor = Theme.of(context).textTheme.headlineMedium?.color;
     final subtitleColor = Theme.of(context).textTheme.bodyMedium?.color;
 
-    final border = isDark
-        ? Colors.white.withValues(alpha: 0.10)
-        : Colors.black.withValues(alpha: 0.08);
-    final fill = isDark
-        ? Colors.white.withValues(alpha: 0.06)
-        : Colors.white.withValues(alpha: 0.75);
+    const orange = Color(0xFFF97316);
 
     return Column(
       children: [
         Container(
-          padding: const EdgeInsets.all(16),
+          width: 90,
+          height: 90,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: fill,
+            color: orange.withValues(alpha: 0.12),
             border: Border.all(
-              color: border,
-              width: 1,
+              color: orange.withValues(alpha: 0.3),
+              width: 2,
             ),
           ),
-          child: Icon(Icons.store_rounded, size: 46, color: primary),
+          child: ClipOval(
+            child: Padding(
+              padding: const EdgeInsets.all(14),
+              child: Image.asset(
+                'assets/icon/Gomuter.png',
+                fit: BoxFit.contain,
+              ),
+            ),
+          ),
         ),
         const SizedBox(height: 16),
         Text(
@@ -894,7 +938,7 @@ class _SegmentedToggle extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final isDark = scheme.brightness == Brightness.dark;
-    final primary = scheme.primary;
+    const primary = Color(0xFFF97316);
     final border = isDark
       ? Colors.white.withValues(alpha: 0.10)
       : Colors.black.withValues(alpha: 0.10);

@@ -179,14 +179,14 @@ class _PembeliChatListPageState extends State<PembeliChatListPage> {
       body: _isLoading
           ? Center(
               child: CircularProgressIndicator(
-                color: _themeManager.primaryGreen,
+                color: _themeManager.primaryOrange,
               ),
             )
           : SafeArea(
               bottom: false,
               child: RefreshIndicator(
                 onRefresh: _loadChats,
-                color: _themeManager.primaryGreen,
+                color: _themeManager.primaryOrange,
                 child: ListView(
                   physics: const AlwaysScrollableScrollPhysics(),
                   padding: const EdgeInsets.fromLTRB(16, 10, 16, 24),
@@ -230,9 +230,9 @@ class _PembeliChatListPageState extends State<PembeliChatListPage> {
   Widget _buildHeader({required int unreadCount}) {
     final textColor = _themeManager.textColor;
     final mutedText = _themeManager.mutedTextColor;
-    final badgeBg = _themeManager.accentGold.withValues(alpha: 0.14);
-    final badgeBorder = _themeManager.accentGold.withValues(alpha: 0.3);
-    final badgeText = _themeManager.accentGold;
+    final badgeBg = _themeManager.primaryOrange.withValues(alpha: 0.14);
+    final badgeBorder = _themeManager.primaryOrange.withValues(alpha: 0.3);
+    final badgeText = _themeManager.primaryOrange;
 
     return Row(
       children: [
@@ -296,8 +296,8 @@ class _PembeliChatListPageState extends State<PembeliChatListPage> {
         const SizedBox(width: 4),
         CircleAvatar(
           radius: 18,
-          backgroundColor: _themeManager.accentSurfaceColor,
-          foregroundColor: _themeManager.primaryGreen,
+          backgroundColor: _themeManager.orangeSurfaceColor,
+          foregroundColor: _themeManager.primaryOrange,
           child: Text(
             _myInitial,
             style: const TextStyle(fontWeight: FontWeight.w800),
@@ -427,7 +427,7 @@ class _PembeliChatListPageState extends State<PembeliChatListPage> {
                     borderRadius: BorderRadius.circular(18),
                     border: Border.all(
                       color: unread
-                          ? _themeManager.accentGold.withValues(alpha: 0.55)
+                          ? _themeManager.primaryOrange.withValues(alpha: 0.55)
                           : border,
                       width: unread ? 2 : 1,
                     ),
@@ -441,8 +441,8 @@ class _PembeliChatListPageState extends State<PembeliChatListPage> {
                         children: [
                           CircleAvatar(
                             radius: 20,
-                            backgroundColor: _themeManager.accentSurfaceColor,
-                            foregroundColor: _themeManager.primaryGreen,
+                            backgroundColor: _themeManager.orangeSurfaceColor,
+                            foregroundColor: _themeManager.primaryOrange,
                             child: Text(
                               name.isEmpty ? '?' : name[0].toUpperCase(),
                               style: const TextStyle(fontWeight: FontWeight.w800),
@@ -456,7 +456,7 @@ class _PembeliChatListPageState extends State<PembeliChatListPage> {
                                 width: 12,
                                 height: 12,
                                 decoration: BoxDecoration(
-                                  color: _themeManager.accentGold,
+                                  color: _themeManager.primaryOrange,
                                   shape: BoxShape.circle,
                                   border: Border.all(
                                     color: _themeManager.cardColor,
@@ -523,7 +523,7 @@ class _PembeliChatListPageState extends State<PembeliChatListPage> {
           Icon(
             Icons.chat_bubble_outline,
             size: 44,
-            color: _themeManager.primaryGreen,
+            color: _themeManager.primaryOrange,
           ),
           SizedBox(height: 10),
           Text(
@@ -560,7 +560,7 @@ class _PembeliChatListPageState extends State<PembeliChatListPage> {
               ));
 
     final stripeColor = unread
-        ? _themeManager.accentGold
+        ? _themeManager.primaryOrange
         : _themeManager.hintTextColor.withValues(alpha: 0.45);
     final tileBg = unread ? _themeManager.cardColor : _themeManager.surfaceColor;
 
@@ -585,7 +585,7 @@ class _PembeliChatListPageState extends State<PembeliChatListPage> {
             borderRadius: BorderRadius.circular(24),
             border: Border.all(
               color: unread
-                  ? _themeManager.accentGold.withValues(alpha: 0.35)
+                  ? _themeManager.primaryOrange.withValues(alpha: 0.35)
                   : border,
               width: unread ? 1.5 : 1,
             ),
@@ -602,8 +602,8 @@ class _PembeliChatListPageState extends State<PembeliChatListPage> {
               ),
               const SizedBox(width: 12),
               CircleAvatar(
-                backgroundColor: _themeManager.accentSurfaceColor,
-                foregroundColor: _themeManager.primaryGreen,
+                backgroundColor: _themeManager.orangeSurfaceColor,
+                foregroundColor: _themeManager.primaryOrange,
                 child: Text(pklName.isEmpty ? '?' : pklName[0].toUpperCase()),
               ),
               const SizedBox(width: 12),
@@ -632,7 +632,7 @@ class _PembeliChatListPageState extends State<PembeliChatListPage> {
                               vertical: 5,
                             ),
                             decoration: BoxDecoration(
-                              color: _themeManager.accentGold,
+                              color: _themeManager.primaryOrange,
                               borderRadius: BorderRadius.circular(999),
                             ),
                             child: const Text(
