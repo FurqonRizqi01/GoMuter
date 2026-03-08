@@ -20,9 +20,8 @@ secret.key
 *.pem
 *.crt
 
-# Django settings with hardcoded secrets
-# Use .env + django-environ in production instead
-gomuter_backend/gomuter_backend/settings.py
+# Track settings.py in git (it is now env-driven and safe to commit).
+# Keep secrets in environment variables / .env only.
 
 # Firebase service account key
 **/serviceAccountKey.json

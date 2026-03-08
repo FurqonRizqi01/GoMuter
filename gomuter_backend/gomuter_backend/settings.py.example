@@ -1,39 +1,43 @@
-# Copy this file to settings.py and fill in your values
-# DO NOT commit settings.py to git!
+# This file documents expected environment variables for settings.py.
+# Keep secrets in env vars (or .env locally), never hardcode credentials.
 
-import os
-from pathlib import Path
-from datetime import timedelta
+# Core
+# DEBUG=False
+# SECRET_KEY=replace-with-a-long-random-secret
+# ALLOWED_HOSTS=api.example.com
+# CSRF_TRUSTED_ORIGINS=https://api.example.com
+# CORS_ALLOWED_ORIGINS=https://app.example.com
 
-import firebase_admin
-from firebase_admin import credentials
+# Database (preferred in production)
+# DATABASE_URL=postgresql://user:password@host:5432/dbname?sslmode=require
+# Optional overrides when DATABASE_URL is not set:
+# DB_NAME=gomuter_db
+# DB_USER=postgres
+# DB_PASSWORD=postgres
+# DB_HOST=localhost
+# DB_PORT=5432
+# DB_SSLMODE=require
+# DB_CONN_MAX_AGE=600
 
-BASE_DIR = Path(__file__).resolve().parent.parent
+# API rate limits
+# DRF_THROTTLE_ANON=60/min
+# DRF_THROTTLE_USER=300/min
 
-# SECURITY WARNING: Change this to a unique, unpredictable value!
-SECRET_KEY = 'CHANGE-ME-to-a-random-secret-key'
-
-DEBUG = True
-
-ALLOWED_HOSTS = ['*']
-
-# Database
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'gomuter_db',
-        'USER': 'postgres',
-        'PASSWORD': 'YOUR_DB_PASSWORD_HERE',
-        'HOST': 'localhost',
-        'PORT': '5432',
-    }
-}
-
-# Firebase
-FIREBASE_KEY_PATH = BASE_DIR / "serviceAccountKey.json"
+# Security (production defaults are enabled when DEBUG=False)
+# SECURE_SSL_REDIRECT=True
+# SESSION_COOKIE_SECURE=True
+# CSRF_COOKIE_SECURE=True
+# SECURE_HSTS_SECONDS=31536000
+# SECURE_HSTS_INCLUDE_SUBDOMAINS=True
+# SECURE_HSTS_PRELOAD=True
 
 # Email (password reset)
-EMAIL_HOST_USER = os.getenv('GOMUTER_EMAIL_HOST_USER', '').strip()
-EMAIL_HOST_PASSWORD = os.getenv('GOMUTER_EMAIL_HOST_PASSWORD', '').strip()
+# GOMUTER_EMAIL_HOST_USER=you@example.com
+# GOMUTER_EMAIL_HOST_PASSWORD=app-password
+# GOMUTER_EMAIL_HOST=smtp.gmail.com
+# GOMUTER_EMAIL_PORT=587
+# GOMUTER_EMAIL_USE_TLS=true
+# GOMUTER_DEFAULT_FROM_EMAIL=no-reply@example.com
 
-# See the full settings.py for remaining configuration (INSTALLED_APPS, MIDDLEWARE, etc.)
+# Firebase
+# Place service account file at: gomuter_backend/serviceAccountKey.json
