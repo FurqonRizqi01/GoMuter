@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'navigation/admin_routes.dart';
 import 'navigation/pkl_routes.dart';
 import 'pages/admin/admin_home_page.dart';
+import 'pages/pembeli/pembeli_home_page.dart';
 import 'pages/pkl/pkl_chat_list_page.dart';
 import 'pages/pkl/pkl_edit_info_page.dart';
 import 'pages/pkl/pkl_home_page.dart';
@@ -14,6 +16,7 @@ import 'pages/pkl/pkl_preorder_page.dart';
 import 'pages/pkl/pkl_profile_page.dart';
 import 'web/file_picker_web_registrar.dart';
 import 'pages/auth/auth_page.dart';
+import 'utils/token_manager.dart';
 import 'utils/theme_manager.dart';
 import 'utils/notification_service.dart';
 
@@ -215,7 +218,7 @@ class GoMuterApp extends StatelessWidget {
       builder: (context, _) => MaterialApp(
         title: 'GoMuter',
         theme: _buildTheme(themeManager),
-        home: const AuthPage(),
+        home: const _SessionGate(),
         routes: const {},
         onGenerateRoute: _onGenerateRoute,
       ),
@@ -277,6 +280,70 @@ class GoMuterApp extends StatelessWidget {
         );
     }
     return null;
+  }
+}
+
+/// Checks for an existing valid session on app start.
+/// If the user was previously logged in and the token is still valid,
+/// navigates directly to the appropriate home page (no re-login needed).
+class _SessionGate extends StatefulWidget {
+  const _SessionGate();
+
+  @override
+  State<_SessionGate> createState() => _SessionGateState();
+}
+
+class _SessionGateState extends State<_SessionGate> {
+  @override
+  void initState() {
+    super.initState();
+    _checkSession();
+  }
+
+  Future<void> _checkSession() async {
+    final token = await TokenManager.getValidAccessToken();
+
+    if (token == null) {
+      _goToAuth();
+      return;
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    final role = (prefs.getString('user_role') ?? '').toUpperCase();
+
+    if (!mounted) return;
+
+    if (role == 'PKL') {
+      Navigator.pushReplacementNamed(context, PklRoutes.home);
+    } else if (role == 'ADMIN') {
+      Navigator.pushReplacementNamed(
+        context,
+        AdminRoutes.dashboard,
+        arguments: token,
+      );
+    } else if (role == 'USER' && role.isNotEmpty) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const PembeliHomePage()),
+      );
+    } else {
+      _goToAuth();
+    }
+  }
+
+  void _goToAuth() {
+    if (!mounted) return;
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (_) => const AuthPage()),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      body: Center(child: CircularProgressIndicator()),
+    );
   }
 }
 
