@@ -3,9 +3,9 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'dart:convert';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import '../config.dart';
+import 'token_manager.dart';
 
 // Background message handler
 @pragma('vm:entry-point')
@@ -163,8 +163,7 @@ class NotificationService {
 
   Future<void> _sendTokenToBackend(String fcmToken) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final accessToken = prefs.getString('access_token');
+      final accessToken = await TokenManager.getValidAccessToken();
 
       if (accessToken == null || accessToken.isEmpty) {
         // Not logged in yet
