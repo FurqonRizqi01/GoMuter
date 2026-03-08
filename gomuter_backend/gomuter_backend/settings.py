@@ -13,6 +13,8 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 from pathlib import Path
 from datetime import timedelta
 import os
+import json
+import base64
 from urllib.parse import urlparse
 import firebase_admin
 from firebase_admin import credentials
@@ -243,10 +245,42 @@ else:
 
 
 FIREBASE_KEY_PATH = BASE_DIR / "serviceAccountKey.json"
+FIREBASE_SERVICE_ACCOUNT_JSON = os.getenv('FIREBASE_SERVICE_ACCOUNT_JSON', '').strip()
+FIREBASE_SERVICE_ACCOUNT_B64 = os.getenv('FIREBASE_SERVICE_ACCOUNT_B64', '').strip()
 
-if FIREBASE_KEY_PATH.exists():
-    cred = credentials.Certificate(str(FIREBASE_KEY_PATH))
+
+def _init_firebase_admin() -> None:
+    # Avoid duplicate initialization on process reload.
+    if firebase_admin._apps:
+        return
+
+    cred = None
+
+    if FIREBASE_SERVICE_ACCOUNT_JSON:
+        try:
+            cred = credentials.Certificate(json.loads(FIREBASE_SERVICE_ACCOUNT_JSON))
+        except Exception as e:
+            print(f"Warning: FIREBASE_SERVICE_ACCOUNT_JSON invalid: {e}")
+
+    if cred is None and FIREBASE_SERVICE_ACCOUNT_B64:
+        try:
+            decoded = base64.b64decode(FIREBASE_SERVICE_ACCOUNT_B64).decode('utf-8')
+            cred = credentials.Certificate(json.loads(decoded))
+        except Exception as e:
+            print(f"Warning: FIREBASE_SERVICE_ACCOUNT_B64 invalid: {e}")
+
+    if cred is None and FIREBASE_KEY_PATH.exists():
+        cred = credentials.Certificate(str(FIREBASE_KEY_PATH))
+
+    if cred is None:
+        print(
+            "Warning: Firebase credentials not found. "
+            "Set FIREBASE_SERVICE_ACCOUNT_JSON or FIREBASE_SERVICE_ACCOUNT_B64 "
+            "(or provide serviceAccountKey.json locally). Push notifications will be disabled."
+        )
+        return
+
     firebase_admin.initialize_app(cred)
-else:
-    # Optional: Log warning if key is missing
-    print("Warning: serviceAccountKey.json not found. Push notifications will be disabled.")
+
+
+_init_firebase_admin()
