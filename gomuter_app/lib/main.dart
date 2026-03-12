@@ -16,6 +16,8 @@ import 'pages/pkl/pkl_preorder_page.dart';
 import 'pages/pkl/pkl_profile_page.dart';
 import 'web/file_picker_web_registrar.dart';
 import 'pages/auth/auth_page.dart';
+import 'pages/splash/splash_screen.dart';
+import 'pages/onboarding/onboarding_screen.dart';
 import 'utils/token_manager.dart';
 import 'utils/theme_manager.dart';
 import 'utils/notification_service.dart';
@@ -283,9 +285,7 @@ class GoMuterApp extends StatelessWidget {
   }
 }
 
-/// Checks for an existing valid session on app start.
-/// If the user was previously logged in and the token is still valid,
-/// navigates directly to the appropriate home page (no re-login needed).
+/// Entry gate: Splash → Onboarding (first-time) → Session check.
 class _SessionGate extends StatefulWidget {
   const _SessionGate();
 
@@ -293,10 +293,33 @@ class _SessionGate extends StatefulWidget {
   State<_SessionGate> createState() => _SessionGateState();
 }
 
+enum _GatePhase { splash, onboarding, sessionCheck }
+
 class _SessionGateState extends State<_SessionGate> {
-  @override
-  void initState() {
-    super.initState();
+  _GatePhase _phase = _GatePhase.splash;
+
+  static const _onboardingDoneKey = 'onboarding_done';
+
+  void _onSplashFinished() async {
+    final prefs = await SharedPreferences.getInstance();
+    final onboardingDone = prefs.getBool(_onboardingDoneKey) ?? false;
+
+    if (!mounted) return;
+
+    if (onboardingDone) {
+      setState(() => _phase = _GatePhase.sessionCheck);
+      _checkSession();
+    } else {
+      setState(() => _phase = _GatePhase.onboarding);
+    }
+  }
+
+  void _onOnboardingFinished() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_onboardingDoneKey, true);
+
+    if (!mounted) return;
+    setState(() => _phase = _GatePhase.sessionCheck);
     _checkSession();
   }
 
@@ -341,9 +364,16 @@ class _SessionGateState extends State<_SessionGate> {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
-      body: Center(child: CircularProgressIndicator()),
-    );
+    switch (_phase) {
+      case _GatePhase.splash:
+        return SplashScreen(onFinished: _onSplashFinished);
+      case _GatePhase.onboarding:
+        return OnboardingScreen(onFinished: _onOnboardingFinished);
+      case _GatePhase.sessionCheck:
+        return const Scaffold(
+          body: Center(child: CircularProgressIndicator()),
+        );
+    }
   }
 }
 
