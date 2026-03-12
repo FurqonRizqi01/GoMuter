@@ -18,6 +18,7 @@ import 'web/file_picker_web_registrar.dart';
 import 'pages/auth/auth_page.dart';
 import 'pages/splash/splash_screen.dart';
 import 'pages/onboarding/onboarding_screen.dart';
+import 'pages/onboarding/permission_screen.dart';
 import 'utils/token_manager.dart';
 import 'utils/theme_manager.dart';
 import 'utils/notification_service.dart';
@@ -293,7 +294,7 @@ class _SessionGate extends StatefulWidget {
   State<_SessionGate> createState() => _SessionGateState();
 }
 
-enum _GatePhase { splash, onboarding, sessionCheck }
+enum _GatePhase { splash, onboarding, permissions, sessionCheck }
 
 class _SessionGateState extends State<_SessionGate> {
   _GatePhase _phase = _GatePhase.splash;
@@ -307,6 +308,7 @@ class _SessionGateState extends State<_SessionGate> {
     if (!mounted) return;
 
     if (onboardingDone) {
+      // Returning user — skip onboarding & permissions, go straight to session
       setState(() => _phase = _GatePhase.sessionCheck);
       _checkSession();
     } else {
@@ -318,6 +320,12 @@ class _SessionGateState extends State<_SessionGate> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_onboardingDoneKey, true);
 
+    if (!mounted) return;
+    // After onboarding, ask for permissions
+    setState(() => _phase = _GatePhase.permissions);
+  }
+
+  void _onPermissionsFinished() {
     if (!mounted) return;
     setState(() => _phase = _GatePhase.sessionCheck);
     _checkSession();
@@ -369,6 +377,8 @@ class _SessionGateState extends State<_SessionGate> {
         return SplashScreen(onFinished: _onSplashFinished);
       case _GatePhase.onboarding:
         return OnboardingScreen(onFinished: _onOnboardingFinished);
+      case _GatePhase.permissions:
+        return PermissionScreen(onFinished: _onPermissionsFinished);
       case _GatePhase.sessionCheck:
         return const Scaffold(
           body: Center(child: CircularProgressIndicator()),
