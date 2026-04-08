@@ -47,9 +47,12 @@ SECRET_KEY = os.getenv(
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = _env_bool('DEBUG', default=True)
 
-ALLOWED_HOSTS = _env_list('ALLOWED_HOSTS', default='127.0.0.1,localhost')
+ALLOWED_HOSTS = _env_list('ALLOWED_HOSTS', default='127.0.0.1,localhost,.onrender.com')
 
-CSRF_TRUSTED_ORIGINS = _env_list('CSRF_TRUSTED_ORIGINS')
+CSRF_TRUSTED_ORIGINS = _env_list(
+    'CSRF_TRUSTED_ORIGINS',
+    default='http://127.0.0.1:8000,http://localhost:8000,https://*.onrender.com',
+)
 
 
 # Application definition
