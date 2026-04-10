@@ -8,7 +8,10 @@ from django.utils import timezone
 DEFAULT_RADIUS_METERS = 300
 ALLOWED_RADIUS_METERS = (300, 500, 1000, 1500)
 
+
+# Model profil usaha Pedagang Kaki Lima (PKL) yang terhubung langsung ke akun user.
 class PKL(models.Model):
+    # Satu akun user role PKL memiliki tepat satu profil PKL (one-to-one).
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
@@ -25,7 +28,7 @@ class PKL(models.Model):
     qris_link = models.CharField(max_length=255, blank=True, null=True)
     profile_image_url = models.CharField(max_length=255, blank=True, null=True)
 
-    
+    # Status verifikasi dipakai admin untuk menentukan kelayakan tampil di sistem.
     STATUS_VERIFIKASI_CHOICES = (
         ('PENDING', 'Pending'),
         ('DITERIMA', 'Diterima'),
@@ -60,11 +63,13 @@ class LokasiPKL(models.Model):
 
 
 class Chat(models.Model):
+    # Pihak pembeli yang membuka percakapan.
     pembeli = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name='chats_as_pembeli',
     )
+    # PKL tujuan percakapan.
     pkl = models.ForeignKey(
         PKL,
         on_delete=models.CASCADE,
@@ -74,6 +79,7 @@ class Chat(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
+        # Satu pembeli hanya memiliki satu room chat per PKL.
         unique_together = ('pembeli', 'pkl')
         ordering = ['-updated_at']
 
@@ -102,6 +108,7 @@ class ChatMessage(models.Model):
 
 
 class PreOrder(models.Model):
+    # Status alur pesanan dari sisi proses bisnis transaksi.
     STATUS_CHOICES = [
         ('PENDING', 'Pending'),
         ('DITERIMA', 'Diterima'),
@@ -109,17 +116,20 @@ class PreOrder(models.Model):
         ('SELESAI', 'Selesai'),
     ]
 
+    # Status pembayaran DP untuk mengontrol validasi bukti bayar.
     DP_STATUS_CHOICES = [
         ('BELUM_BAYAR', 'Belum Bayar'),
         ('MENUNGGU_KONFIRMASI', 'Menunggu Konfirmasi'),
         ('TERKONFIRMASI', 'Terkonfirmasi'),
     ]
 
+    # Relasi pembeli sebagai pembuat transaksi pre-order.
     pembeli = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name='preorders',
     )
+    # Relasi PKL sebagai penerima pesanan.
     pkl = models.ForeignKey(
         PKL,
         on_delete=models.CASCADE,
@@ -209,6 +219,7 @@ class FavoritePKL(models.Model):
 
 
 class Notification(models.Model):
+    # Tipe notifikasi inti: PKL terdekat dan PKL favorit aktif.
     TYPE_NEARBY = 'NEARBY_PKL'
     TYPE_FAVORITE_ACTIVE = 'FAVORITE_ACTIVE'
     TYPE_CHOICES = (
@@ -216,11 +227,13 @@ class Notification(models.Model):
         (TYPE_FAVORITE_ACTIVE, 'PKL Favorit Aktif'),
     )
 
+    # User pembeli penerima notifikasi.
     buyer = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name='notifications',
     )
+    # PKL sumber notifikasi; boleh kosong untuk notifikasi umum.
     pkl = models.ForeignKey(
         PKL,
         on_delete=models.CASCADE,
@@ -232,7 +245,9 @@ class Notification(models.Model):
     message = models.CharField(max_length=255)
     radius_m = models.PositiveIntegerField(default=DEFAULT_RADIUS_METERS)
     distance_m = models.FloatField(null=True, blank=True)
+    # Penanda apakah notifikasi sudah dibaca di aplikasi.
     is_read = models.BooleanField(default=False)
+    # Metadata fleksibel (JSON) untuk payload tambahan notifikasi.
     metadata = models.JSONField(default=dict, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 

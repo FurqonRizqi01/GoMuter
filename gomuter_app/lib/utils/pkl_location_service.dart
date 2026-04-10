@@ -7,6 +7,8 @@ import 'package:gomuter_app/api_service.dart';
 import 'package:gomuter_app/utils/token_manager.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+
+// Service sinkronisasi lokasi PKL ke backend (manual dan berkala otomatis).
 class PklLocationService with WidgetsBindingObserver {
   static final PklLocationService _instance = PklLocationService._internal();
   factory PklLocationService() => _instance;
@@ -14,6 +16,7 @@ class PklLocationService with WidgetsBindingObserver {
 
   static const _prefsLastUpdateKey = 'pkl_last_location_update_iso';
   static const _prefsAutoModeKey = 'pkl_location_auto_mode';
+  // Interval update lokasi otomatis (menit).
   static const _updateIntervalMinutes = 2;
 
   Timer? _locationTimer;
@@ -99,6 +102,7 @@ class PklLocationService with WidgetsBindingObserver {
   }
 
   Future<bool> _ensureLocationAccess() async {
+    // Validasi service lokasi aktif dan permission diberikan user.
     final enabled = await Geolocator.isLocationServiceEnabled();
     if (!enabled) return false;
 
@@ -116,6 +120,7 @@ class PklLocationService with WidgetsBindingObserver {
   }
 
   Future<bool> updateLocation({bool showSnack = true}) async {
+    // Trigger update lokasi satu kali (mode manual).
     if (_isUpdating) return false;
 
     _isUpdating = true;
@@ -190,6 +195,7 @@ class PklLocationService with WidgetsBindingObserver {
       }
 
       Future<void> callUpdateWithToken(String currentToken) async {
+        // Kirim koordinat terbaru ke endpoint backend /api/pkl/update-location/.
         await ApiService.updatePKLLocation(
           token: currentToken,
           latitude: currentPosition.latitude,
@@ -228,6 +234,7 @@ class PklLocationService with WidgetsBindingObserver {
   }
 
   Future<void> startAutoSync({bool showSnack = true}) async {
+    // Mengaktifkan mode otomatis dan membuat timer periodik update lokasi.
     _locationTimer?.cancel();
     _locationTimer = null;
 
@@ -259,6 +266,7 @@ class PklLocationService with WidgetsBindingObserver {
   }
 
   Future<void> stopAutoSync({bool showSnack = true}) async {
+    // Mematikan mode otomatis dan menghentikan timer periodik.
     _locationTimer?.cancel();
     _locationTimer = null;
     _isAutoMode = false;

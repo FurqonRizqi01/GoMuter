@@ -4,8 +4,8 @@
 # Core
 # DEBUG=False
 # SECRET_KEY=replace-with-a-long-random-secret
-# ALLOWED_HOSTS=api.example.com
-# CSRF_TRUSTED_ORIGINS=https://api.example.com
+# ALLOWED_HOSTS=api.example.com,.run.app
+# CSRF_TRUSTED_ORIGINS=https://api.example.com,https://<service>-<hash>-<region>.run.app
 # CORS_ALLOWED_ORIGINS=https://app.example.com
 
 # Database (preferred in production)
@@ -41,3 +41,6 @@
 
 # Firebase
 # Place service account file at: gomuter_backend/serviceAccountKey.json
+# Or set one of these env vars on Cloud Run:
+# FIREBASE_SERVICE_ACCOUNT_JSON={...json...}
+# FIREBASE_SERVICE_ACCOUNT_B64=<base64-json>

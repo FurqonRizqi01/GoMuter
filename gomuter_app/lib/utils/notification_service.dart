@@ -17,6 +17,7 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 }
 
 class NotificationService {
+  // Singleton service agar inisialisasi notifikasi tidak berulang.
   static final NotificationService _instance = NotificationService._internal();
 
   factory NotificationService() {
@@ -37,6 +38,7 @@ class NotificationService {
   final FlutterLocalNotificationsPlugin _flutterLocalNotificationsPlugin =
       FlutterLocalNotificationsPlugin();
 
+  // Inisialisasi notifikasi: permission, channel, listener, dan sinkronisasi token FCM.
   Future<void> initialize() async {
     if (Firebase.apps.isEmpty) {
       debugPrint(
@@ -94,12 +96,13 @@ class NotificationService {
       _showLocalNotification(message);
     });
 
-    // Get FCM Token and potentially send to backend
+    // Ambil token FCM awal dan kirim ke backend sebagai identitas perangkat.
     String? token = await messaging.getToken();
     if (token != null) {
       await _sendTokenToBackend(token);
     }
 
+    // Jika token FCM berubah, backend diperbarui agar push tetap tepat sasaran.
     messaging.onTokenRefresh.listen((newToken) {
       _sendTokenToBackend(newToken);
     });
@@ -161,6 +164,7 @@ class NotificationService {
     }
   }
 
+  // Mengirim token FCM ke endpoint backend agar user bisa menerima push notification.
   Future<void> _sendTokenToBackend(String fcmToken) async {
     try {
       final accessToken = await TokenManager.getValidAccessToken();

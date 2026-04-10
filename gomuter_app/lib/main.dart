@@ -224,6 +224,7 @@ class GoMuterApp extends StatelessWidget {
         home: const _SessionGate(),
         routes: const {},
         onGenerateRoute: _onGenerateRoute,
+        debugShowCheckedModeBanner: false,
       ),
     );
   }

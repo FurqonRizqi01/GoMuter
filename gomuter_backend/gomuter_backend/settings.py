@@ -19,11 +19,12 @@ from urllib.parse import urlparse
 import firebase_admin
 from firebase_admin import credentials
 
-# Build paths inside the project like this: BASE_DIR / 'subdir'.
+# BASE_DIR dipakai sebagai akar path proyek untuk static, media, dan file kredensial.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
 def _env_bool(name: str, default: bool = False) -> bool:
+    # Helper untuk membaca nilai boolean dari environment variable.
     value = os.getenv(name)
     if value is None:
         return default
@@ -31,28 +32,35 @@ def _env_bool(name: str, default: bool = False) -> bool:
 
 
 def _env_list(name: str, default: str = '') -> list[str]:
+    # Helper untuk membaca daftar (comma-separated) dari environment variable.
     value = os.getenv(name, default)
     return [item.strip() for item in value.split(',') if item.strip()]
 
 
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
+# =====================
+# Konfigurasi Dasar
+# =====================
 
-# SECURITY WARNING: keep the secret key used in production secret!
+# Kunci rahasia aplikasi; pada produksi WAJIB diambil dari environment.
 SECRET_KEY = os.getenv(
     'SECRET_KEY',
     'django-insecure-r+q8xdx1m)vo)5dt+3wo3z709zf)hh#rp80&!7ss&a4g%wht6k',
 )
 
-# SECURITY WARNING: don't run with debug turned on in production!
+# DEBUG=True untuk pengembangan lokal, harus False di produksi.
 DEBUG = _env_bool('DEBUG', default=True)
 
-ALLOWED_HOSTS = _env_list('ALLOWED_HOSTS', default='127.0.0.1,localhost')
+# Daftar host/domain yang diizinkan mengakses backend.
+# Default mencakup lokal + domain Cloud Run (run.app).
+ALLOWED_HOSTS = _env_list('ALLOWED_HOSTS', default='127.0.0.1,localhost,.run.app')
 
+# Origin frontend yang dipercaya untuk request dengan CSRF protection.
 CSRF_TRUSTED_ORIGINS = _env_list('CSRF_TRUSTED_ORIGINS')
 
 
-# Application definition
+# =====================
+# Registrasi Aplikasi
+# =====================
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -62,11 +70,12 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'corsheaders',
-    'rest_framework',   # Django REST framework
+    'rest_framework',
     'accounts',
     'pkl',
 ]
 
+# Konfigurasi global REST API: autentikasi JWT + pembatasan laju request.
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
@@ -76,30 +85,35 @@ REST_FRAMEWORK = {
         'rest_framework.throttling.UserRateThrottle',
     ),
     'DEFAULT_THROTTLE_RATES': {
-        # Sensible baseline; tune in production monitoring.
+        # Nilai dasar throttle; dapat disesuaikan sesuai beban produksi.
         'anon': os.getenv('DRF_THROTTLE_ANON', '60/min'),
         'user': os.getenv('DRF_THROTTLE_USER', '300/min'),
     },
 }
 
 
-# JWT settings
-# Goal: keep sessions stable on mobile (login once, then auto-refresh).
-# Access tokens are short-lived; refresh tokens are longer-lived.
+# =====================
+# Autentikasi JWT
+# =====================
+# Access token dibuat lebih singkat untuk keamanan,
+# refresh token lebih panjang untuk menjaga sesi mobile tetap stabil.
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(hours=4),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=30),
-    # Keep refresh rotation on so clients can keep a fresh token.
-    # NOTE: If you add `rest_framework_simplejwt.token_blacklist` to INSTALLED_APPS,
-    # you can set BLACKLIST_AFTER_ROTATION=True for stronger security.
+    # Refresh token dirotasi agar klien mendapat token terbaru secara berkala.
     'ROTATE_REFRESH_TOKENS': True,
+    # Belum memakai token blacklist app; diset False agar kompatibel konfigurasi saat ini.
     'BLACKLIST_AFTER_ROTATION': False,
+    # Mencatat timestamp login terakhir user pada saat token diperbarui.
     'UPDATE_LAST_LOGIN': True,
 }
 
 
+# Middleware utama untuk keamanan HTTP, sesi, CORS, dan autentikasi.
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    # WhiteNoise memungkinkan static files dilayani langsung oleh aplikasi.
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -129,8 +143,10 @@ TEMPLATES = [
 WSGI_APPLICATION = 'gomuter_backend.wsgi.application'
 
 
-# Database
-# https://docs.djangoproject.com/en/5.2/ref/settings/#databases
+# =====================
+# Koneksi Basis Data
+# =====================
+# Default koneksi lokal PostgreSQL (untuk pengembangan).
 
 DATABASES = {
     'default': {
@@ -143,6 +159,8 @@ DATABASES = {
     }
 }
 
+# Jika DATABASE_URL tersedia, konfigurasi ini menimpa default lokal.
+# Umumnya dipakai saat deployment ke cloud.
 database_url = os.getenv('DATABASE_URL', '').strip()
 if database_url:
     parsed = urlparse(database_url)
@@ -155,16 +173,17 @@ if database_url:
             'HOST': parsed.hostname or 'localhost',
             'PORT': str(parsed.port or '5432'),
             'OPTIONS': {
-                # Supabase and most managed Postgres require TLS.
+                # Managed PostgreSQL umumnya membutuhkan SSL/TLS.
                 'sslmode': os.getenv('DB_SSLMODE', 'require'),
             },
+            # Connection pooling sederhana untuk mengurangi overhead reconnect.
             'CONN_MAX_AGE': int(os.getenv('DB_CONN_MAX_AGE', '600')),
         }
 
+# Menggunakan custom user model agar peran user dapat dikendalikan oleh aplikasi.
 AUTH_USER_MODEL = 'accounts.User'
 
-# Password validation
-# https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
+# Validasi password bawaan Django untuk menjaga kekuatan kata sandi.
 
 AUTH_PASSWORD_VALIDATORS = [
     {
@@ -182,8 +201,9 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 
-# Internationalization
-# https://docs.djangoproject.com/en/5.2/topics/i18n/
+# =====================
+# Internasionalisasi
+# =====================
 
 LANGUAGE_CODE = 'en-us'
 
@@ -194,31 +214,45 @@ USE_I18N = True
 USE_TZ = True
 
 
-# Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/5.2/howto/static-files/
+# =====================
+# Static dan Media
+# =====================
+# STATIC_* untuk aset aplikasi, MEDIA_* untuk file unggahan pengguna.
 
 STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
+# Gunakan storage static siap produksi (compressed + cache-friendly manifest).
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 MEDIA_URL = '/media/'
+# Catatan Cloud Run: filesystem lokal bersifat ephemeral (tidak persisten).
+# Untuk produksi, sebaiknya media dipindah ke object storage (mis. GCS/S3).
 MEDIA_ROOT = BASE_DIR / 'media'
 
-# Default primary key field type
-# https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
+# Tipe primary key default untuk model yang tidak mendefinisikan id manual.
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# CORS: open in dev, strict allowlist in production.
+# =====================
+# CORS dan Keamanan Produksi
+# =====================
+# Origin frontend yang diizinkan mengakses API.
 CORS_ALLOWED_ORIGINS = _env_list(
     'CORS_ALLOWED_ORIGINS',
     default='http://127.0.0.1:59891,http://localhost:59891,http://127.0.0.1:8000,http://localhost:8000',
 )
 CORS_ALLOW_ALL_ORIGINS = DEBUG and _env_bool('CORS_ALLOW_ALL_ORIGINS_DEV', default=True)
 
+# Hardening keamanan hanya diaktifkan saat DEBUG=False.
 if not DEBUG:
+    # Membaca skema asli dari reverse proxy (mis. Nginx/Platform cloud).
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    # Memaksa seluruh traffic ke HTTPS.
     SECURE_SSL_REDIRECT = _env_bool('SECURE_SSL_REDIRECT', default=True)
+    # Cookie sesi hanya dikirim melalui HTTPS.
     SESSION_COOKIE_SECURE = _env_bool('SESSION_COOKIE_SECURE', default=True)
+    # Cookie CSRF hanya dikirim melalui HTTPS.
     CSRF_COOKIE_SECURE = _env_bool('CSRF_COOKIE_SECURE', default=True)
+    # Kebijakan HSTS untuk mencegah downgrade ke HTTP.
     SECURE_HSTS_SECONDS = int(os.getenv('SECURE_HSTS_SECONDS', '31536000'))
     SECURE_HSTS_INCLUDE_SUBDOMAINS = _env_bool(
         'SECURE_HSTS_INCLUDE_SUBDOMAINS',
@@ -226,9 +260,11 @@ if not DEBUG:
     )
     SECURE_HSTS_PRELOAD = _env_bool('SECURE_HSTS_PRELOAD', default=True)
 
-# Email (password reset)
-# - Default: console backend (dev) so emails appear in the runserver terminal
-# - If credentials are provided via env vars, use Gmail SMTP
+# =====================
+# Email untuk Reset Password
+# =====================
+# Jika kredensial SMTP tersedia, backend mengirim email sungguhan.
+# Jika tidak, email ditulis ke console (mode pengembangan).
 
 EMAIL_HOST_USER = os.getenv('GOMUTER_EMAIL_HOST_USER', '').strip()
 EMAIL_HOST_PASSWORD = os.getenv('GOMUTER_EMAIL_HOST_PASSWORD', '').strip()
@@ -244,13 +280,20 @@ else:
     DEFAULT_FROM_EMAIL = 'no-reply@gomuter.local'
 
 
+# =====================
+# Integrasi Firebase Admin
+# =====================
+# Prioritas sumber kredensial:
+# 1) FIREBASE_SERVICE_ACCOUNT_JSON
+# 2) FIREBASE_SERVICE_ACCOUNT_B64
+# 3) file lokal serviceAccountKey.json
 FIREBASE_KEY_PATH = BASE_DIR / "serviceAccountKey.json"
 FIREBASE_SERVICE_ACCOUNT_JSON = os.getenv('FIREBASE_SERVICE_ACCOUNT_JSON', '').strip()
 FIREBASE_SERVICE_ACCOUNT_B64 = os.getenv('FIREBASE_SERVICE_ACCOUNT_B64', '').strip()
 
 
 def _init_firebase_admin() -> None:
-    # Avoid duplicate initialization on process reload.
+    # Hindari inisialisasi ganda ketika proses reload (mis. dev server).
     if firebase_admin._apps:
         return
 
@@ -260,6 +303,7 @@ def _init_firebase_admin() -> None:
         try:
             cred = credentials.Certificate(json.loads(FIREBASE_SERVICE_ACCOUNT_JSON))
         except Exception as e:
+            # Tidak menghentikan aplikasi; notifikasi push cukup dinonaktifkan.
             print(f"Warning: FIREBASE_SERVICE_ACCOUNT_JSON invalid: {e}")
 
     if cred is None and FIREBASE_SERVICE_ACCOUNT_B64:
@@ -267,6 +311,7 @@ def _init_firebase_admin() -> None:
             decoded = base64.b64decode(FIREBASE_SERVICE_ACCOUNT_B64).decode('utf-8')
             cred = credentials.Certificate(json.loads(decoded))
         except Exception as e:
+            # Tidak menghentikan aplikasi; notifikasi push cukup dinonaktifkan.
             print(f"Warning: FIREBASE_SERVICE_ACCOUNT_B64 invalid: {e}")
 
     if cred is None and FIREBASE_KEY_PATH.exists():
@@ -280,7 +325,9 @@ def _init_firebase_admin() -> None:
         )
         return
 
+    # Inisialisasi global Firebase Admin SDK untuk kebutuhan push notification.
     firebase_admin.initialize_app(cred)
 
 
+# Jalankan inisialisasi saat startup Django.
 _init_firebase_admin()

@@ -3,16 +3,20 @@ import 'package:http/http.dart' as http;
 import 'package:gomuter_app/config.dart';
 
 class ApiService {
+  // Base URL backend yang dipakai seluruh request dari aplikasi mobile.
   static const String baseUrl = AppConfig.baseUrl;
 
   static Map<String, String> _jsonHeaders({String? token}) {
+    // Header standar JSON untuk komunikasi dengan REST API backend.
     final headers = {'Content-Type': 'application/json'};
     if (token != null && token.isNotEmpty) {
+      // Access token JWT dikirim pada endpoint yang membutuhkan autentikasi.
       headers['Authorization'] = 'Bearer $token';
     }
     return headers;
   }
 
+  // Endpoint login: mengirim username/password dan menerima access+refresh token.
   static Future<Map<String, dynamic>> login({
     required String username,
     required String password,
@@ -38,6 +42,7 @@ class ApiService {
     required String password,
     required String role,
   }) async {
+    // Endpoint registrasi akun baru (pembeli/PKL) dari aplikasi mobile.
     final url = Uri.parse('$baseUrl/api/auth/register/');
 
     final response = await http.post(
@@ -58,6 +63,7 @@ class ApiService {
     }
   }
 
+  // Endpoint refresh token: memperbarui access token saat token lama kedaluwarsa.
   static Future<Map<String, dynamic>> refreshAccessToken({
     required String refreshToken,
   }) async {
@@ -77,6 +83,7 @@ class ApiService {
   }
 
   static Future<void> requestPasswordReset({required String identifier}) async {
+    // Mengirim permintaan reset password berbasis email/username.
     final url = Uri.parse('$baseUrl/api/auth/password-reset/request/');
     final response = await http.post(
       url,
@@ -95,6 +102,7 @@ class ApiService {
     required String token,
     required String newPassword,
   }) async {
+    // Konfirmasi reset password menggunakan uid + token dari backend.
     final url = Uri.parse('$baseUrl/api/auth/password-reset/confirm/');
     final response = await http.post(
       url,
@@ -115,6 +123,7 @@ class ApiService {
   // === Endpoint PKL (role PKL) ===
 
   static Future<Map<String, dynamic>?> getPKLProfile(String token) async {
+    // Mengambil profil PKL milik user yang sedang login.
     final url = Uri.parse('$baseUrl/api/pkl/profile/');
     final response = await http.get(url, headers: _jsonHeaders(token: token));
 
@@ -132,6 +141,7 @@ class ApiService {
     required Map<String, dynamic> data,
     required bool isNew,
   }) async {
+    // Menyimpan profil PKL: POST untuk create, PUT untuk update.
     final url = Uri.parse('$baseUrl/api/pkl/profile/');
     final body = jsonEncode(data);
     late http.Response response;
@@ -281,6 +291,7 @@ class ApiService {
     required double latitude,
     required double longitude,
   }) async {
+    // Mengirim koordinat lokasi PKL ke backend (manual/otomatis).
     final url = Uri.parse('$baseUrl/api/pkl/update-location/');
     final response = await http
         .post(
@@ -323,6 +334,7 @@ class ApiService {
     String? jenis,
     String? query,
   }) async {
+    // Mengambil daftar PKL aktif dengan opsi filter jenis dagangan dan keyword.
     final params = <String, String>{};
     if (jenis != null && jenis.isNotEmpty) {
       params['jenis'] = jenis;
@@ -348,6 +360,7 @@ class ApiService {
   }
 
   static Future<Map<String, dynamic>> getPKLDetail(int id) async {
+    // Mengambil detail satu PKL berdasarkan id untuk halaman detail usaha.
     final url = Uri.parse('$baseUrl/api/pkl/$id/');
     final response = await http.get(url);
 
@@ -419,6 +432,7 @@ class ApiService {
   static Future<Map<String, dynamic>> getAdminDashboard({
     required String token,
   }) async {
+    // Mengambil ringkasan statistik operasional untuk dashboard admin.
     final url = Uri.parse('$baseUrl/api/pkl/admin/dashboard/');
     final response = await http.get(url, headers: _jsonHeaders(token: token));
 
@@ -471,6 +485,7 @@ class ApiService {
     required int id,
     required Map<String, dynamic> data,
   }) async {
+    // Endpoint verifikasi PKL oleh admin (diterima/ditolak + catatan).
     final url = Uri.parse('$baseUrl/api/pkl/admin/$id/verify/');
     final response = await http.patch(
       url,
@@ -552,6 +567,7 @@ class ApiService {
     required String token,
     required int pklId,
   }) async {
+    // Membuat/membuka room chat antara pembeli dan PKL.
     final url = Uri.parse('$baseUrl/api/pkl/chat/start/');
     final response = await http.post(
       url,
@@ -569,6 +585,7 @@ class ApiService {
     required String token,
     required int chatId,
   }) async {
+    // Mengambil riwayat pesan pada room chat tertentu.
     final url = Uri.parse('$baseUrl/api/pkl/chat/$chatId/messages/');
     final response = await http.get(url, headers: _jsonHeaders(token: token));
 
@@ -583,6 +600,7 @@ class ApiService {
     required int chatId,
     required String content,
   }) async {
+    // Mengirim pesan baru dari user aktif ke room chat.
     final url = Uri.parse('$baseUrl/api/pkl/chat/$chatId/messages/');
     final response = await http.post(
       url,
@@ -620,6 +638,7 @@ class ApiService {
     double? perkiraanTotal,
     List<Map<String, dynamic>>? items,
   }) async {
+    // Membuat transaksi pre-order dari pembeli ke PKL.
     final url = Uri.parse('$baseUrl/api/pkl/preorder/create/');
     final payload = <String, dynamic>{
       'pkl_id': pklId,
@@ -672,6 +691,7 @@ class ApiService {
     required int preorderId,
     required String status,
   }) async {
+    // Update status pre-order oleh PKL (diterima/ditolak/selesai).
     final url = Uri.parse('$baseUrl/api/pkl/preorder/$preorderId/status/');
     final response = await http.post(
       url,
@@ -708,6 +728,7 @@ class ApiService {
     required int preorderId,
     required bool approve,
   }) async {
+    // Verifikasi pembayaran DP oleh PKL (TERIMA/TOLAK).
     final url = Uri.parse(
       '$baseUrl/api/pkl/preorder/$preorderId/dp-verification/',
     );
@@ -777,6 +798,7 @@ class ApiService {
     required double longitude,
     int? radiusM,
   }) async {
+    // Sinkronisasi lokasi pembeli untuk fitur nearby/favorit dan notifikasi.
     final url = Uri.parse('$baseUrl/api/pkl/buyer/location/');
     final payload = {
       'latitude': latitude,
@@ -844,6 +866,7 @@ class ApiService {
     bool unreadOnly = false,
     int limit = 20,
   }) async {
+    // Mengambil daftar notifikasi pembeli dari backend.
     final params = {
       'limit': limit.toString(),
       if (unreadOnly) 'unread': 'true',
@@ -863,6 +886,7 @@ class ApiService {
     required String token,
     required int notificationId,
   }) async {
+    // Menandai notifikasi tertentu sebagai sudah dibaca.
     final url = Uri.parse(
       '$baseUrl/api/pkl/buyer/notifications/$notificationId/read/',
     );
