@@ -86,6 +86,23 @@ class _PklHomePageState extends State<PklHomePage> {
     return TokenManager.getValidAccessToken();
   }
 
+  bool get _isVerifiedProfile => _isVerifiedStatus(_statusVerifikasi);
+
+  bool _isVerifiedStatus(String status) {
+    final normalized = status.isEmpty ? 'PENDING' : status.toUpperCase();
+    return normalized == 'DITERIMA' || normalized == 'VERIFIED';
+  }
+
+  String get _verificationLockMessage {
+    final status = _statusVerifikasi.isEmpty
+        ? 'PENDING'
+        : _statusVerifikasi.toUpperCase();
+    if (status == 'DITOLAK') {
+      return 'Profil usaha ditolak admin. Perbaiki data profil sebelum mengaktifkan status toko dan lokasi.';
+    }
+    return 'Profil usaha masih menunggu verifikasi admin. Status toko dan lokasi aktif setelah disetujui.';
+  }
+
   Future<void> _loadChatBadge() async {
     try {
       final token = await _getToken();
@@ -133,16 +150,19 @@ class _PklHomePageState extends State<PklHomePage> {
       } else {
         final lat = (profile['latest_latitude'] as num?)?.toDouble();
         final lng = (profile['latest_longitude'] as num?)?.toDouble();
+        final verificationStatus = (profile['status_verifikasi'] ?? 'PENDING')
+            .toString()
+            .toUpperCase();
         setState(() {
           _isNewProfile = false;
           _namaUsaha = profile['nama_usaha'] ?? '';
           _jenisDagangan = profile['jenis_dagangan'] ?? '';
           _jamOperasional = profile['jam_operasional'] ?? '';
           _alamatDomisili = profile['alamat_domisili'] ?? '';
-          _statusVerifikasi = (profile['status_verifikasi'] ?? 'PENDING')
-              .toString()
-              .toUpperCase();
-          _statusAktif = profile['status_aktif'] ?? false;
+          _statusVerifikasi = verificationStatus;
+          _statusAktif =
+              _isVerifiedStatus(verificationStatus) &&
+              (profile['status_aktif'] ?? false);
           _latestLatitude = lat;
           _latestLongitude = lng;
           _profileImageUrl =
@@ -198,6 +218,15 @@ class _PklHomePageState extends State<PklHomePage> {
   }
 
   Future<void> _openLocationPage() async {
+    if (_isNewProfile) {
+      _showProfileRequired();
+      return;
+    }
+    if (!_isVerifiedProfile) {
+      _showSnack(_verificationLockMessage);
+      return;
+    }
+
     await Navigator.of(context).pushNamed(PklRoutes.location);
     if (!mounted) return;
     await _loadProfile();
@@ -221,6 +250,10 @@ class _PklHomePageState extends State<PklHomePage> {
     if (_isUpdatingStatusAktif) return;
     if (_isNewProfile) {
       _showProfileRequired();
+      return;
+    }
+    if (!_isVerifiedProfile) {
+      _showSnack(_verificationLockMessage);
       return;
     }
 
@@ -445,6 +478,13 @@ class _PklHomePageState extends State<PklHomePage> {
     final textColor = _themeManager.textColor;
     final mutedText = _themeManager.mutedTextColor;
     final orange = _themeManager.pklPrimary;
+    final statusSubtitle = _isNewProfile
+        ? 'Lengkapi profil terlebih dahulu'
+        : !_isVerifiedProfile
+            ? 'Menunggu verifikasi admin'
+            : _statusAktif
+                ? 'Terima pesanan sekarang'
+                : 'Toko sedang tutup';
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
@@ -478,9 +518,7 @@ class _PklHomePageState extends State<PklHomePage> {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    _statusAktif
-                        ? 'Terima pesanan sekarang'
-                        : 'Toko sedang tutup',
+                    statusSubtitle,
                     style: TextStyle(
                       color: mutedText,
                       fontWeight: FontWeight.w500,
@@ -497,6 +535,10 @@ class _PklHomePageState extends State<PklHomePage> {
                   : (value) {
                       if (_isNewProfile) {
                         _showProfileRequired();
+                        return;
+                      }
+                      if (!_isVerifiedProfile) {
+                        _showSnack(_verificationLockMessage);
                         return;
                       }
                       _setStatusAktif(value);
@@ -1624,7 +1666,7 @@ class _PklHomePageState extends State<PklHomePage> {
                       onPressed:
                           _isNewProfile ? null : _openLocationPage,
                       icon: const Icon(Icons.my_location_rounded, size: 18),
-                      label: const Text('Update'),
+                      label: Text(_isVerifiedProfile ? 'Update' : 'Terkunci'),
                       style: ElevatedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 14,
@@ -1662,6 +1704,38 @@ class _PklHomePageState extends State<PklHomePage> {
                             Expanded(
                               child: Text(
                                 'Lengkapi profil dagangan untuk mengaktifkan fitur lokasi.',
+                                style: TextStyle(
+                                  color: textColor,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  if (!_isNewProfile && !_isVerifiedProfile)
+                    Positioned(
+                      left: 16,
+                      right: 16,
+                      bottom: 74,
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Color.alphaBlend(
+                            orange.withValues(alpha: 0.20),
+                            cardColor,
+                          ),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: borderColor),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.lock_clock_rounded, color: orange),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                _verificationLockMessage,
                                 style: TextStyle(
                                   color: textColor,
                                   fontWeight: FontWeight.w700,

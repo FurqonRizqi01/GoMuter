@@ -10,14 +10,21 @@ import 'package:gomuter_app/api_service.dart';
 import 'package:gomuter_app/pages/pembeli/chat_page.dart';
 import 'package:gomuter_app/pages/pembeli/preorder_page.dart';
 import 'package:gomuter_app/utils/chat_badge_manager.dart';
+import 'package:gomuter_app/utils/map_route_service.dart';
 import 'package:gomuter_app/utils/theme_manager.dart';
 import 'package:gomuter_app/utils/token_manager.dart';
 
 class PklDetailPage extends StatefulWidget {
   final int pklId;
   final Map<String, dynamic>? initialData;
+  final LatLng? initialBuyerLatLng;
 
-  const PklDetailPage({super.key, required this.pklId, this.initialData});
+  const PklDetailPage({
+    super.key,
+    required this.pklId,
+    this.initialData,
+    this.initialBuyerLatLng,
+  });
 
   @override
   State<PklDetailPage> createState() => _PklDetailPageState();
@@ -48,8 +55,9 @@ class _PklDetailPageState extends State<PklDetailPage> {
   Timer? _statusPollingTimer;
   bool _isStatusPolling = false;
 
-  bool _isBuyerMarkerSelected = false;
-  bool _isPklMarkerSelected = false;
+  List<LatLng> _routePoints = [];
+  double? _routeDistanceMeters;
+  int _routeRequestSerial = 0;
 
   // Cart: productId → quantity
   final Map<int, int> _cart = {};
@@ -62,6 +70,8 @@ class _PklDetailPageState extends State<PklDetailPage> {
       _detail = Map<String, dynamic>.from(widget.initialData!);
       _pklLatLng = _extractLatLng(_detail);
     }
+    _buyerLatLng = widget.initialBuyerLatLng;
+    _distanceMeters = _computeDistance(_buyerLatLng, _pklLatLng);
     _loadDetail(initial: true);
     _loadRatingSummary();
     _loadBuyerLocation();
@@ -95,6 +105,7 @@ class _PklDetailPageState extends State<PklDetailPage> {
         _pklLatLng = _extractLatLng(_detail);
         _distanceMeters = _computeDistance(_buyerLatLng, _pklLatLng);
       });
+      unawaited(_loadRoute());
     } catch (_) {
       // Keep UI stable when polling fails briefly (network spikes, backend restart).
     } finally {
@@ -123,6 +134,43 @@ class _PklDetailPageState extends State<PklDetailPage> {
     );
   }
 
+  Future<void> _loadRoute({VoidCallback? onUpdated}) async {
+    final buyer = _buyerLatLng;
+    final pkl = _pklLatLng;
+    if (buyer == null || pkl == null) {
+      if (mounted) {
+        setState(() {
+          _routeRequestSerial++;
+          _routePoints = [];
+          _routeDistanceMeters = null;
+        });
+        onUpdated?.call();
+      }
+      return;
+    }
+
+    final requestId = ++_routeRequestSerial;
+    final result = await MapRouteService.fetchRoute(
+      origin: buyer,
+      destination: pkl,
+    );
+
+    if (!mounted || requestId != _routeRequestSerial) return;
+    setState(() {
+      _routePoints = result.points;
+      _routeDistanceMeters = result.distanceMeters;
+    });
+    onUpdated?.call();
+  }
+
+  List<LatLng> _visibleRoutePoints(LatLng buyer, LatLng pkl) {
+    return _routePoints.length >= 2 ? _routePoints : [buyer, pkl];
+  }
+
+  double? _visibleRouteDistanceMeters() {
+    return _routeDistanceMeters ?? _distanceMeters;
+  }
+
   Future<void> _loadDetail({bool initial = false}) async {
     final showBlockingLoader = initial && _detail == null;
 
@@ -147,6 +195,7 @@ class _PklDetailPageState extends State<PklDetailPage> {
         _distanceMeters = _computeDistance(_buyerLatLng, _pklLatLng);
         _error = null;
       });
+      unawaited(_loadRoute());
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -165,9 +214,35 @@ class _PklDetailPageState extends State<PklDetailPage> {
   }
 
   Future<void> _loadBuyerLocation() async {
+    Future<bool> useSavedBuyerLocation() async {
+      try {
+        final token = await TokenManager.getValidAccessToken();
+        if (token == null) return false;
+
+        final saved = await ApiService.getBuyerLocation(token: token);
+        final lat = (saved?['latitude'] as num?)?.toDouble();
+        final lng = (saved?['longitude'] as num?)?.toDouble();
+        if (lat == null || lng == null) return false;
+
+        if (!mounted) return true;
+        final buyer = LatLng(lat, lng);
+        setState(() {
+          _buyerLatLng = buyer;
+          _distanceMeters = _computeDistance(buyer, _pklLatLng);
+        });
+        unawaited(_loadRoute());
+        return true;
+      } catch (_) {
+        return false;
+      }
+    }
+
     try {
       final serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) return;
+      if (!serviceEnabled) {
+        await useSavedBuyerLocation();
+        return;
+      }
 
       var permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
@@ -176,10 +251,18 @@ class _PklDetailPageState extends State<PklDetailPage> {
 
       if (permission == LocationPermission.denied ||
           permission == LocationPermission.deniedForever) {
+        await useSavedBuyerLocation();
         return;
       }
 
-      final position = await Geolocator.getCurrentPosition(
+      Position? position;
+      try {
+        position = await Geolocator.getLastKnownPosition();
+      } catch (_) {
+        position = null;
+      }
+
+      position ??= await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
       );
 
@@ -189,21 +272,15 @@ class _PklDetailPageState extends State<PklDetailPage> {
         _buyerLatLng = buyer;
         _distanceMeters = _computeDistance(buyer, _pklLatLng);
       });
+      unawaited(_loadRoute());
     } catch (_) {
-      // Buyer position is optional for this view.
+      await useSavedBuyerLocation();
     }
   }
 
-  void _toggleBuyerMarker() {
-    setState(() {
-      _isBuyerMarkerSelected = !_isBuyerMarkerSelected;
-    });
-  }
-
-  void _togglePklMarker() {
-    setState(() {
-      _isPklMarkerSelected = !_isPklMarkerSelected;
-    });
+  void _refreshRoute() {
+    if (_buyerLatLng == null) return;
+    unawaited(_loadRoute());
   }
 
   String _formatDistance(double meters) {
@@ -212,13 +289,6 @@ class _PklDetailPageState extends State<PklDetailPage> {
       return '${km.toStringAsFixed(km < 10 ? 1 : 0)} km';
     }
     return '${meters.round()} m';
-  }
-
-  LatLng _midpoint(LatLng a, LatLng b) {
-    return LatLng(
-      (a.latitude + b.latitude) / 2,
-      (a.longitude + b.longitude) / 2,
-    );
   }
 
   Widget _buildDistanceLabel(String text) {
@@ -723,31 +793,32 @@ class _PklDetailPageState extends State<PklDetailPage> {
         return StatefulBuilder(
           builder: (ctx, setSheetState) {
             final buyer = _buyerLatLng;
-            final showLine =
-                buyer != null && _isBuyerMarkerSelected && _isPklMarkerSelected;
+            final showRoute = buyer != null;
+            final routePoints = buyer != null
+                ? _visibleRoutePoints(buyer, location)
+                : const <LatLng>[];
 
-            final distanceMeters = showLine
-                ? (_distanceMeters ?? _computeDistance(buyer, location))
+            final distanceMeters = showRoute
+                ? (_visibleRouteDistanceMeters() ??
+                      _computeDistance(buyer, location))
                 : null;
             final distanceText = distanceMeters != null
                 ? _formatDistance(distanceMeters)
                 : null;
-            final labelPoint = distanceText != null
-                ? _midpoint(buyer!, location)
+            final labelPoint = distanceText != null && routePoints.length >= 2
+                ? routePoints[routePoints.length ~/ 2]
+                : null;
+            final cameraFit = routePoints.length >= 2
+                ? CameraFit.bounds(
+                    bounds: LatLngBounds.fromPoints(routePoints),
+                    padding: const EdgeInsets.all(42),
+                    maxZoom: 16,
+                  )
                 : null;
 
-            void toggleBuyerMarker() {
-              setState(() {
-                _isBuyerMarkerSelected = !_isBuyerMarkerSelected;
-              });
-              setSheetState(() {});
-            }
-
-            void togglePklMarker() {
-              setState(() {
-                _isPklMarkerSelected = !_isPklMarkerSelected;
-              });
-              setSheetState(() {});
+            void refreshSheetRoute() {
+              if (_buyerLatLng == null) return;
+              unawaited(_loadRoute(onUpdated: () => setSheetState(() {})));
             }
 
             return SafeArea(
@@ -779,9 +850,13 @@ class _PklDetailPageState extends State<PklDetailPage> {
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(16),
                         child: FlutterMap(
+                          key: ValueKey(
+                            'detail-sheet-${buyer?.latitude}-${buyer?.longitude}-${location.latitude}-${location.longitude}-${routePoints.length}',
+                          ),
                           options: MapOptions(
                             initialCenter: location,
                             initialZoom: 16,
+                            initialCameraFit: cameraFit,
                           ),
                           children: [
                             TileLayer(
@@ -790,13 +865,18 @@ class _PklDetailPageState extends State<PklDetailPage> {
                               subdomains: const ['a', 'b', 'c'],
                               userAgentPackageName: 'com.example.gomuter_app',
                             ),
-                            if (showLine)
+                            if (showRoute && routePoints.length >= 2)
                               PolylineLayer(
                                 polylines: [
                                   Polyline(
-                                    points: [buyer, location],
-                                    strokeWidth: 4,
-                                    color: _secondary.withValues(alpha: 0.9),
+                                    points: routePoints,
+                                    strokeWidth: 9,
+                                    color: Colors.white.withValues(alpha: 0.92),
+                                  ),
+                                  Polyline(
+                                    points: routePoints,
+                                    strokeWidth: 5,
+                                    color: const Color(0xFF31A853),
                                   ),
                                 ],
                               ),
@@ -827,8 +907,8 @@ class _PklDetailPageState extends State<PklDetailPage> {
                                     child: _buildMapMarker(
                                       icon: Icons.person_pin_circle_rounded,
                                       color: _ctaAccent,
-                                      selected: _isBuyerMarkerSelected,
-                                      onTap: toggleBuyerMarker,
+                                      selected: true,
+                                      onTap: refreshSheetRoute,
                                     ),
                                   ),
                                 Marker(
@@ -838,8 +918,8 @@ class _PklDetailPageState extends State<PklDetailPage> {
                                   child: _buildMapMarker(
                                     icon: Icons.storefront_rounded,
                                     color: _primary,
-                                    selected: _isPklMarkerSelected,
-                                    onTap: togglePklMarker,
+                                    selected: true,
+                                    onTap: refreshSheetRoute,
                                   ),
                                 ),
                               ],
@@ -1938,17 +2018,27 @@ class _PklDetailPageState extends State<PklDetailPage> {
     }
 
     final buyer = _buyerLatLng;
-    final showLine =
-        buyer != null && _isBuyerMarkerSelected && _isPklMarkerSelected;
+    final showRoute = buyer != null;
+    final routePoints = buyer != null
+        ? _visibleRoutePoints(buyer, _pklLatLng!)
+        : const <LatLng>[];
 
-    final distanceMeters = showLine
-        ? (_distanceMeters ?? _computeDistance(buyer, _pklLatLng))
+    final distanceMeters = showRoute
+        ? (_visibleRouteDistanceMeters() ??
+              _computeDistance(buyer, _pklLatLng))
         : null;
     final distanceText = distanceMeters != null
         ? _formatDistance(distanceMeters)
         : null;
-    final labelPoint = distanceText != null
-        ? _midpoint(buyer!, _pklLatLng!)
+    final labelPoint = distanceText != null && routePoints.length >= 2
+        ? routePoints[routePoints.length ~/ 2]
+        : null;
+    final cameraFit = routePoints.length >= 2
+        ? CameraFit.bounds(
+            bounds: LatLngBounds.fromPoints(routePoints),
+            padding: const EdgeInsets.fromLTRB(32, 28, 32, 54),
+            maxZoom: 16,
+          )
         : null;
 
     return Padding(
@@ -1983,9 +2073,13 @@ class _PklDetailPageState extends State<PklDetailPage> {
               child: Stack(
                 children: [
                   FlutterMap(
+                    key: ValueKey(
+                      'detail-preview-${buyer?.latitude}-${buyer?.longitude}-${_pklLatLng!.latitude}-${_pklLatLng!.longitude}-${routePoints.length}',
+                    ),
                     options: MapOptions(
                       initialCenter: _pklLatLng!,
                       initialZoom: 16,
+                      initialCameraFit: cameraFit,
                     ),
                     children: [
                       TileLayer(
@@ -1994,13 +2088,18 @@ class _PklDetailPageState extends State<PklDetailPage> {
                         subdomains: const ['a', 'b', 'c'],
                         userAgentPackageName: 'com.example.gomuter_app',
                       ),
-                      if (showLine)
+                      if (showRoute && routePoints.length >= 2)
                         PolylineLayer(
                           polylines: [
                             Polyline(
-                              points: [buyer, _pklLatLng!],
-                              strokeWidth: 4,
-                              color: _secondary.withValues(alpha: 0.9),
+                              points: routePoints,
+                              strokeWidth: 9,
+                              color: Colors.white.withValues(alpha: 0.92),
+                            ),
+                            Polyline(
+                              points: routePoints,
+                              strokeWidth: 5,
+                              color: const Color(0xFF31A853),
                             ),
                           ],
                         ),
@@ -2029,8 +2128,8 @@ class _PklDetailPageState extends State<PklDetailPage> {
                               child: _buildMapMarker(
                                 icon: Icons.person_pin_circle_rounded,
                                 color: _ctaAccent,
-                                selected: _isBuyerMarkerSelected,
-                                onTap: _toggleBuyerMarker,
+                                selected: true,
+                                onTap: _refreshRoute,
                               ),
                             ),
                           Marker(
@@ -2040,8 +2139,8 @@ class _PklDetailPageState extends State<PklDetailPage> {
                             child: _buildMapMarker(
                               icon: Icons.storefront_rounded,
                               color: _primary,
-                              selected: _isPklMarkerSelected,
-                              onTap: _togglePklMarker,
+                              selected: true,
+                              onTap: _refreshRoute,
                             ),
                           ),
                         ],

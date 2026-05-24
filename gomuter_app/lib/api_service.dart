@@ -818,6 +818,21 @@ class ApiService {
     throw Exception('Gagal menyimpan lokasi pembeli: ${response.body}');
   }
 
+  static Future<Map<String, dynamic>?> getBuyerLocation({
+    required String token,
+  }) async {
+    final url = Uri.parse('$baseUrl/api/pkl/buyer/location/');
+    final response = await http.get(url, headers: _jsonHeaders(token: token));
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    }
+    if (response.statusCode == 404) {
+      return null;
+    }
+    throw Exception('Gagal mengambil lokasi pembeli: ${response.body}');
+  }
+
   static Future<List<dynamic>> getFavoritePKL({required String token}) async {
     final url = Uri.parse('$baseUrl/api/pkl/buyer/favorites/');
     final response = await http.get(url, headers: _jsonHeaders(token: token));

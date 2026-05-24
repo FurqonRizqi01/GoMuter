@@ -3,7 +3,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../api_service.dart';
 
-
 // Pengelola token JWT di sisi mobile (simpan, validasi, dan refresh token).
 class TokenManager {
   static const _accessKey = 'access_token';
@@ -30,13 +29,15 @@ class TokenManager {
   static Future<String?> getValidAccessToken() async {
     final prefs = await SharedPreferences.getInstance();
     final access = prefs.getString(_accessKey);
-    if (access == null) return null;
+    if (access == null || access.isEmpty) {
+      return _refreshAccessToken(prefs);
+    }
 
     // Refresh proactively if token is expired OR will expire soon.
     final needsRefresh = _isExpired(access) || _expiresSoon(access);
     if (!needsRefresh) return access;
 
-    return await _refreshAccessToken(prefs) ?? access;
+    return _refreshAccessToken(prefs);
   }
 
   static Future<String?> forceRefreshAccessToken() async {
@@ -48,6 +49,10 @@ class TokenManager {
   static Future<String?> _refreshAccessToken(SharedPreferences prefs) async {
     final refresh = prefs.getString(_refreshKey);
     if (refresh == null || refresh.isEmpty) {
+      return null;
+    }
+    if (_isExpired(refresh)) {
+      await clearTokens();
       return null;
     }
 
@@ -68,8 +73,8 @@ class TokenManager {
       }
       return newAccess;
     } catch (_) {
-      // Jika refresh gagal, token dibersihkan untuk memaksa login ulang.
-      await clearTokens();
+      // Jangan hapus refresh token untuk error sementara seperti koneksi/CORS/server.
+      // Token akan dicoba refresh lagi saat aplikasi dibuka atau request berikutnya.
       return null;
     }
   }

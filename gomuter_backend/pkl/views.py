@@ -59,6 +59,30 @@ class IsPembeli(permissions.BasePermission):
         return bool(request.user and request.user.is_authenticated and request.user.role == 'USER')
 
 
+def _is_pkl_verified(pkl: PKL) -> bool:
+    return pkl.status_verifikasi == 'DITERIMA'
+
+
+def _is_truthy(value) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() in {'1', 'true', 'yes', 'on'}
+    return bool(value)
+
+
+def _pkl_verification_required_response():
+    return Response(
+        {
+            "detail": (
+                "Profil usaha belum diverifikasi admin. "
+                "Status toko dan pembaruan lokasi baru dapat digunakan setelah diterima."
+            )
+        },
+        status=status.HTTP_403_FORBIDDEN,
+    )
+
+
 def _increment_daily_stat(pkl: PKL, field: str) -> None:
     today = timezone.localdate()
     stats, _created = PKLDailyStats.objects.get_or_create(pkl=pkl, date=today)
@@ -113,11 +137,18 @@ class PKLProfileView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
+        requested_active = request.data.get('status_aktif')
+        if requested_active is not None and _is_truthy(requested_active) and not _is_pkl_verified(pkl):
+            return _pkl_verification_required_response()
+
         was_active = pkl.status_aktif
         serializer = PKLSerializer(pkl, data=request.data, partial=True)
         if serializer.is_valid():
             updated_pkl = serializer.save()
-            if not was_active and updated_pkl.status_aktif:
+            if not _is_pkl_verified(updated_pkl) and updated_pkl.status_aktif:
+                updated_pkl.status_aktif = False
+                updated_pkl.save(update_fields=['status_aktif'])
+            if _is_pkl_verified(updated_pkl) and not was_active and updated_pkl.status_aktif:
                 notify_favorite_pkl_active(updated_pkl)
             return Response(PKLSerializer(updated_pkl).data)
 
@@ -135,6 +166,9 @@ class PKLUpdateLocationView(APIView):
                 {"detail": "Profil PKL belum dibuat."},
                 status=status.HTTP_404_NOT_FOUND,
             )
+
+        if not _is_pkl_verified(pkl):
+            return _pkl_verification_required_response()
 
         serializer = LokasiPKLSerializer(data=request.data)
         if serializer.is_valid():
@@ -595,6 +629,12 @@ class AdminPKLVerifyView(generics.UpdateAPIView):
     serializer_class = PKLVerifySerializer
     permission_classes = [IsAdmin]
 
+    def perform_update(self, serializer):
+        pkl = serializer.save()
+        if not _is_pkl_verified(pkl) and pkl.status_aktif:
+            pkl.status_aktif = False
+            pkl.save(update_fields=['status_aktif'])
+
 
 class AdminMonitoringPKLView(generics.ListAPIView):
     """
@@ -771,7 +811,7 @@ class AdminDashboardView(APIView):
 # === PRE-ORDER ===
 
 class CreatePreOrderView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, IsPembeli]
 
     def post(self, request):
         pkl_id = request.data.get('pkl_id')

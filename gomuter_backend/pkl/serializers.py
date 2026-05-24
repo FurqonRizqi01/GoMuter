@@ -44,6 +44,15 @@ class PKLSerializer(serializers.ModelSerializer):
             'latest_timestamp',
             'created_at',
         ]
+        read_only_fields = [
+            'id',
+            'status_verifikasi',
+            'catatan_verifikasi',
+            'latest_latitude',
+            'latest_longitude',
+            'latest_timestamp',
+            'created_at',
+        ]
 
     def get_latest_latitude(self, obj):
         lokasi = obj.lokasi.order_by('-timestamp').first()

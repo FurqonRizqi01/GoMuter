@@ -7,6 +7,17 @@ from .models import Chat, ChatMessage, PKL
 from .serializers import ChatSerializer, ChatMessageSerializer
 
 
+class IsPembeli(permissions.BasePermission):
+    """Hanya user pembeli (role USER) yang boleh memulai chat baru."""
+
+    def has_permission(self, request, view):
+        return bool(
+            request.user
+            and request.user.is_authenticated
+            and request.user.role == 'USER'
+        )
+
+
 class ChatListView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
@@ -22,7 +33,7 @@ class ChatListView(APIView):
 
 
 class StartChatView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, IsPembeli]
 
     def post(self, request):
         pkl_id = request.data.get('pkl_id')

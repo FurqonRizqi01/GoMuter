@@ -12,6 +12,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:gomuter_app/utils/chat_badge_manager.dart';
+import 'package:gomuter_app/utils/map_route_service.dart';
 import 'package:gomuter_app/utils/token_manager.dart';
 import 'package:gomuter_app/utils/theme_manager.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -53,6 +54,9 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
   final List<String> _categories = ['Semua', 'Makanan', 'Minuman', 'Snack'];
   String? _buyerName;
   int _unreadChatCount = 0;
+  List<LatLng> _selectedRoutePoints = [];
+  double? _selectedRouteDistanceMeters;
+  int _routeRequestSerial = 0;
 
   int get _unreadNotificationsCount {
     var count = 0;
@@ -96,8 +100,7 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
     if (token != null && token.isNotEmpty) {
       return token;
     }
-    final prefs = await _getPrefs();
-    return prefs.getString('access_token');
+    return null;
   }
 
   Future<void> _loadChatBadge() async {
@@ -151,6 +154,9 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
           setState(() {
             _buyerPosition = position;
           });
+          if (_selectedPklMarkerId != null) {
+            unawaited(_loadSelectedRoute());
+          }
         });
   }
 
@@ -259,15 +265,85 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
     setState(() {
       _selectedPklMarkerId = pklId;
     });
+    unawaited(_loadSelectedRoute());
   }
 
   void _togglePklMarkerSelection(int markerId) {
     setState(() {
       if (_selectedPklMarkerId == markerId) {
         _selectedPklMarkerId = null;
+        _clearSelectedRoute();
       } else {
         _selectedPklMarkerId = markerId;
       }
+    });
+    if (_selectedPklMarkerId != null) {
+      unawaited(_loadSelectedRoute());
+    }
+  }
+
+  LatLng? _buyerLatLng() {
+    final buyer = _buyerPosition;
+    if (buyer == null) return null;
+    return LatLng(buyer.latitude, buyer.longitude);
+  }
+
+  LatLng? _latLngForPKL(Map<String, dynamic> pkl) {
+    final latRaw = pkl['latest_latitude'];
+    final lngRaw = pkl['latest_longitude'];
+    if (latRaw == null || lngRaw == null) return null;
+    return LatLng((latRaw as num).toDouble(), (lngRaw as num).toDouble());
+  }
+
+  Map<String, dynamic>? _selectedPklForRoute() {
+    final selectedId = _selectedPklMarkerId;
+    if (selectedId == null) return null;
+    for (final item in _pkls) {
+      if (item is Map<String, dynamic>) {
+        final id = (item['id'] as num?)?.toInt();
+        if (id == selectedId) return item;
+      }
+    }
+    return null;
+  }
+
+  void _clearSelectedRoute() {
+    _routeRequestSerial++;
+    _selectedRoutePoints = [];
+    _selectedRouteDistanceMeters = null;
+  }
+
+  Future<void> _loadSelectedRoute() async {
+    final buyer = _buyerLatLng();
+    final selectedPkl = _selectedPklForRoute();
+    final destination = selectedPkl == null ? null : _latLngForPKL(selectedPkl);
+    if (buyer == null || destination == null) {
+      if (mounted) {
+        setState(_clearSelectedRoute);
+      }
+      return;
+    }
+
+    final requestId = ++_routeRequestSerial;
+    final result = await MapRouteService.fetchRoute(
+      origin: buyer,
+      destination: destination,
+    );
+
+    if (!mounted || requestId != _routeRequestSerial) return;
+    final stillSelected = _selectedPklForRoute();
+    final stillDestination = stillSelected == null
+        ? null
+        : _latLngForPKL(stillSelected);
+    if (stillDestination == null ||
+        stillDestination.latitude != destination.latitude ||
+        stillDestination.longitude != destination.longitude) {
+      return;
+    }
+
+    setState(() {
+      _selectedRoutePoints = result.points;
+      _selectedRouteDistanceMeters = result.distanceMeters;
     });
   }
 
@@ -475,6 +551,9 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
         longitude: position.longitude,
         radiusM: _selectedRadius,
       );
+      if (_selectedPklMarkerId != null) {
+        unawaited(_loadSelectedRoute());
+      }
       return true;
     } catch (e) {
       if (mounted) {
@@ -1205,10 +1284,42 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
   String _distanceLabelForPKL(Map<String, dynamic> pkl) {
     final meters = _distanceMetersForPKL(pkl);
     if (meters == null) return '-';
+    return _formatDistanceMeters(meters);
+  }
+
+  String _formatDistanceMeters(double meters) {
     if (meters >= 1000) {
       return '${(meters / 1000).toStringAsFixed(1)} km';
     }
     return '${meters.toStringAsFixed(0)} m';
+  }
+
+  Widget _buildRouteDistanceLabel(String text) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: _themeManager.cardColor,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: _themeManager.borderColor),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(
+              alpha: _themeManager.isDarkMode ? 0.35 : 0.14,
+            ),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          color: _themeManager.textColor,
+          fontSize: 12,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    );
   }
 
   IconData _getCategoryIcon(String jenis) {
@@ -1243,6 +1354,13 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
     const pklListHeight = 144.0;
     final pklListBottom = 16.0 + bottomInset;
     final fabBottom = pklListBottom + pklListHeight + 16.0;
+    final routePoints = _selectedRoutePoints;
+    final routeLabelPoint = routePoints.length >= 2
+        ? routePoints[routePoints.length ~/ 2]
+        : null;
+    final routeDistanceText = _selectedRouteDistanceMeters == null
+        ? null
+        : _formatDistanceMeters(_selectedRouteDistanceMeters!);
 
     return Scaffold(
       backgroundColor: bgColor,
@@ -1290,6 +1408,36 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
                     return widget;
                   },
                 ),
+                if (routePoints.length >= 2)
+                  PolylineLayer(
+                    polylines: [
+                      Polyline(
+                        points: routePoints,
+                        strokeWidth: 9,
+                        color: Colors.white.withValues(alpha: 0.92),
+                      ),
+                      Polyline(
+                        points: routePoints,
+                        strokeWidth: 5,
+                        color: const Color(0xFF31A853),
+                      ),
+                    ],
+                  ),
+                if (routeLabelPoint != null && routeDistanceText != null)
+                  MarkerLayer(
+                    markers: [
+                      Marker(
+                        point: routeLabelPoint,
+                        width: 140,
+                        height: 42,
+                        child: IgnorePointer(
+                          child: Center(
+                            child: _buildRouteDistanceLabel(routeDistanceText),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 MarkerLayer(markers: _buildPklMarkers()),
                 if (_buyerPosition != null)
                   MarkerLayer(
@@ -1302,38 +1450,45 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
                         width: 44,
                         height: 44,
                         alignment: Alignment.center,
-                        child: Stack(
-                          alignment: Alignment.center,
-                          children: [
-                            Container(
-                              width: 42,
-                              height: 42,
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                shape: BoxShape.circle,
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.18),
-                                    blurRadius: 10,
-                                    offset: const Offset(0, 4),
-                                  ),
-                                ],
+                        child: GestureDetector(
+                          onTap: _selectedPklMarkerId == null
+                              ? null
+                              : () => unawaited(_loadSelectedRoute()),
+                          child: Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              Container(
+                                width: 42,
+                                height: 42,
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  shape: BoxShape.circle,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withValues(
+                                        alpha: 0.18,
+                                      ),
+                                      blurRadius: 10,
+                                      offset: const Offset(0, 4),
+                                    ),
+                                  ],
+                                ),
                               ),
-                            ),
-                            Container(
-                              width: 34,
-                              height: 34,
-                              decoration: BoxDecoration(
-                                color: _themeManager.accentGold,
-                                shape: BoxShape.circle,
+                              Container(
+                                width: 34,
+                                height: 34,
+                                decoration: BoxDecoration(
+                                  color: _themeManager.accentGold,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.person_rounded,
+                                  color: Colors.white,
+                                  size: 20,
+                                ),
                               ),
-                              child: const Icon(
-                                Icons.person_rounded,
-                                color: Colors.white,
-                                size: 20,
-                              ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                     ],
@@ -1977,7 +2132,11 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
                   await Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) => PklDetailPage(pklId: pklId),
+                      builder: (_) => PklDetailPage(
+                        pklId: pklId,
+                        initialData: pkl,
+                        initialBuyerLatLng: _buyerLatLng(),
+                      ),
                     ),
                   );
                   await _loadFavorites();

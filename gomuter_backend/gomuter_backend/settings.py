@@ -37,6 +37,17 @@ def _env_list(name: str, default: str = '') -> list[str]:
     return [item.strip() for item in value.split(',') if item.strip()]
 
 
+def _env_int(name: str, default: int) -> int:
+    # Helper untuk membaca integer dari environment variable.
+    value = os.getenv(name)
+    if value is None or value.strip() == '':
+        return default
+    try:
+        return int(value)
+    except ValueError:
+        return default
+
+
 # =====================
 # Konfigurasi Dasar
 # =====================
@@ -98,8 +109,8 @@ REST_FRAMEWORK = {
 # Access token dibuat lebih singkat untuk keamanan,
 # refresh token lebih panjang untuk menjaga sesi mobile tetap stabil.
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(hours=4),
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=30),
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=_env_int('JWT_ACCESS_MINUTES', 240)),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=_env_int('JWT_REFRESH_DAYS', 90)),
     # Refresh token dirotasi agar klien mendapat token terbaru secara berkala.
     'ROTATE_REFRESH_TOKENS': True,
     # Belum memakai token blacklist app; diset False agar kompatibel konfigurasi saat ini.
@@ -239,6 +250,10 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 CORS_ALLOWED_ORIGINS = _env_list(
     'CORS_ALLOWED_ORIGINS',
     default='http://127.0.0.1:59891,http://localhost:59891,http://127.0.0.1:8000,http://localhost:8000',
+)
+CORS_ALLOWED_ORIGIN_REGEXES = _env_list(
+    'CORS_ALLOWED_ORIGIN_REGEXES',
+    default=r'^http://localhost:\d+$,^http://127\.0\.0\.1:\d+$',
 )
 CORS_ALLOW_ALL_ORIGINS = DEBUG and _env_bool('CORS_ALLOW_ALL_ORIGINS_DEV', default=True)
 

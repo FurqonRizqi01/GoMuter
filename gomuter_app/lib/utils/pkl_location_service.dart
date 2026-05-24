@@ -7,7 +7,6 @@ import 'package:gomuter_app/api_service.dart';
 import 'package:gomuter_app/utils/token_manager.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-
 // Service sinkronisasi lokasi PKL ke backend (manual dan berkala otomatis).
 class PklLocationService with WidgetsBindingObserver {
   static final PklLocationService _instance = PklLocationService._internal();
@@ -158,6 +157,11 @@ class PklLocationService with WidgetsBindingObserver {
         return false;
       }
 
+      final verified = await _ensureVerifiedProfile(token);
+      if (!verified) {
+        return false;
+      }
+
       final hasAccess = await _ensureLocationAccess();
       if (!hasAccess) {
         _lastError = 'Izin/layanan lokasi belum aktif.';
@@ -233,17 +237,56 @@ class PklLocationService with WidgetsBindingObserver {
     }
   }
 
+  Future<bool> _ensureVerifiedProfile(String token) async {
+    try {
+      final profile = await ApiService.getPKLProfile(token);
+      final status = (profile?['status_verifikasi'] ?? 'PENDING')
+          .toString()
+          .toUpperCase();
+      if (status == 'DITERIMA' || status == 'VERIFIED') {
+        return true;
+      }
+
+      _lastError = status == 'DITOLAK'
+          ? 'Profil usaha ditolak admin. Perbaiki data terlebih dahulu.'
+          : 'Profil usaha masih menunggu verifikasi admin.';
+      await _disableAutoMode();
+      return false;
+    } catch (e) {
+      _lastError = 'Gagal mengecek status verifikasi profil. $e';
+      return false;
+    }
+  }
+
+  Future<void> _disableAutoMode() async {
+    _locationTimer?.cancel();
+    _locationTimer = null;
+    _isAutoMode = false;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_prefsAutoModeKey, false);
+    _notifyListeners();
+  }
+
   Future<void> startAutoSync({bool showSnack = true}) async {
     // Mengaktifkan mode otomatis dan membuat timer periodik update lokasi.
     _locationTimer?.cancel();
     _locationTimer = null;
 
+    final token = await TokenManager.getValidAccessToken();
+    if (token == null || token.isEmpty) {
+      _lastError = 'Sesi habis. Silakan login ulang.';
+      await _disableAutoMode();
+      return;
+    }
+
+    final verified = await _ensureVerifiedProfile(token);
+    if (!verified) {
+      return;
+    }
+
     final hasAccess = await _ensureLocationAccess();
     if (!hasAccess) {
-      _isAutoMode = false;
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool(_prefsAutoModeKey, false);
-      _notifyListeners();
+      await _disableAutoMode();
       return;
     }
 

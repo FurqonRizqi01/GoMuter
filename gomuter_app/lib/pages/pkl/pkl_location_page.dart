@@ -51,6 +51,23 @@ class _PklLocationPageState extends State<PklLocationPage> {
     if (mounted) setState(() {});
   }
 
+  bool get _isVerifiedProfile {
+    final status = _statusVerifikasi.isEmpty
+        ? 'PENDING'
+        : _statusVerifikasi.toUpperCase();
+    return status == 'DITERIMA' || status == 'VERIFIED';
+  }
+
+  String get _verificationLockMessage {
+    final status = _statusVerifikasi.isEmpty
+        ? 'PENDING'
+        : _statusVerifikasi.toUpperCase();
+    if (status == 'DITOLAK') {
+      return 'Profil usaha ditolak admin. Perbaiki data profil sebelum memperbarui lokasi.';
+    }
+    return 'Profil usaha masih menunggu verifikasi admin. Lokasi bisa diperbarui setelah disetujui.';
+  }
+
   Future<void> _loadInitial() async {
     setState(() {
       _isLoading = true;
@@ -95,6 +112,11 @@ class _PklLocationPageState extends State<PklLocationPage> {
   }
 
   Future<void> _runManualUpdate() async {
+    if (!_isVerifiedProfile) {
+      _showSnack(_verificationLockMessage);
+      return;
+    }
+
     final ok = await _locationService.updateLocation(showSnack: false);
     if (!mounted) return;
     if (ok) {
@@ -110,6 +132,13 @@ class _PklLocationPageState extends State<PklLocationPage> {
   }
 
   Future<void> _setAutoMode(bool enabled) async {
+    if (enabled && !_isVerifiedProfile) {
+      await _locationService.stopAutoSync(showSnack: false);
+      if (!mounted) return;
+      _showSnack(_verificationLockMessage);
+      return;
+    }
+
     if (enabled) {
       await _locationService.startAutoSync(showSnack: false);
       if (!mounted) return;
@@ -395,7 +424,11 @@ class _PklLocationPageState extends State<PklLocationPage> {
                     : _runManualUpdate,
                 icon: const Icon(Icons.my_location_rounded, size: 18),
                 label: Text(
-                  _locationService.isUpdating ? 'Update...' : 'Update',
+                  !_isVerifiedProfile
+                      ? 'Terkunci'
+                      : _locationService.isUpdating
+                          ? 'Update...'
+                          : 'Update',
                 ),
                 style: ElevatedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(
@@ -678,6 +711,37 @@ class _PklLocationPageState extends State<PklLocationPage> {
     );
   }
 
+  Widget _buildVerificationLockCard() {
+    final isDark = _themeManager.isDarkMode;
+    final borderColor = _themeManager.borderColor;
+    final textColor = _themeManager.textColor;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Color.alphaBlend(
+          _themeManager.accentGold.withValues(alpha: isDark ? 0.16 : 0.12),
+          _themeManager.cardColor,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: borderColor),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.lock_clock_rounded, color: _themeManager.accentGold),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              _verificationLockMessage,
+              style: TextStyle(color: textColor, fontWeight: FontWeight.w700),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final bgColor = _themeManager.backgroundColor;
@@ -728,11 +792,15 @@ class _PklLocationPageState extends State<PklLocationPage> {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    _buildUpdateMethodToggle(),
-                    const SizedBox(height: 14),
-                    _buildManualCard(),
-                    const SizedBox(height: 14),
-                    _buildInfoCallout(),
+                    if (!_isVerifiedProfile) ...[
+                      _buildVerificationLockCard(),
+                    ] else ...[
+                      _buildUpdateMethodToggle(),
+                      const SizedBox(height: 14),
+                      _buildManualCard(),
+                      const SizedBox(height: 14),
+                      _buildInfoCallout(),
+                    ],
                   ],
                 ),
               ),
