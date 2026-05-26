@@ -109,7 +109,9 @@ REST_FRAMEWORK = {
 # Access token dibuat lebih singkat untuk keamanan,
 # refresh token lebih panjang untuk menjaga sesi mobile tetap stabil.
 SIMPLE_JWT = {
+    # Dapat dioverride dari Cloud Run tanpa mengubah kode deafult access 4 jam.
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=_env_int('JWT_ACCESS_MINUTES', 240)),
+    # Refresh token default 90 hari agar pengguna harus login ulang.
     'REFRESH_TOKEN_LIFETIME': timedelta(days=_env_int('JWT_REFRESH_DAYS', 90)),
     # Refresh token dirotasi agar klien mendapat token terbaru secara berkala.
     'ROTATE_REFRESH_TOKENS': True,
@@ -238,6 +240,12 @@ MEDIA_URL = '/media/'
 # Catatan Cloud Run: filesystem lokal bersifat ephemeral (tidak persisten).
 # Untuk produksi, sebaiknya media dipindah ke object storage (mis. GCS/S3).
 MEDIA_ROOT = BASE_DIR / 'media'
+
+# Supabase Storage opsional untuk media publik.
+# Jika ketiga env ini tersedia, upload gambar akan masuk ke object storage.
+SUPABASE_URL = os.getenv('SUPABASE_URL', '').strip().rstrip('/')
+SUPABASE_SERVICE_ROLE_KEY = os.getenv('SUPABASE_SERVICE_ROLE_KEY', '').strip()
+SUPABASE_STORAGE_BUCKET = os.getenv('SUPABASE_STORAGE_BUCKET', '').strip()
 
 # Tipe primary key default untuk model yang tidak mendefinisikan id manual.
 

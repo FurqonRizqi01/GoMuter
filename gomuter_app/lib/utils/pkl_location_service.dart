@@ -239,6 +239,7 @@ class PklLocationService with WidgetsBindingObserver {
 
   Future<bool> _ensureVerifiedProfile(String token) async {
     try {
+      // Pembaruan lokasi hanya boleh berjalan setelah profil usaha diterima admin.
       final profile = await ApiService.getPKLProfile(token);
       final status = (profile?['status_verifikasi'] ?? 'PENDING')
           .toString()
@@ -250,6 +251,7 @@ class PklLocationService with WidgetsBindingObserver {
       _lastError = status == 'DITOLAK'
           ? 'Profil usaha ditolak admin. Perbaiki data terlebih dahulu.'
           : 'Profil usaha masih menunggu verifikasi admin.';
+      // Mode otomatis dimatikan agar PKL pending/ditolak tidak terus mengirim lokasi.
       await _disableAutoMode();
       return false;
     } catch (e) {
@@ -281,6 +283,7 @@ class PklLocationService with WidgetsBindingObserver {
 
     final verified = await _ensureVerifiedProfile(token);
     if (!verified) {
+      // Jika belum terverifikasi, proses timer otomatis tidak dibuat.
       return;
     }
 
@@ -319,6 +322,7 @@ class PklLocationService with WidgetsBindingObserver {
 
     _notifyListeners();
   }
+
 
   void dispose() {
     _locationTimer?.cancel();

@@ -191,6 +191,17 @@ class _PklEditInfoPageState extends State<PklEditInfoPage> {
   }
 
   Future<void> _saveProfile() async {
+    if (_namaUsahaController.text.trim().isEmpty ||
+        _jenisDaganganController.text.trim().isEmpty ||
+        _jamOperasionalController.text.trim().isEmpty ||
+        _alamatController.text.trim().isEmpty) {
+      setState(() {
+        _error =
+            'Nama usaha, kategori, jam operasional, dan alamat domisili wajib diisi.';
+      });
+      return;
+    }
+
     setState(() {
       _isSaving = true;
       _error = null;
@@ -371,6 +382,7 @@ class _PklEditInfoPageState extends State<PklEditInfoPage> {
     String? selectedFileName;
     bool removeImage = false;
     final existingImageUrl = product?['image_url'] as String?;
+    final previewImageUrl = _resolveImageUrl(existingImageUrl);
     String? formError;
 
     final result = await showModalBottomSheet<_ProductFormResult>(
@@ -433,12 +445,15 @@ class _PklEditInfoPageState extends State<PklEditInfoPage> {
                   width: double.infinity,
                   height: double.infinity,
                 );
-              } else if (existingImageUrl != null && !removeImage) {
+              } else if (previewImageUrl != null && !removeImage) {
                 child = Image.network(
-                  existingImageUrl,
+                  previewImageUrl,
                   fit: BoxFit.cover,
                   width: double.infinity,
                   height: double.infinity,
+                  errorBuilder: (_, __, ___) => const Center(
+                    child: Icon(Icons.broken_image_outlined, size: 36),
+                  ),
                 );
               } else {
                 child = Column(
@@ -906,14 +921,23 @@ class _PklEditInfoPageState extends State<PklEditInfoPage> {
   }
 
   Widget _buildProductImage(String? imageUrl) {
+    final resolvedUrl = _resolveImageUrl(imageUrl);
     return ClipRRect(
       borderRadius: BorderRadius.circular(18),
       child: Container(
         width: 88,
         height: 88,
         color: const Color(0xFFF0F2F5),
-        child: imageUrl != null
-            ? Image.network(imageUrl, fit: BoxFit.cover)
+        child: resolvedUrl != null
+            ? Image.network(
+                resolvedUrl,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Icon(
+                  Icons.fastfood_rounded,
+                  color: Colors.black.withValues(alpha: 0.4),
+                  size: 30,
+                ),
+              )
             : Icon(
                 Icons.fastfood_rounded,
                 color: Colors.black.withValues(alpha: 0.4),
@@ -921,6 +945,18 @@ class _PklEditInfoPageState extends State<PklEditInfoPage> {
               ),
       ),
     );
+  }
+
+  String? _resolveImageUrl(String? url) {
+    final value = (url ?? '').trim();
+    if (value.isEmpty) return null;
+    if (value.startsWith('http://') || value.startsWith('https://')) {
+      return value;
+    }
+    if (value.startsWith('/')) {
+      return '${ApiService.baseUrl}$value';
+    }
+    return '${ApiService.baseUrl}/$value';
   }
 
   Widget _buildTag(String label, Color color) {
@@ -1024,6 +1060,7 @@ class _PklEditInfoPageState extends State<PklEditInfoPage> {
                     controller: _namaUsahaController,
                     icon: Icons.storefront_rounded,
                     hintText: 'Contoh: Warung Bu Nani',
+                    requiredField: true,
                   ),
                   const SizedBox(height: 18),
                   _buildRoundedField(
@@ -1031,6 +1068,7 @@ class _PklEditInfoPageState extends State<PklEditInfoPage> {
                     controller: _jenisDaganganController,
                     icon: Icons.category_rounded,
                     hintText: 'Contoh: Makanan atau Minuman',
+                    requiredField: true,
                   ),
                   const SizedBox(height: 18),
                   _buildRoundedField(
@@ -1038,6 +1076,7 @@ class _PklEditInfoPageState extends State<PklEditInfoPage> {
                     controller: _jamOperasionalController,
                     icon: Icons.access_time_rounded,
                     hintText: 'Contoh: 10.00 - 19.00 WIB',
+                    requiredField: true,
                   ),
                   const SizedBox(height: 18),
                   _buildRoundedField(
@@ -1046,6 +1085,7 @@ class _PklEditInfoPageState extends State<PklEditInfoPage> {
                     icon: Icons.location_city_rounded,
                     hintText: 'Contoh: Jl. Merdeka No. 10, Jakarta',
                     maxLines: 3,
+                    requiredField: true,
                   ),
                   const SizedBox(height: 18),
                   _buildRoundedField(
@@ -1118,6 +1158,7 @@ class _PklEditInfoPageState extends State<PklEditInfoPage> {
     required IconData icon,
     String? hintText,
     int maxLines = 1,
+    bool requiredField = false,
   }) {
     final borderColor = _themeManager.borderColor;
     final textColor = _themeManager.textColor;
@@ -1126,13 +1167,29 @@ class _PklEditInfoPageState extends State<PklEditInfoPage> {
       children: [
         Padding(
           padding: const EdgeInsets.only(left: 4, bottom: 8),
-          child: Text(
-            label,
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-              letterSpacing: -0.2,
-            ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -0.2,
+                ),
+              ),
+              if (requiredField) ...[
+                const SizedBox(width: 4),
+                const Text(
+                  '*',
+                  style: TextStyle(
+                    color: Color(0xFFD32F2F),
+                    fontSize: 15,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
+            ],
           ),
         ),
         TextField(

@@ -30,10 +30,12 @@ class TokenManager {
     final prefs = await SharedPreferences.getInstance();
     final access = prefs.getString(_accessKey);
     if (access == null || access.isEmpty) {
+      // Jika access token tidak ada tetapi refresh token masih ada,
+      // aplikasi mencoba membuat access token baru tanpa meminta login ulang.
       return _refreshAccessToken(prefs);
     }
 
-    // Refresh proactively if token is expired OR will expire soon.
+    // Access token yang habis/nyaris habis tidak dipakai lagi untuk request API.
     final needsRefresh = _isExpired(access) || _expiresSoon(access);
     if (!needsRefresh) return access;
 
@@ -52,6 +54,7 @@ class TokenManager {
       return null;
     }
     if (_isExpired(refresh)) {
+      // Refresh token adalah batas sesi utama; jika habis, pengguna harus login lagi.
       await clearTokens();
       return null;
     }
@@ -67,6 +70,7 @@ class TokenManager {
         return null;
       }
 
+      // Simpan access token baru, dan simpan refresh token baru jika backend merotasi token.
       await prefs.setString(_accessKey, newAccess);
       if (newRefresh != null && newRefresh.isNotEmpty) {
         await prefs.setString(_refreshKey, newRefresh);

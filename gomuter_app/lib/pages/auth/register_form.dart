@@ -103,8 +103,9 @@ class RegisterForm extends StatelessWidget {
         const SizedBox(height: 12),
         _AuthTextField(
           controller: emailController,
-          label: 'Email',
+          label: 'Email *',
           icon: Icons.mail_outline_rounded,
+          keyboardType: TextInputType.emailAddress,
           textInputAction: TextInputAction.next,
         ),
         const SizedBox(height: 12),
@@ -243,6 +244,7 @@ class _AuthTextField extends StatelessWidget {
     this.suffixIcon,
     this.onSuffixPressed,
     this.textInputAction,
+    this.keyboardType,
   });
 
   final TextEditingController controller;
@@ -252,6 +254,7 @@ class _AuthTextField extends StatelessWidget {
   final IconData? suffixIcon;
   final VoidCallback? onSuffixPressed;
   final TextInputAction? textInputAction;
+  final TextInputType? keyboardType;
 
   @override
   Widget build(BuildContext context) {
@@ -275,6 +278,7 @@ class _AuthTextField extends StatelessWidget {
       child: TextField(
         controller: controller,
         obscureText: obscureText,
+        keyboardType: keyboardType,
         textInputAction: textInputAction,
         style: TextStyle(color: textColor),
         decoration: InputDecoration(

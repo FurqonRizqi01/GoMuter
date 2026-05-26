@@ -861,9 +861,8 @@ class _PklDetailPageState extends State<PklDetailPage> {
                           children: [
                             TileLayer(
                               urlTemplate:
-                                  'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-                              subdomains: const ['a', 'b', 'c'],
-                              userAgentPackageName: 'com.example.gomuter_app',
+                                  'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                              userAgentPackageName: 'com.gomuter.app',
                             ),
                             if (showRoute && routePoints.length >= 2)
                               PolylineLayer(
@@ -966,11 +965,12 @@ class _PklDetailPageState extends State<PklDetailPage> {
       if (item is Map) {
         final url = item['image_url'];
         if (url is String && url.isNotEmpty) {
-          heroImageUrl = url;
+          heroImageUrl = _resolveImageUrl(url);
           break;
         }
       }
     }
+    heroImageUrl ??= _resolveImageUrl(data['profile_image_url'] as String?);
 
     final isDark = _themeManager.isDarkMode;
 
@@ -1266,6 +1266,18 @@ class _PklDetailPageState extends State<PklDetailPage> {
       return Icons.fastfood_rounded;
     }
     return Icons.storefront_rounded;
+  }
+
+  String? _resolveImageUrl(String? url) {
+    final value = (url ?? '').trim();
+    if (value.isEmpty) return null;
+    if (value.startsWith('http://') || value.startsWith('https://')) {
+      return value;
+    }
+    if (value.startsWith('/')) {
+      return '${ApiService.baseUrl}$value';
+    }
+    return '${ApiService.baseUrl}/$value';
   }
 
   Widget _buildActionButtons() {
@@ -1719,7 +1731,7 @@ class _PklDetailPageState extends State<PklDetailPage> {
     final id = product['id'] as int;
     final name = (product['name'] ?? '-') as String;
     final price = (product['price'] as num?)?.toInt() ?? 0;
-    final imageUrl = product['image_url'] as String?;
+    final imageUrl = _resolveImageUrl(product['image_url'] as String?);
     final description = (product['description'] ?? '') as String;
     final isFeatured = product['is_featured'] == true;
     final qty = _cart[id] ?? 0;
@@ -2084,9 +2096,8 @@ class _PklDetailPageState extends State<PklDetailPage> {
                     children: [
                       TileLayer(
                         urlTemplate:
-                            'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-                        subdomains: const ['a', 'b', 'c'],
-                        userAgentPackageName: 'com.example.gomuter_app',
+                            'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                        userAgentPackageName: 'com.gomuter.app',
                       ),
                       if (showRoute && routePoints.length >= 2)
                         PolylineLayer(

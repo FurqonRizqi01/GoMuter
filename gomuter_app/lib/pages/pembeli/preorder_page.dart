@@ -1351,7 +1351,7 @@ class _PreOrderPageState extends State<PreOrderPage>
     final id = product['id'] as int;
     final name = (product['name'] ?? '-') as String;
     final price = (product['price'] as num?)?.toInt() ?? 0;
-    final imageUrl = product['image_url'] as String?;
+    final imageUrl = _resolveImageUrl(product['image_url'] as String?);
     final qty = _cart[id] ?? 0;
     final isDark = _themeManager.isDarkMode;
 
@@ -1584,6 +1584,18 @@ class _PreOrderPageState extends State<PreOrderPage>
       buffer.write(str[i]);
     }
     return buffer.toString();
+  }
+
+  String? _resolveImageUrl(String? url) {
+    final value = (url ?? '').trim();
+    if (value.isEmpty) return null;
+    if (value.startsWith('http://') || value.startsWith('https://')) {
+      return value;
+    }
+    if (value.startsWith('/')) {
+      return '${ApiService.baseUrl}$value';
+    }
+    return '${ApiService.baseUrl}/$value';
   }
 
   Widget _buildLocationPicker() {

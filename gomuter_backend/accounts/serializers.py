@@ -16,6 +16,7 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, min_length=6)
     role = serializers.ChoiceField(choices=User.ROLE_CHOICES)
+    email = serializers.EmailField(required=True, allow_blank=False)
 
     class Meta:
         model = User
@@ -29,6 +30,12 @@ class RegisterSerializer(serializers.ModelSerializer):
             **validated_data
         )
         return user
+
+    def validate_email(self, value):
+        value = (value or '').strip().lower()
+        if not value:
+            raise serializers.ValidationError('Email wajib diisi.')
+        return value
 
 class UserMeSerializer(serializers.ModelSerializer):
     class Meta:

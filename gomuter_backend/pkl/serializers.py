@@ -46,8 +46,10 @@ class PKLSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = [
             'id',
+            # Status verifikasi hanya boleh diubah oleh admin melalui endpoint verifikasi.
             'status_verifikasi',
             'catatan_verifikasi',
+            # Lokasi terakhir berasal dari tabel LokasiPKL, bukan input langsung profil.
             'latest_latitude',
             'latest_longitude',
             'latest_timestamp',
@@ -73,6 +75,23 @@ class PKLSerializer(serializers.ModelSerializer):
             return dj.isoformat() if dj is not None else None
         except Exception:
             return None
+
+    def validate(self, attrs):
+        instance = getattr(self, 'instance', None)
+        required_fields = {
+            'nama_usaha': 'Nama usaha wajib diisi.',
+            'jenis_dagangan': 'Kategori atau jenis dagangan wajib diisi.',
+            'jam_operasional': 'Jam operasional wajib diisi.',
+            'alamat_domisili': 'Alamat domisili wajib diisi.',
+        }
+        errors = {}
+        for field, message in required_fields.items():
+            value = attrs.get(field, getattr(instance, field, None))
+            if not str(value or '').strip():
+                errors[field] = message
+        if errors:
+            raise serializers.ValidationError(errors)
+        return attrs
 
 
 class LokasiPKLSerializer(serializers.ModelSerializer):
@@ -341,6 +360,8 @@ class PKLProductSerializer(serializers.ModelSerializer):
     def get_image_url(self, obj):
         if not obj.image:
             return None
+        if str(obj.image).startswith(('http://', 'https://')):
+            return str(obj.image)
         request = self.context.get('request') if hasattr(self, 'context') else None
         url = obj.image.url
         if request is not None:
@@ -390,6 +411,7 @@ class PKLProductWriteSerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         remove_image = validated_data.pop('remove_image', False)
         if remove_image and instance.image:
-            instance.image.delete(save=False)
+            if not str(instance.image).startswith(('http://', 'https://')):
+                instance.image.delete(save=False)
             instance.image = None
         return super().update(instance, validated_data)

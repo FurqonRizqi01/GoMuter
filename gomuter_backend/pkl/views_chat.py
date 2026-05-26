@@ -33,6 +33,8 @@ class ChatListView(APIView):
 
 
 class StartChatView(APIView):
+    # Ruang chat baru hanya dapat dimulai oleh pembeli.
+    # PKL tetap dapat membalas chat yang sudah dibuat pembeli melalui ChatMessagesView.
     permission_classes = [permissions.IsAuthenticated, IsPembeli]
 
     def post(self, request):

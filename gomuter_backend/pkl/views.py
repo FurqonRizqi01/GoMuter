@@ -14,6 +14,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.parsers import MultiPartParser, FormParser
 
+from .storage_service import is_supabase_storage_enabled, upload_public_media
 from .models import (
     PKL,
     LokasiPKL,
@@ -60,6 +61,7 @@ class IsPembeli(permissions.BasePermission):
 
 
 def _is_pkl_verified(pkl: PKL) -> bool:
+    # PKL dianggap layak tampil/beroperasi hanya setelah diterima admin.
     return pkl.status_verifikasi == 'DITERIMA'
 
 
@@ -81,6 +83,25 @@ def _pkl_verification_required_response():
         },
         status=status.HTTP_403_FORBIDDEN,
     )
+
+
+def _uploaded_file_extension(file_obj, default='jpg') -> str:
+    name = getattr(file_obj, 'name', '') or ''
+    if '.' not in name:
+        return default
+    return name.rsplit('.', 1)[-1].lower() or default
+
+
+def _save_uploaded_media(file_obj, folder: str, request=None) -> str:
+    extension = _uploaded_file_extension(file_obj)
+    filename = f'{uuid.uuid4().hex}.{extension}'
+    if is_supabase_storage_enabled():
+        return upload_public_media(file_obj, folder, filename)
+
+    saved_path = default_storage.save(f'{folder}/{filename}', file_obj)
+    if request is not None:
+        return request.build_absolute_uri(default_storage.url(saved_path))
+    return default_storage.url(saved_path)
 
 
 def _increment_daily_stat(pkl: PKL, field: str) -> None:
@@ -139,6 +160,7 @@ class PKLProfileView(APIView):
 
         requested_active = request.data.get('status_aktif')
         if requested_active is not None and _is_truthy(requested_active) and not _is_pkl_verified(pkl):
+            # PKL pending/ditolak tidak boleh mengaktifkan toko dari aplikasi maupun API.
             return _pkl_verification_required_response()
 
         was_active = pkl.status_aktif
@@ -146,6 +168,7 @@ class PKLProfileView(APIView):
         if serializer.is_valid():
             updated_pkl = serializer.save()
             if not _is_pkl_verified(updated_pkl) and updated_pkl.status_aktif:
+                # Perlindungan tambahan jika payload mencoba menyimpan status aktif saat belum diverifikasi.
                 updated_pkl.status_aktif = False
                 updated_pkl.save(update_fields=['status_aktif'])
             if _is_pkl_verified(updated_pkl) and not was_active and updated_pkl.status_aktif:
@@ -168,6 +191,7 @@ class PKLUpdateLocationView(APIView):
             )
 
         if not _is_pkl_verified(pkl):
+            # Pembaruan lokasi ditolak sampai admin menerima profil usaha.
             return _pkl_verification_required_response()
 
         serializer = LokasiPKLSerializer(data=request.data)
@@ -517,9 +541,19 @@ class PKLProductListCreateView(APIView):
 
     def post(self, request):
         pkl = self._get_pkl(request)
-        serializer = PKLProductWriteSerializer(data=request.data)
+        payload = request.data.copy()
+        image_file = request.FILES.get('image')
+        image_url = None
+        if image_file and is_supabase_storage_enabled():
+            image_url = _save_uploaded_media(image_file, 'pkl_products', request)
+            payload.pop('image', None)
+
+        serializer = PKLProductWriteSerializer(data=payload)
         if serializer.is_valid():
             product = serializer.save(pkl=pkl)
+            if image_url:
+                product.image = image_url
+                product.save(update_fields=['image'])
             read_serializer = PKLProductSerializer(
                 product,
                 context={'request': request},
@@ -541,13 +575,23 @@ class PKLProductDetailView(APIView):
 
     def patch(self, request, product_id):
         product = self._get_object(request, product_id)
+        payload = request.data.copy()
+        image_file = request.FILES.get('image')
+        image_url = None
+        if image_file and is_supabase_storage_enabled():
+            image_url = _save_uploaded_media(image_file, 'pkl_products', request)
+            payload.pop('image', None)
+
         serializer = PKLProductWriteSerializer(
             product,
-            data=request.data,
+            data=payload,
             partial=True,
         )
         if serializer.is_valid():
             product = serializer.save()
+            if image_url:
+                product.image = image_url
+                product.save(update_fields=['image'])
             read_serializer = PKLProductSerializer(
                 product,
                 context={'request': request},
@@ -557,7 +601,7 @@ class PKLProductDetailView(APIView):
 
     def delete(self, request, product_id):
         product = self._get_object(request, product_id)
-        if product.image:
+        if product.image and not str(product.image).startswith(('http://', 'https://')):
             product.image.delete(save=False)
         product.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
@@ -811,6 +855,7 @@ class AdminDashboardView(APIView):
 # === PRE-ORDER ===
 
 class CreatePreOrderView(APIView):
+    # Pre-order hanya boleh dibuat oleh pembeli, bukan akun PKL/admin.
     permission_classes = [permissions.IsAuthenticated, IsPembeli]
 
     def post(self, request):
@@ -822,6 +867,7 @@ class CreatePreOrderView(APIView):
             )
 
         try:
+            # Pesanan hanya dapat dibuat ke PKL yang aktif dan sudah diverifikasi admin.
             pkl = PKL.objects.get(id=pkl_id, status_aktif=True, status_verifikasi='DITERIMA')
         except PKL.DoesNotExist:
             return Response(
@@ -1044,10 +1090,7 @@ class DPProofUploadView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        extension = file_obj.name.split('.')[-1]
-        filename = f"dp_proofs/{uuid.uuid4().hex}.{extension}"
-        saved_path = default_storage.save(filename, file_obj)
-        file_url = request.build_absolute_uri(default_storage.url(saved_path))
+        file_url = _save_uploaded_media(file_obj, 'dp_proofs', request)
 
         return Response({'url': file_url}, status=status.HTTP_201_CREATED)
 
@@ -1072,10 +1115,7 @@ class PKLProfilePhotoUploadView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        extension = file_obj.name.split('.')[-1].lower()
-        filename = f"pkl_profile_photos/{uuid.uuid4().hex}.{extension}"
-        saved_path = default_storage.save(filename, file_obj)
-        file_url = request.build_absolute_uri(default_storage.url(saved_path))
+        file_url = _save_uploaded_media(file_obj, 'pkl_profile_photos', request)
 
         pkl.profile_image_url = file_url
         pkl.save(update_fields=['profile_image_url'])

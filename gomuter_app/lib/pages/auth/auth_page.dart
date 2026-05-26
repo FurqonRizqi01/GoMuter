@@ -461,6 +461,21 @@ class _AuthPageState extends State<AuthPage> {
   }
 
   Future<void> _handleRegister() async {
+    final email = _emailController.text.trim();
+    final emailValid = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email);
+    if (email.isEmpty) {
+      setState(() {
+        _errorText = 'Email wajib diisi.';
+      });
+      return;
+    }
+    if (!emailValid) {
+      setState(() {
+        _errorText = 'Format email tidak valid.';
+      });
+      return;
+    }
+
     setState(() {
       _isLoading = true;
       _errorText = null;
@@ -469,7 +484,7 @@ class _AuthPageState extends State<AuthPage> {
     try {
       await ApiService.register(
         username: _usernameController.text.trim(),
-        email: _emailController.text.trim(),
+        email: email,
         password: _passwordController.text,
         role: _selectedRole,
       );

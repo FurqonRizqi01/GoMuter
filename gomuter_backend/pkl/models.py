@@ -292,7 +292,12 @@ class PKLProduct(models.Model):
     name = models.CharField(max_length=120)
     price = models.PositiveIntegerField()
     description = models.TextField(blank=True)
-    image = models.ImageField(upload_to='pkl_products/', blank=True, null=True)
+    image = models.ImageField(
+        upload_to='pkl_products/',
+        blank=True,
+        null=True,
+        max_length=500,
+    )
     is_featured = models.BooleanField(default=False)
     is_available = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
