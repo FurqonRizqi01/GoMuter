@@ -26,9 +26,14 @@ class _PklPaymentSettingsPageState extends State<PklPaymentSettingsPage> {
 
   final _qrisLinkController = TextEditingController();
   final _qrisImageController = TextEditingController();
+  final _namaRekeningController = TextEditingController();
+  final _nomorRekeningController = TextEditingController();
+  final _ewalletProviderController = TextEditingController();
+  final _ewalletNumberController = TextEditingController();
 
   bool _isLoading = true;
   bool _isSavingLink = false;
+  bool _isSavingTransfer = false;
   bool _isUploading = false;
   bool _isHoveringDrop = false;
   bool _isNewProfile = false;
@@ -46,6 +51,10 @@ class _PklPaymentSettingsPageState extends State<PklPaymentSettingsPage> {
   void dispose() {
     _qrisLinkController.dispose();
     _qrisImageController.dispose();
+    _namaRekeningController.dispose();
+    _nomorRekeningController.dispose();
+    _ewalletProviderController.dispose();
+    _ewalletNumberController.dispose();
     _themeManager.removeListener(_onThemeChanged);
     super.dispose();
   }
@@ -81,6 +90,10 @@ class _PklPaymentSettingsPageState extends State<PklPaymentSettingsPage> {
       } else {
         _qrisLinkController.text = profile['qris_link'] ?? '';
         _qrisImageController.text = profile['qris_image_url'] ?? '';
+        _namaRekeningController.text = profile['nama_rekening'] ?? '';
+        _nomorRekeningController.text = profile['nomor_rekening'] ?? '';
+        _ewalletProviderController.text = profile['ewallet_provider'] ?? '';
+        _ewalletNumberController.text = profile['ewallet_number'] ?? '';
         setState(() {
           _isNewProfile = false;
           _previewBytes = null;
@@ -140,6 +153,47 @@ class _PklPaymentSettingsPageState extends State<PklPaymentSettingsPage> {
       if (mounted) {
         setState(() {
           _isSavingLink = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _saveTransferInfo() async {
+    if (_isNewProfile) {
+      _showSnack(
+        'Ajukan profil usaha terlebih dahulu sebelum menyimpan pembayaran.',
+      );
+      return;
+    }
+
+    setState(() {
+      _isSavingTransfer = true;
+    });
+
+    try {
+      final token = await _getToken();
+      if (token == null) {
+        throw Exception('Token tidak ditemukan.');
+      }
+
+      await ApiService.savePKLProfile(
+        token: token,
+        data: {
+          'nama_rekening': _namaRekeningController.text.trim(),
+          'nomor_rekening': _nomorRekeningController.text.trim(),
+          'ewallet_provider': _ewalletProviderController.text.trim(),
+          'ewallet_number': _ewalletNumberController.text.trim(),
+        },
+        isNew: false,
+      );
+
+      _showSnack('Informasi rekening/e-wallet berhasil disimpan.');
+    } catch (e) {
+      _showSnack('Gagal menyimpan rekening/e-wallet: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSavingTransfer = false;
         });
       }
     }
@@ -681,6 +735,121 @@ class _PklPaymentSettingsPageState extends State<PklPaymentSettingsPage> {
     );
   }
 
+  Widget _buildPaymentTextField({
+    required TextEditingController controller,
+    required IconData icon,
+    required String label,
+    required String hintText,
+    TextInputType? keyboardType,
+  }) {
+    final borderColor = _themeManager.borderColor;
+    return TextField(
+      controller: controller,
+      keyboardType: keyboardType,
+      decoration: InputDecoration(
+        labelText: label,
+        hintText: hintText,
+        prefixIcon: Container(
+          margin: const EdgeInsets.all(12),
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: _themeManager.pklAccentSurface,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(icon, color: _themeManager.pklPrimary, size: 20),
+        ),
+        filled: true,
+        fillColor: _themeManager.surfaceColor,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(20),
+          borderSide: BorderSide(color: borderColor, width: 1.5),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(20),
+          borderSide: BorderSide(color: borderColor, width: 1.5),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(20),
+          borderSide: const BorderSide(color: Color(0xFFF97316), width: 2),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTransferCard() {
+    return _buildCardShell(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildSectionHeading(
+            'Rekening & E-Wallet',
+            'Tambahkan pilihan pembayaran selain QRIS untuk pembeli.',
+          ),
+          const SizedBox(height: 20),
+          _buildPaymentTextField(
+            controller: _namaRekeningController,
+            icon: Icons.badge_rounded,
+            label: 'Nama Rekening',
+            hintText: 'Contoh: Budi Santoso / BCA',
+          ),
+          const SizedBox(height: 14),
+          _buildPaymentTextField(
+            controller: _nomorRekeningController,
+            icon: Icons.account_balance_rounded,
+            label: 'Nomor Rekening',
+            hintText: 'Contoh: 1234567890',
+            keyboardType: TextInputType.number,
+          ),
+          const SizedBox(height: 14),
+          _buildPaymentTextField(
+            controller: _ewalletProviderController,
+            icon: Icons.account_balance_wallet_rounded,
+            label: 'Nama E-Wallet',
+            hintText: 'Contoh: GoPay / DANA / OVO',
+          ),
+          const SizedBox(height: 14),
+          _buildPaymentTextField(
+            controller: _ewalletNumberController,
+            icon: Icons.phone_android_rounded,
+            label: 'Nomor E-Wallet',
+            hintText: 'Contoh: 081234567890',
+            keyboardType: TextInputType.phone,
+          ),
+          const SizedBox(height: 18),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: _isSavingTransfer ? null : _saveTransferInfo,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFF97316),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                elevation: 0,
+              ),
+              icon: _isSavingTransfer
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.5,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Icon(Icons.save_rounded, size: 20),
+              label: Text(
+                _isSavingTransfer ? 'Menyimpan...' : 'Simpan Pembayaran',
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildQrisCard() {
     return _buildCardShell(
       child: Column(
@@ -796,6 +965,8 @@ class _PklPaymentSettingsPageState extends State<PklPaymentSettingsPage> {
                     _buildHeroBanner(),
                     const SizedBox(height: 18),
                     if (_error != null) _buildErrorBanner(),
+                    _buildTransferCard(),
+                    const SizedBox(height: 18),
                     _buildLinkCard(),
                     const SizedBox(height: 18),
                     _buildQrisCard(),

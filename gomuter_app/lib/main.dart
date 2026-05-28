@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:intl/date_symbol_data_local.dart';
@@ -333,15 +335,33 @@ class _SessionGateState extends State<_SessionGate> {
   }
 
   Future<void> _checkSession() async {
+    final prefs = await SharedPreferences.getInstance();
+    final role = (prefs.getString('user_role') ?? '').toUpperCase();
+    final hasRefreshSession = await TokenManager.hasRefreshSession();
+
+    if (!mounted) return;
+
+    if (hasRefreshSession && role == 'PKL') {
+      unawaited(TokenManager.getValidAccessToken());
+      Navigator.pushReplacementNamed(context, PklRoutes.home);
+      return;
+    }
+
+    if (hasRefreshSession && role == 'USER') {
+      unawaited(TokenManager.getValidAccessToken());
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const PembeliHomePage()),
+      );
+      return;
+    }
+
     final token = await TokenManager.getValidAccessToken();
 
     if (token == null) {
       _goToAuth();
       return;
     }
-
-    final prefs = await SharedPreferences.getInstance();
-    final role = (prefs.getString('user_role') ?? '').toUpperCase();
 
     if (!mounted) return;
 

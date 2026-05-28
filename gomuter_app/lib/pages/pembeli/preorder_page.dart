@@ -230,6 +230,59 @@ class _PreOrderPageState extends State<PreOrderPage>
     });
   }
 
+  Future<void> _setPickupPoint(
+    LatLng point, {
+    String? initialLabel,
+    bool moveMap = true,
+  }) async {
+    if (!mounted) return;
+
+    setState(() {
+      _initialCenter = point;
+      _initialZoom = 16;
+      _selectedLatLng = point;
+      _latController.text = point.latitude.toString();
+      _lngController.text = point.longitude.toString();
+      if (initialLabel != null && initialLabel.trim().isNotEmpty) {
+        _addressController.text = initialLabel.trim();
+      }
+    });
+
+    if (moveMap) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _mapController.move(point, 16);
+      });
+    }
+
+    final address = await _reverseGeocode(point);
+    if (!mounted) return;
+    if (address != null && address.isNotEmpty) {
+      setState(() {
+        _addressController.text = address;
+      });
+    }
+  }
+
+  Future<bool> _loadSavedBuyerPickupPoint() async {
+    try {
+      final token = await _getToken();
+      if (token == null) return false;
+
+      final saved = await ApiService.getBuyerLocation(token: token);
+      final lat = (saved?['latitude'] as num?)?.toDouble();
+      final lng = (saved?['longitude'] as num?)?.toDouble();
+      if (lat == null || lng == null) return false;
+
+      await _setPickupPoint(
+        LatLng(lat, lng),
+        initialLabel: 'Lokasi terakhir saya',
+      );
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<void> _initMap() async {
     // Always show a map quickly (avoid infinite spinner on web/permission issues).
     if (mounted) {
@@ -259,19 +312,15 @@ class _PreOrderPageState extends State<PreOrderPage>
         pos = null;
       }
 
-      if (pos == null) return;
+      if (pos == null) {
+        await _loadSavedBuyerPickupPoint();
+        return;
+      }
 
       final center = LatLng(pos.latitude, pos.longitude);
-      if (!mounted) return;
-      setState(() {
-        _initialCenter = center;
-        _initialZoom = 16;
-      });
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _mapController.move(center, 16);
-      });
+      await _setPickupPoint(center, initialLabel: 'Lokasi saya saat ini');
     } catch (_) {
-      // keep fallback
+      await _loadSavedBuyerPickupPoint();
     }
   }
 
@@ -337,10 +386,15 @@ class _PreOrderPageState extends State<PreOrderPage>
       if (latlng == null) {
         throw Exception('Alamat tidak ditemukan');
       }
-      _selectedLatLng = latlng;
-      _addressController.text = query;
-      _latController.text = latlng.latitude.toString();
-      _lngController.text = latlng.longitude.toString();
+      final formattedAddress = await _reverseGeocode(latlng);
+      await _setPickupPoint(
+        latlng,
+        initialLabel:
+            formattedAddress != null && formattedAddress.isNotEmpty
+                ? formattedAddress
+                : query,
+        moveMap: false,
+      );
       _mapController.move(latlng, 16);
       setState(() {});
     } catch (e) {
@@ -350,6 +404,46 @@ class _PreOrderPageState extends State<PreOrderPage>
         );
       }
     }
+  }
+
+  String? _joinAddressParts(Iterable<String?> rawParts) {
+    final parts = <String>[];
+    final seen = <String>{};
+
+    for (final raw in rawParts) {
+      final value = raw?.trim();
+      if (value == null || value.isEmpty) continue;
+
+      final normalized = value
+          .replaceAll(RegExp(r'\s+'), ' ')
+          .replaceAll(RegExp(r',+$'), '')
+          .toLowerCase();
+      if (normalized.isEmpty || seen.contains(normalized)) continue;
+
+      seen.add(normalized);
+      parts.add(value);
+    }
+
+    return parts.isEmpty ? null : parts.join(', ');
+  }
+
+  String? _formatPlacemarkAddress(Placemark p) {
+    final numberedStreet = _joinAddressParts([
+      p.subThoroughfare,
+      p.thoroughfare,
+    ])?.replaceAll(', ', ' ');
+
+    return _joinAddressParts([
+      p.street,
+      numberedStreet,
+      p.name,
+      p.subLocality,
+      p.locality,
+      p.subAdministrativeArea,
+      p.administrativeArea,
+      p.postalCode,
+      p.country,
+    ]);
   }
 
   Future<String?> _reverseGeocode(LatLng pos) async {
@@ -366,21 +460,8 @@ class _PreOrderPageState extends State<PreOrderPage>
         return await _reverseGeocodeViaNominatim(pos);
       }
       final p = placemarks.first;
-      final parts = <String>[];
-      if (p.street != null && p.street!.isNotEmpty) {
-        parts.add(p.street!);
-      }
-      if (p.subLocality != null && p.subLocality!.isNotEmpty) {
-        parts.add(p.subLocality!);
-      }
-      if (p.locality != null && p.locality!.isNotEmpty) {
-        parts.add(p.locality!);
-      }
-      if (p.administrativeArea != null && p.administrativeArea!.isNotEmpty) {
-        parts.add(p.administrativeArea!);
-      }
-      final built = parts.join(', ');
-      if (built.trim().isNotEmpty) {
+      final built = _formatPlacemarkAddress(p);
+      if (built != null && built.trim().isNotEmpty) {
         return built;
       }
       return await _reverseGeocodeViaNominatim(pos);
@@ -390,14 +471,7 @@ class _PreOrderPageState extends State<PreOrderPage>
   }
 
   Future<void> _onMapTap(LatLng pos) async {
-    _selectedLatLng = pos;
-    _latController.text = pos.latitude.toString();
-    _lngController.text = pos.longitude.toString();
-    final addr = await _reverseGeocode(pos);
-    if (addr != null && addr.isNotEmpty) {
-      _addressController.text = addr;
-    }
-    if (mounted) setState(() {});
+    await _setPickupPoint(pos, moveMap: false);
   }
 
   Future<void> _submitPreOrder({bool retryOnAuthError = true}) async {
@@ -1714,6 +1788,14 @@ class _PreOrderPageState extends State<PreOrderPage>
 
   Widget _buildDPCard() {
     final isDark = _themeManager.isDarkMode;
+    final bankName = (_pklString('nama_rekening') ?? '').trim();
+    final bankNumber = (_pklString('nomor_rekening') ?? '').trim();
+    final walletProvider = (_pklString('ewallet_provider') ?? '').trim();
+    final walletNumber = (_pklString('ewallet_number') ?? '').trim();
+    final qrisImage = (_pklString('qris_image_url') ?? '').trim();
+    final qrisLink = (_pklString('qris_link') ?? '').trim();
+    final hasBankPayment = bankName.isNotEmpty || bankNumber.isNotEmpty;
+    final hasWalletPayment = walletNumber.isNotEmpty;
 
     return Container(
       decoration: BoxDecoration(
@@ -1830,7 +1912,7 @@ class _PreOrderPageState extends State<PreOrderPage>
                 ? Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      if ((_pklString('nama_rekening') ?? '').isNotEmpty)
+                      if (hasBankPayment)
                         Container(
                           padding: const EdgeInsets.all(12),
                           margin: const EdgeInsets.only(bottom: 12),
@@ -1855,18 +1937,86 @@ class _PreOrderPageState extends State<PreOrderPage>
                               ),
                               const SizedBox(width: 12),
                               Expanded(
-                                child: Text(
-                                  _pklString('nama_rekening')!,
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                    color: _darkColor,
-                                  ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      bankName.isEmpty
+                                          ? 'Rekening Bank'
+                                          : bankName,
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                        color: _darkColor,
+                                      ),
+                                    ),
+                                    if (bankNumber.isNotEmpty) ...[
+                                      const SizedBox(height: 3),
+                                      SelectableText(
+                                        bankNumber,
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w800,
+                                          color: _primaryColor,
+                                        ),
+                                      ),
+                                    ],
+                                  ],
                                 ),
                               ),
                             ],
                           ),
                         ),
-                      if ((_pklString('qris_image_url') ?? '').isNotEmpty)
+                      if (hasWalletPayment)
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          margin: const EdgeInsets.only(bottom: 12),
+                          decoration: BoxDecoration(
+                            color: isDark
+                                ? _themeManager.surfaceColor
+                                : Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.05),
+                                blurRadius: 10,
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.account_balance_wallet,
+                                color: _primaryColor,
+                                size: 20,
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      walletProvider.isEmpty
+                                          ? 'E-Wallet'
+                                          : walletProvider,
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                        color: _darkColor,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 3),
+                                    SelectableText(
+                                      walletNumber,
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w800,
+                                        color: _primaryColor,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      if (qrisImage.isNotEmpty)
                         Container(
                           decoration: BoxDecoration(
                             color: isDark
@@ -1923,7 +2073,7 @@ class _PreOrderPageState extends State<PreOrderPage>
                                 child: AspectRatio(
                                   aspectRatio: 1,
                                   child: Image.network(
-                                    _pklString('qris_image_url')!,
+                                    qrisImage,
                                     fit: BoxFit.contain,
                                     errorBuilder: (_, __, ___) => Container(
                                       color: isDark
@@ -1958,8 +2108,11 @@ class _PreOrderPageState extends State<PreOrderPage>
                             ],
                           ),
                         )
-                      else if ((_pklString('qris_link') ?? '').isNotEmpty)
+                      else if (qrisLink.isNotEmpty)
                         Container(
+                          margin: EdgeInsets.only(
+                            top: hasBankPayment || hasWalletPayment ? 4 : 0,
+                          ),
                           padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
                             color: isDark
@@ -1979,7 +2132,7 @@ class _PreOrderPageState extends State<PreOrderPage>
                               const SizedBox(width: 12),
                               Expanded(
                                 child: Text(
-                                  _pklString('qris_link')!,
+                                  qrisLink,
                                   style: TextStyle(
                                     color: _primaryColor,
                                     decoration: TextDecoration.underline,
@@ -1991,7 +2144,7 @@ class _PreOrderPageState extends State<PreOrderPage>
                             ],
                           ),
                         )
-                      else
+                      else if (!hasBankPayment && !hasWalletPayment)
                         Container(
                           padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
@@ -2011,7 +2164,7 @@ class _PreOrderPageState extends State<PreOrderPage>
                               const SizedBox(width: 12),
                               Expanded(
                                 child: Text(
-                                  'PKL belum mengunggah QRIS. Hubungi PKL untuk info pembayaran.',
+                                  'PKL belum menambahkan informasi pembayaran. Hubungi PKL untuk info pembayaran.',
                                   style: TextStyle(
                                     color: isDark
                                         ? _mutedTextColor

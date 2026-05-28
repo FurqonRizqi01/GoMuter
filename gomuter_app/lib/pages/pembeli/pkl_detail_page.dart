@@ -32,6 +32,7 @@ class PklDetailPage extends StatefulWidget {
 
 class _PklDetailPageState extends State<PklDetailPage> {
   final ThemeManager _themeManager = ThemeManager();
+  final MapController _previewMapController = MapController();
   static const Duration _statusPollingInterval = Duration(seconds: 10);
 
   Color get _primary => _themeManager.primaryOrange;
@@ -161,6 +162,51 @@ class _PklDetailPageState extends State<PklDetailPage> {
       _routeDistanceMeters = result.distanceMeters;
     });
     onUpdated?.call();
+    _refreshPreviewMap();
+  }
+
+  void _refreshPreviewMap() {
+    final pkl = _pklLatLng;
+    if (pkl == null) return;
+
+    final buyer = _buyerLatLng;
+    final routePoints = buyer != null
+        ? _visibleRoutePoints(buyer, pkl)
+        : const <LatLng>[];
+    final cameraFit = routePoints.length >= 2
+        ? CameraFit.bounds(
+            bounds: LatLngBounds.fromPoints(routePoints),
+            padding: const EdgeInsets.fromLTRB(32, 28, 32, 54),
+            maxZoom: 16,
+          )
+        : null;
+
+    _refreshMapController(_previewMapController, pkl, cameraFit);
+  }
+
+  void _refreshMapController(
+    MapController controller,
+    LatLng center,
+    CameraFit? cameraFit,
+  ) {
+    void kick() {
+      if (!mounted) return;
+      try {
+        final fitted = cameraFit != null && controller.fitCamera(cameraFit);
+        if (!fitted) {
+          controller.move(center, 16.0001, id: 'render-kick');
+          controller.move(center, 16, id: 'render-kick-reset');
+        }
+      } catch (_) {
+        // Controller may not be attached yet during the first layout pass.
+      }
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      kick();
+      Future<void>.delayed(const Duration(milliseconds: 250), kick);
+      Future<void>.delayed(const Duration(milliseconds: 700), kick);
+    });
   }
 
   List<LatLng> _visibleRoutePoints(LatLng buyer, LatLng pkl) {
@@ -195,6 +241,7 @@ class _PklDetailPageState extends State<PklDetailPage> {
         _distanceMeters = _computeDistance(_buyerLatLng, _pklLatLng);
         _error = null;
       });
+      _refreshPreviewMap();
       unawaited(_loadRoute());
     } catch (e) {
       if (!mounted) return;
@@ -706,6 +753,41 @@ class _PklDetailPageState extends State<PklDetailPage> {
     }
   }
 
+  String _normalizeWhatsappNumber(String value) {
+    var number = value.replaceAll(RegExp(r'[^0-9+]'), '');
+    if (number.startsWith('+')) {
+      number = number.substring(1);
+    }
+    if (number.startsWith('0')) {
+      number = '62${number.substring(1)}';
+    }
+    return number;
+  }
+
+  Future<void> _openWhatsapp() async {
+    final number = _normalizeWhatsappNumber(
+      (_detail?['whatsapp_number'] ?? '').toString(),
+    );
+    if (number.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Nomor WhatsApp PKL belum tersedia.')),
+      );
+      return;
+    }
+
+    final message = Uri.encodeComponent(
+      'Halo, saya pembeli GoMuter. Saya ingin bertanya tentang ${_detail?['nama_usaha'] ?? 'dagangan Anda'}.',
+    );
+    final uri = Uri.parse('https://wa.me/$number?text=$message');
+    final success = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!success && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Gagal membuka WhatsApp.')),
+      );
+    }
+  }
+
   Future<void> _openChat() async {
     final data = _detail;
     if (data == null) return;
@@ -785,6 +867,7 @@ class _PklDetailPageState extends State<PklDetailPage> {
   void _showMapSheet() {
     final location = _pklLatLng;
     if (location == null) return;
+    final sheetMapController = MapController();
 
     showModalBottomSheet(
       context: context,
@@ -850,6 +933,7 @@ class _PklDetailPageState extends State<PklDetailPage> {
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(16),
                         child: FlutterMap(
+                          mapController: sheetMapController,
                           key: ValueKey(
                             'detail-sheet-${buyer?.latitude}-${buyer?.longitude}-${location.latitude}-${location.longitude}-${routePoints.length}',
                           ),
@@ -857,6 +941,11 @@ class _PklDetailPageState extends State<PklDetailPage> {
                             initialCenter: location,
                             initialZoom: 16,
                             initialCameraFit: cameraFit,
+                            onMapReady: () => _refreshMapController(
+                              sheetMapController,
+                              location,
+                              cameraFit,
+                            ),
                           ),
                           children: [
                             TileLayer(
@@ -1288,9 +1377,9 @@ class _PklDetailPageState extends State<PklDetailPage> {
         children: [
           _buildCircularAction(
             icon: Icons.phone_rounded,
-            label: 'Telepon',
+            label: 'WhatsApp',
             color: _primary,
-            onTap: _detail == null ? null : _openChat,
+            onTap: _detail == null ? null : _openWhatsapp,
           ),
           _buildCircularAction(
             icon: Icons.near_me_rounded,
@@ -1356,6 +1445,8 @@ class _PklDetailPageState extends State<PklDetailPage> {
   Widget _buildDetailSection(Map<String, dynamic> data) {
     final alamat = (data['alamat_domisili'] ?? '-') as String;
     final jam = (data['jam_operasional'] ?? '-') as String;
+    final paymentSubtitle = _paymentSubtitle(data);
+    final paymentDetail = _paymentDetail(data);
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -1382,9 +1473,55 @@ class _PklDetailPageState extends State<PklDetailPage> {
             subtitle: _priceRangeLabel(data),
             detail: 'Pilih menu di bawah',
           ),
+          const SizedBox(height: 12),
+          _buildInfoCard(
+            icon: Icons.account_balance_wallet_rounded,
+            title: 'Pembayaran',
+            subtitle: paymentSubtitle,
+            detail: paymentDetail,
+          ),
         ],
       ),
     );
+  }
+
+  String _paymentSubtitle(Map<String, dynamic> data) {
+    final methods = <String>[];
+    if (((data['nomor_rekening'] ?? '') as String).trim().isNotEmpty ||
+        ((data['nama_rekening'] ?? '') as String).trim().isNotEmpty) {
+      methods.add('Rekening');
+    }
+    if (((data['ewallet_number'] ?? '') as String).trim().isNotEmpty) {
+      methods.add('E-Wallet');
+    }
+    if (((data['qris_image_url'] ?? '') as String).trim().isNotEmpty ||
+        ((data['qris_link'] ?? '') as String).trim().isNotEmpty) {
+      methods.add('QRIS');
+    }
+    return methods.isEmpty ? 'Belum tersedia' : methods.join(' / ');
+  }
+
+  String _paymentDetail(Map<String, dynamic> data) {
+    final bankName = ((data['nama_rekening'] ?? '') as String).trim();
+    final bankNumber = ((data['nomor_rekening'] ?? '') as String).trim();
+    final walletName = ((data['ewallet_provider'] ?? '') as String).trim();
+    final walletNumber = ((data['ewallet_number'] ?? '') as String).trim();
+    final details = <String>[];
+
+    if (bankNumber.isNotEmpty || bankName.isNotEmpty) {
+      details.add(
+        bankNumber.isNotEmpty
+            ? '${bankName.isEmpty ? 'Rekening' : bankName}: $bankNumber'
+            : bankName,
+      );
+    }
+    if (walletNumber.isNotEmpty) {
+      details.add('${walletName.isEmpty ? 'E-Wallet' : walletName}: $walletNumber');
+    }
+    if (details.isEmpty && _paymentSubtitle(data) != 'Belum tersedia') {
+      return 'QRIS tersedia saat pre-order.';
+    }
+    return details.isEmpty ? 'Hubungi PKL untuk info pembayaran.' : details.join('\n');
   }
 
   Widget _buildInfoCard({
@@ -2085,6 +2222,7 @@ class _PklDetailPageState extends State<PklDetailPage> {
               child: Stack(
                 children: [
                   FlutterMap(
+                    mapController: _previewMapController,
                     key: ValueKey(
                       'detail-preview-${buyer?.latitude}-${buyer?.longitude}-${_pklLatLng!.latitude}-${_pklLatLng!.longitude}-${routePoints.length}',
                     ),
@@ -2092,6 +2230,7 @@ class _PklDetailPageState extends State<PklDetailPage> {
                       initialCenter: _pklLatLng!,
                       initialZoom: 16,
                       initialCameraFit: cameraFit,
+                      onMapReady: _refreshPreviewMap,
                     ),
                     children: [
                       TileLayer(

@@ -2309,6 +2309,7 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
 
   String? _pickPklThumbnailUrl(Map<String, dynamic> pkl) {
     final candidates = <dynamic>[
+      pkl['featured_product_image_url'],
       pkl['thumbnail_url'],
       pkl['image_url'],
       pkl['photo_url'],

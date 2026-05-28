@@ -226,6 +226,20 @@ class _PklPreOrderPageState extends State<PklPreOrderPage> {
     }
   }
 
+  Future<void> _openPickupInGoogleMaps(LatLng pos) async {
+    final query = '${pos.latitude},${pos.longitude}';
+    final uri = Uri.parse(
+      'https://www.google.com/maps/search/?api=1&query=$query',
+    );
+
+    final success = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!success && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Gagal membuka Google Maps.')),
+      );
+    }
+  }
+
   Future<void> _showDpPreview(String url) async {
     if (!_looksLikeImage(url)) {
       await _openDpLink(url);
@@ -280,41 +294,86 @@ class _PklPreOrderPageState extends State<PklPreOrderPage> {
     );
   }
 
-  List<Widget> _buildDpSection(String proofUrl) {
-    return [
-      const SizedBox(height: 6),
-      Text('Bukti DP: $proofUrl'),
-      const SizedBox(height: 6),
-      if (_looksLikeImage(proofUrl))
-        GestureDetector(
-          onTap: () => _showDpPreview(proofUrl),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: Image.network(
-              proofUrl,
-              height: 160,
-              width: double.infinity,
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => Container(
-                height: 160,
-                color: Colors.black12,
-                alignment: Alignment.center,
-                child: const Text('Pratinjau tidak tersedia'),
+  Widget _buildDpSection(String proofUrl) {
+    final isImage = _looksLikeImage(proofUrl);
+    return Container(
+      margin: const EdgeInsets.only(top: 14),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: _themeManager.surfaceColor,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: _themeManager.borderColor),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.receipt_long_rounded,
+                color: _themeManager.pklPrimary,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Bukti DP',
+                style: TextStyle(
+                  color: _themeManager.textColor,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 14,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (isImage)
+            GestureDetector(
+              onTap: () => _showDpPreview(proofUrl),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(14),
+                child: Image.network(
+                  proofUrl,
+                  height: 150,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => Container(
+                    height: 150,
+                    color: Colors.black12,
+                    alignment: Alignment.center,
+                    child: const Text('Pratinjau tidak tersedia'),
+                  ),
+                ),
+              ),
+            )
+          else
+            Text(
+              'Bukti pembayaran tersedia sebagai tautan.',
+              style: TextStyle(
+                color: _themeManager.mutedTextColor,
+                fontSize: 13,
               ),
             ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              TextButton.icon(
+                onPressed: () => _showDpPreview(proofUrl),
+                icon: Icon(isImage ? Icons.photo_rounded : Icons.open_in_new),
+                label: Text(isImage ? 'Lihat bukti' : 'Buka bukti'),
+              ),
+              if (isImage)
+                TextButton.icon(
+                  onPressed: () => _openDpLink(proofUrl),
+                  icon: const Icon(Icons.open_in_new_rounded),
+                  label: const Text('Buka penuh'),
+                ),
+            ],
           ),
-        ),
-      Align(
-        alignment: Alignment.centerLeft,
-        child: TextButton.icon(
-          onPressed: () => _showDpPreview(proofUrl),
-          icon: Icon(
-            _looksLikeImage(proofUrl) ? Icons.photo : Icons.open_in_new,
-          ),
-          label: Text(_looksLikeImage(proofUrl) ? 'Lihat bukti' : 'Buka bukti'),
-        ),
+        ],
       ),
-    ];
+    );
   }
 
   List<String> _availableStatuses(String current) {
@@ -426,7 +485,15 @@ class _PklPreOrderPageState extends State<PklPreOrderPage> {
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Tutup')),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Tutup'),
+            ),
+            ElevatedButton.icon(
+              onPressed: () => _openPickupInGoogleMaps(pos),
+              icon: const Icon(Icons.directions_rounded),
+              label: const Text('Google Maps'),
+            ),
           ],
         );
       },
@@ -483,6 +550,112 @@ class _PklPreOrderPageState extends State<PklPreOrderPage> {
     );
   }
 
+  Widget _buildPickupSection(String address, LatLng? pickupLatLng) {
+    final hasLocation = pickupLatLng != null;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: _themeManager.surfaceColor,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: _themeManager.borderColor),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.location_on_rounded,
+                color: _themeManager.pklPrimary,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                'Lokasi Pickup',
+                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            address,
+            style: TextStyle(
+              color: _themeManager.textColor,
+              fontWeight: FontWeight.w700,
+              fontSize: 14,
+              height: 1.45,
+            ),
+          ),
+          if (hasLocation) ...[
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: () => _showPickupMapDialog(pickupLatLng, address),
+                  icon: const Icon(Icons.map_rounded, size: 18),
+                  label: const Text('Lihat peta'),
+                ),
+                ElevatedButton.icon(
+                  onPressed: () => _openPickupInGoogleMaps(pickupLatLng),
+                  icon: const Icon(Icons.directions_rounded, size: 18),
+                  label: const Text('Google Maps'),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPaymentSummary({
+    required int totalPrice,
+    required int dpAmount,
+    required String dpStatus,
+  }) {
+    final rows = <Widget>[
+      if (totalPrice > 0)
+        _buildInfoRow(
+          Icons.shopping_bag_rounded,
+          'Total Pembelian',
+          'Rp${_formatCurrency(totalPrice)}',
+        ),
+      _buildInfoRow(
+        Icons.payments_rounded,
+        'DP',
+        'Rp${_formatCurrency(dpAmount)}',
+      ),
+      _buildInfoRow(
+        Icons.account_balance_wallet_rounded,
+        'Status DP',
+        _formatStatusLabel(dpStatus),
+      ),
+    ];
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(top: 14),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: _themeManager.surfaceColor,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: _themeManager.borderColor),
+      ),
+      child: Column(children: rows),
+    );
+  }
+
+  String _formatStatusLabel(String status) {
+    return status
+        .split('_')
+        .where((part) => part.isNotEmpty)
+        .map((part) => part[0] + part.substring(1).toLowerCase())
+        .join(' ');
+  }
+
   Widget _buildOrderCard(Map<String, dynamic> order) {
     final pembeli = order['pembeli_username'] as String? ?? '-';
     final deskripsi = order['deskripsi_pesanan'] as String? ?? '-';
@@ -503,6 +676,9 @@ class _PklPreOrderPageState extends State<PklPreOrderPage> {
         : '${createdAt.day.toString().padLeft(2, '0')}/'
               '${createdAt.month.toString().padLeft(2, '0')} '
               '${createdAt.hour.toString().padLeft(2, '0')}:${createdAt.minute.toString().padLeft(2, '0')}';
+    final pickupLatLng = latitude is num && longitude is num
+        ? LatLng(latitude.toDouble(), longitude.toDouble())
+        : null;
 
     return Container(
       decoration: BoxDecoration(
@@ -680,36 +856,14 @@ class _PklPreOrderPageState extends State<PklPreOrderPage> {
                 ),
               ),
               const SizedBox(height: 14),
-              GestureDetector(
-                onTap: (latitude != null && longitude != null)
-                    ? () {
-                        final lat = (latitude as num).toDouble();
-                        final lng = (longitude as num).toDouble();
-                        _showPickupMapDialog(LatLng(lat, lng), pickupAddress);
-                      }
-                    : null,
-                child: _buildInfoRow(
-                  Icons.location_on_rounded,
-                  'Alamat pickup',
-                  pickupAddress,
-                ),
-              ),
-              if (latitude != null && longitude != null)
-                _buildInfoRow(
-                  Icons.pin_drop_rounded,
-                  'Koordinat',
-                  '$latitude / $longitude',
-                ),
-              if (totalPrice > 0)
-                _buildInfoRow(Icons.shopping_cart_rounded, 'Total Pembelian', 'Rp${_formatCurrency(totalPrice)}'),
-              _buildInfoRow(Icons.payments_rounded, 'DP', 'Rp${_formatCurrency(dpAmount)}'),
-              _buildInfoRow(
-                Icons.account_balance_wallet_rounded,
-                'Status DP',
-                dpStatus,
+              _buildPickupSection(pickupAddress, pickupLatLng),
+              _buildPaymentSummary(
+                totalPrice: totalPrice,
+                dpAmount: dpAmount,
+                dpStatus: dpStatus,
               ),
               if (buktiDp != null && buktiDp.isNotEmpty)
-                ..._buildDpSection(buktiDp),
+                _buildDpSection(buktiDp),
               const SizedBox(height: 18),
               Row(
                 children: [
@@ -885,24 +1039,32 @@ class _PklPreOrderPageState extends State<PklPreOrderPage> {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(icon, size: 18, color: mutedText),
           const SizedBox(width: 10),
-          Text(
-            '$label: ',
-            style: TextStyle(
-              color: mutedText,
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
           Expanded(
             child: Text(
-              value,
+              label,
               style: TextStyle(
+                color: mutedText,
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
-                color: textColor,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Flexible(
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: Text(
+                value,
+                textAlign: TextAlign.right,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  color: textColor,
+                ),
               ),
             ),
           ),

@@ -104,6 +104,19 @@ def _save_uploaded_media(file_obj, folder: str, request=None) -> str:
     return default_storage.url(saved_path)
 
 
+def _storage_error_response(exc: Exception):
+    return Response(
+        {
+            'detail': (
+                'Upload gambar gagal. Periksa konfigurasi Supabase Storage '
+                'atau tipe file yang diunggah.'
+            ),
+            'error': str(exc),
+        },
+        status=status.HTTP_502_BAD_GATEWAY,
+    )
+
+
 def _increment_daily_stat(pkl: PKL, field: str) -> None:
     today = timezone.localdate()
     stats, _created = PKLDailyStats.objects.get_or_create(pkl=pkl, date=today)
@@ -545,7 +558,10 @@ class PKLProductListCreateView(APIView):
         image_file = request.FILES.get('image')
         image_url = None
         if image_file and is_supabase_storage_enabled():
-            image_url = _save_uploaded_media(image_file, 'pkl_products', request)
+            try:
+                image_url = _save_uploaded_media(image_file, 'pkl_products', request)
+            except RuntimeError as exc:
+                return _storage_error_response(exc)
             payload.pop('image', None)
 
         serializer = PKLProductWriteSerializer(data=payload)
@@ -579,7 +595,10 @@ class PKLProductDetailView(APIView):
         image_file = request.FILES.get('image')
         image_url = None
         if image_file and is_supabase_storage_enabled():
-            image_url = _save_uploaded_media(image_file, 'pkl_products', request)
+            try:
+                image_url = _save_uploaded_media(image_file, 'pkl_products', request)
+            except RuntimeError as exc:
+                return _storage_error_response(exc)
             payload.pop('image', None)
 
         serializer = PKLProductWriteSerializer(
@@ -1090,7 +1109,10 @@ class DPProofUploadView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        file_url = _save_uploaded_media(file_obj, 'dp_proofs', request)
+        try:
+            file_url = _save_uploaded_media(file_obj, 'dp_proofs', request)
+        except RuntimeError as exc:
+            return _storage_error_response(exc)
 
         return Response({'url': file_url}, status=status.HTTP_201_CREATED)
 
@@ -1115,7 +1137,10 @@ class PKLProfilePhotoUploadView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        file_url = _save_uploaded_media(file_obj, 'pkl_profile_photos', request)
+        try:
+            file_url = _save_uploaded_media(file_obj, 'pkl_profile_photos', request)
+        except RuntimeError as exc:
+            return _storage_error_response(exc)
 
         pkl.profile_image_url = file_url
         pkl.save(update_fields=['profile_image_url'])

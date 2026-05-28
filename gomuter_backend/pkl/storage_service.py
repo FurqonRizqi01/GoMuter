@@ -33,11 +33,11 @@ def upload_public_media(file_obj, folder: str, filename: str) -> str:
     bucket = settings.SUPABASE_STORAGE_BUCKET
     upload_url = f'{base_url}/storage/v1/object/{bucket}/{encoded_path}'
 
-    content_type = (
-        getattr(file_obj, 'content_type', None)
-        or mimetypes.guess_type(safe_filename)[0]
-        or 'application/octet-stream'
-    )
+    guessed_type = mimetypes.guess_type(safe_filename)[0]
+    uploaded_type = getattr(file_obj, 'content_type', None)
+    content_type = guessed_type or uploaded_type or 'application/octet-stream'
+    if content_type == 'application/octet-stream' and uploaded_type:
+        content_type = uploaded_type
     body = b''.join(file_obj.chunks()) if hasattr(file_obj, 'chunks') else file_obj.read()
 
     req = request.Request(
@@ -59,5 +59,7 @@ def upload_public_media(file_obj, folder: str, filename: str) -> str:
     except error.HTTPError as exc:
         detail = exc.read().decode('utf-8', errors='ignore')
         raise RuntimeError(f'Gagal upload ke Supabase Storage: {detail or exc.reason}') from exc
+    except error.URLError as exc:
+        raise RuntimeError(f'Gagal menghubungi Supabase Storage: {exc.reason}') from exc
 
     return f'{base_url}/storage/v1/object/public/{bucket}/{encoded_path}'

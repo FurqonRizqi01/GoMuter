@@ -52,6 +52,7 @@ class _PklEditInfoPageState extends State<PklEditInfoPage> {
   final _alamatController = TextEditingController();
   final _tentangController = TextEditingController();
   final _namaRekeningController = TextEditingController();
+  final _whatsappController = TextEditingController();
   late final NumberFormat _currencyFormatter = NumberFormat.currency(
     locale: 'id_ID',
     symbol: 'Rp',
@@ -82,6 +83,7 @@ class _PklEditInfoPageState extends State<PklEditInfoPage> {
     _alamatController.dispose();
     _tentangController.dispose();
     _namaRekeningController.dispose();
+    _whatsappController.dispose();
     _themeManager.removeListener(_onThemeChanged);
     super.dispose();
   }
@@ -136,6 +138,7 @@ class _PklEditInfoPageState extends State<PklEditInfoPage> {
         _alamatController.text = profile['alamat_domisili'] ?? '';
         _tentangController.text = profile['tentang'] ?? '';
         _namaRekeningController.text = profile['nama_rekening'] ?? '';
+        _whatsappController.text = profile['whatsapp_number'] ?? '';
         setState(() {
           _isNewProfile = false;
         });
@@ -193,11 +196,10 @@ class _PklEditInfoPageState extends State<PklEditInfoPage> {
   Future<void> _saveProfile() async {
     if (_namaUsahaController.text.trim().isEmpty ||
         _jenisDaganganController.text.trim().isEmpty ||
-        _jamOperasionalController.text.trim().isEmpty ||
-        _alamatController.text.trim().isEmpty) {
+        _jamOperasionalController.text.trim().isEmpty) {
       setState(() {
         _error =
-            'Nama usaha, kategori, jam operasional, dan alamat domisili wajib diisi.';
+            'Nama usaha, kategori, dan jam operasional wajib diisi.';
       });
       return;
     }
@@ -224,6 +226,7 @@ class _PklEditInfoPageState extends State<PklEditInfoPage> {
         'alamat_domisili': _alamatController.text.trim(),
         'tentang': _tentangController.text.trim(),
         'nama_rekening': _namaRekeningController.text.trim(),
+        'whatsapp_number': _whatsappController.text.trim(),
       };
 
       await ApiService.savePKLProfile(
@@ -959,6 +962,65 @@ class _PklEditInfoPageState extends State<PklEditInfoPage> {
     return '${ApiService.baseUrl}/$value';
   }
 
+  TimeOfDay _timeFromText(String value, TimeOfDay fallback) {
+    final match = RegExp(r'(\d{1,2})[:.](\d{2})').firstMatch(value);
+    if (match == null) return fallback;
+    final hour = int.tryParse(match.group(1) ?? '');
+    final minute = int.tryParse(match.group(2) ?? '');
+    if (hour == null || minute == null) return fallback;
+    if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return fallback;
+    return TimeOfDay(hour: hour, minute: minute);
+  }
+
+  String _formatTimeOfDay(TimeOfDay value) {
+    final hour = value.hour.toString().padLeft(2, '0');
+    final minute = value.minute.toString().padLeft(2, '0');
+    return '$hour:$minute';
+  }
+
+  Future<TimeOfDay?> _show24HourTimePicker({
+    required TimeOfDay initialTime,
+    required String helpText,
+  }) {
+    return showTimePicker(
+      context: context,
+      initialTime: initialTime,
+      helpText: helpText,
+      builder: (context, child) {
+        return MediaQuery(
+          data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: true),
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
+    );
+  }
+
+  Future<void> _pickOperatingHours() async {
+    final current = _jamOperasionalController.text;
+    final openInitial = _timeFromText(current, const TimeOfDay(hour: 8, minute: 0));
+    final closeInitial = _timeFromText(
+      current.contains('-') ? current.split('-').last : '',
+      const TimeOfDay(hour: 17, minute: 0),
+    );
+
+    final open = await _show24HourTimePicker(
+      initialTime: openInitial,
+      helpText: 'Pilih jam buka',
+    );
+    if (open == null) return;
+
+    final close = await _show24HourTimePicker(
+      initialTime: closeInitial,
+      helpText: 'Pilih jam tutup',
+    );
+    if (close == null) return;
+
+    setState(() {
+      _jamOperasionalController.text =
+          '${_formatTimeOfDay(open)} - ${_formatTimeOfDay(close)}';
+    });
+  }
+
   Widget _buildTag(String label, Color color) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -1075,17 +1137,26 @@ class _PklEditInfoPageState extends State<PklEditInfoPage> {
                     label: 'Jam Operasional',
                     controller: _jamOperasionalController,
                     icon: Icons.access_time_rounded,
-                    hintText: 'Contoh: 10.00 - 19.00 WIB',
+                    hintText: 'Pilih jam buka dan tutup',
                     requiredField: true,
+                    readOnly: true,
+                    onTap: _pickOperatingHours,
                   ),
                   const SizedBox(height: 18),
                   _buildRoundedField(
-                    label: 'Alamat Domisili',
+                    label: 'Alamat Domisili (opsional)',
                     controller: _alamatController,
                     icon: Icons.location_city_rounded,
                     hintText: 'Contoh: Jl. Merdeka No. 10, Jakarta',
                     maxLines: 3,
-                    requiredField: true,
+                  ),
+                  const SizedBox(height: 18),
+                  _buildRoundedField(
+                    label: 'Nomor WhatsApp (opsional)',
+                    controller: _whatsappController,
+                    icon: Icons.phone_rounded,
+                    hintText: 'Contoh: 081234567890',
+                    keyboardType: TextInputType.phone,
                   ),
                   const SizedBox(height: 18),
                   _buildRoundedField(
@@ -1159,6 +1230,9 @@ class _PklEditInfoPageState extends State<PklEditInfoPage> {
     String? hintText,
     int maxLines = 1,
     bool requiredField = false,
+    bool readOnly = false,
+    VoidCallback? onTap,
+    TextInputType? keyboardType,
   }) {
     final borderColor = _themeManager.borderColor;
     final textColor = _themeManager.textColor;
@@ -1195,6 +1269,9 @@ class _PklEditInfoPageState extends State<PklEditInfoPage> {
         TextField(
           controller: controller,
           maxLines: maxLines,
+          readOnly: readOnly,
+          onTap: onTap,
+          keyboardType: keyboardType,
           decoration: InputDecoration(
             filled: true,
             fillColor: _themeManager.surfaceColor,
@@ -1224,6 +1301,9 @@ class _PklEditInfoPageState extends State<PklEditInfoPage> {
               vertical: 18,
             ),
             hintText: hintText,
+            suffixIcon: onTap != null
+                ? const Icon(Icons.keyboard_arrow_down_rounded)
+                : null,
             hintStyle: TextStyle(color: _themeManager.hintTextColor),
           ),
           style: TextStyle(color: textColor),

@@ -680,6 +680,87 @@ class _PklLocationPageState extends State<PklLocationPage> {
     );
   }
 
+  Widget _buildAutoModeCard() {
+    final isDark = _themeManager.isDarkMode;
+    final borderColor = _themeManager.borderColor;
+    final textColor = _themeManager.textColor;
+    final mutedText = _themeManager.mutedTextColor;
+
+    final lastUpdate = _locationService.lastUpdate;
+    final lastUpdateLabel = lastUpdate != null
+        ? '${_formatTime(lastUpdate)} WIB'
+        : '-';
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: _themeManager.cardColor,
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: borderColor),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.24 : 0.06),
+            blurRadius: 20,
+            offset: const Offset(0, 12),
+          ),
+        ],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: Color.alphaBlend(
+                _themeManager.pklPrimary.withValues(alpha: 0.16),
+                _themeManager.cardColor,
+              ),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Icon(
+              Icons.sync_rounded,
+              color: _themeManager.pklPrimary,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Mode otomatis aktif',
+                  style: TextStyle(
+                    color: textColor,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 16,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Aplikasi akan memperbarui lokasi secara berkala selama izin lokasi aktif dan aplikasi berjalan.',
+                  style: TextStyle(
+                    color: mutedText,
+                    fontWeight: FontWeight.w600,
+                    height: 1.35,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Terakhir diperbarui : $lastUpdateLabel',
+                  style: TextStyle(
+                    color: mutedText,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildInfoCallout() {
     final isDark = _themeManager.isDarkMode;
     final borderColor = _themeManager.borderColor;
@@ -797,7 +878,9 @@ class _PklLocationPageState extends State<PklLocationPage> {
                     ] else ...[
                       _buildUpdateMethodToggle(),
                       const SizedBox(height: 14),
-                      _buildManualCard(),
+                      _locationService.isAutoMode
+                          ? _buildAutoModeCard()
+                          : _buildManualCard(),
                       const SizedBox(height: 14),
                       _buildInfoCallout(),
                     ],

@@ -25,6 +25,13 @@ class TokenManager {
     await prefs.remove(_refreshKey);
   }
 
+  static Future<bool> hasRefreshSession() async {
+    final prefs = await SharedPreferences.getInstance();
+    final refresh = prefs.getString(_refreshKey);
+    if (refresh == null || refresh.isEmpty) return false;
+    return !_isExpired(refresh);
+  }
+
   // Mengembalikan access token yang masih valid; refresh otomatis jika diperlukan.
   static Future<String?> getValidAccessToken() async {
     final prefs = await SharedPreferences.getInstance();

@@ -35,6 +35,10 @@ class PKLSerializer(serializers.ModelSerializer):
             'alamat_domisili',
             'tentang',
             'nama_rekening',
+            'nomor_rekening',
+            'ewallet_provider',
+            'ewallet_number',
+            'whatsapp_number',
             'qris_image_url',
             'qris_link',
             'status_verifikasi',
@@ -82,7 +86,6 @@ class PKLSerializer(serializers.ModelSerializer):
             'nama_usaha': 'Nama usaha wajib diisi.',
             'jenis_dagangan': 'Kategori atau jenis dagangan wajib diisi.',
             'jam_operasional': 'Jam operasional wajib diisi.',
-            'alamat_domisili': 'Alamat domisili wajib diisi.',
         }
         errors = {}
         for field, message in required_fields.items():
@@ -108,6 +111,7 @@ class PKLListSerializer(serializers.ModelSerializer):
     latest_timestamp = serializers.SerializerMethodField()
     average_rating = serializers.SerializerMethodField()
     rating_count = serializers.SerializerMethodField()
+    featured_product_image_url = serializers.SerializerMethodField()
 
     class Meta:
         model = PKL
@@ -121,6 +125,10 @@ class PKLListSerializer(serializers.ModelSerializer):
             'alamat_domisili',
             'tentang',
             'nama_rekening',
+            'nomor_rekening',
+            'ewallet_provider',
+            'ewallet_number',
+            'whatsapp_number',
             'qris_image_url',
             'qris_link',
             'status_verifikasi',
@@ -130,6 +138,7 @@ class PKLListSerializer(serializers.ModelSerializer):
             'latest_timestamp',
             'average_rating',
             'rating_count',
+            'featured_product_image_url',
         ]
 
     def get_latest_latitude(self, obj):
@@ -164,6 +173,24 @@ class PKLListSerializer(serializers.ModelSerializer):
             return int(value)
         return obj.ratings.count()
 
+    def get_featured_product_image_url(self, obj):
+        product = (
+            obj.products
+            .filter(is_available=True)
+            .exclude(image='')
+            .order_by('-is_featured', '-updated_at')
+            .first()
+        )
+        if product is None or not product.image:
+            return None
+        if str(product.image).startswith(('http://', 'https://')):
+            return str(product.image)
+        request = self.context.get('request') if hasattr(self, 'context') else None
+        url = product.image.url
+        if request is not None:
+            return request.build_absolute_uri(url)
+        return url
+
 
 class PKLVerifySerializer(serializers.ModelSerializer):
     class Meta:
@@ -175,6 +202,10 @@ class PKLVerifySerializer(serializers.ModelSerializer):
             'catatan_verifikasi',
             'status_aktif',
             'nama_rekening',
+            'nomor_rekening',
+            'ewallet_provider',
+            'ewallet_number',
+            'whatsapp_number',
             'qris_image_url',
             'qris_link',
         ]
