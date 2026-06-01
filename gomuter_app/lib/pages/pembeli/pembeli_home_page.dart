@@ -44,7 +44,7 @@ class _PembeliHomePageState extends State<PembeliHomePage> {
   LatLng _initialCenter = const LatLng(-6.2, 106.8);
   int? _selectedPklMarkerId;
   final List<int> _radiusOptions = [300, 500, 1000];
-  int? _selectedRadius = 300;
+  int? _selectedRadius;
   Timer? _locationTimer;
   StreamSubscription<Position>? _positionStreamSub;
   static const Duration _locationInterval = Duration(minutes: 5);

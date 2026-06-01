@@ -61,5 +61,7 @@ def upload_public_media(file_obj, folder: str, filename: str) -> str:
         raise RuntimeError(f'Gagal upload ke Supabase Storage: {detail or exc.reason}') from exc
     except error.URLError as exc:
         raise RuntimeError(f'Gagal menghubungi Supabase Storage: {exc.reason}') from exc
+    except Exception as exc:
+        raise RuntimeError(f'Gagal upload ke Supabase Storage: {exc}') from exc
 
     return f'{base_url}/storage/v1/object/public/{bucket}/{encoded_path}'

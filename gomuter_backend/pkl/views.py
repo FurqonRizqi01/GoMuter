@@ -553,29 +553,40 @@ class PKLProductListCreateView(APIView):
         return Response(serializer.data)
 
     def post(self, request):
-        pkl = self._get_pkl(request)
-        payload = request.data.copy()
-        image_file = request.FILES.get('image')
-        image_url = None
-        if image_file and is_supabase_storage_enabled():
-            try:
+        try:
+            pkl = self._get_pkl(request)
+            payload = {
+                key: value
+                for key, value in request.data.items()
+                if key not in request.FILES
+            }
+            image_file = request.FILES.get('image')
+            image_url = None
+            if image_file and is_supabase_storage_enabled():
                 image_url = _save_uploaded_media(image_file, 'pkl_products', request)
-            except RuntimeError as exc:
-                return _storage_error_response(exc)
-            payload.pop('image', None)
 
-        serializer = PKLProductWriteSerializer(data=payload)
-        if serializer.is_valid():
-            product = serializer.save(pkl=pkl)
-            if image_url:
-                product.image = image_url
-                product.save(update_fields=['image'])
-            read_serializer = PKLProductSerializer(
-                product,
-                context={'request': request},
+            serializer = PKLProductWriteSerializer(data=payload)
+            if serializer.is_valid():
+                product = serializer.save(pkl=pkl)
+                if image_url:
+                    product.image = image_url
+                    product.save(update_fields=['image'])
+                read_serializer = PKLProductSerializer(
+                    product,
+                    context={'request': request},
+                )
+                return Response(read_serializer.data, status=status.HTTP_201_CREATED)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except RuntimeError as exc:
+            return _storage_error_response(exc)
+        except Exception as exc:
+            return Response(
+                {
+                    'detail': 'Gagal membuat produk PKL.',
+                    'error': str(exc),
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
-            return Response(read_serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 class PKLProductDetailView(APIView):
@@ -590,33 +601,44 @@ class PKLProductDetailView(APIView):
         )
 
     def patch(self, request, product_id):
-        product = self._get_object(request, product_id)
-        payload = request.data.copy()
-        image_file = request.FILES.get('image')
-        image_url = None
-        if image_file and is_supabase_storage_enabled():
-            try:
+        try:
+            product = self._get_object(request, product_id)
+            payload = {
+                key: value
+                for key, value in request.data.items()
+                if key not in request.FILES
+            }
+            image_file = request.FILES.get('image')
+            image_url = None
+            if image_file and is_supabase_storage_enabled():
                 image_url = _save_uploaded_media(image_file, 'pkl_products', request)
-            except RuntimeError as exc:
-                return _storage_error_response(exc)
-            payload.pop('image', None)
 
-        serializer = PKLProductWriteSerializer(
-            product,
-            data=payload,
-            partial=True,
-        )
-        if serializer.is_valid():
-            product = serializer.save()
-            if image_url:
-                product.image = image_url
-                product.save(update_fields=['image'])
-            read_serializer = PKLProductSerializer(
+            serializer = PKLProductWriteSerializer(
                 product,
-                context={'request': request},
+                data=payload,
+                partial=True,
             )
-            return Response(read_serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            if serializer.is_valid():
+                product = serializer.save()
+                if image_url:
+                    product.image = image_url
+                    product.save(update_fields=['image'])
+                read_serializer = PKLProductSerializer(
+                    product,
+                    context={'request': request},
+                )
+                return Response(read_serializer.data)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except RuntimeError as exc:
+            return _storage_error_response(exc)
+        except Exception as exc:
+            return Response(
+                {
+                    'detail': 'Gagal memperbarui produk PKL.',
+                    'error': str(exc),
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
     def delete(self, request, product_id):
         product = self._get_object(request, product_id)
