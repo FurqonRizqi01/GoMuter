@@ -63,3 +63,7 @@ db.sqlite3
 *.tgz
 *.tar.gz
 *.zip
+
+# Generated git history exports
+git-files-log.txt
+git-full-code-log.txt
